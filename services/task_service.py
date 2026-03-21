@@ -221,9 +221,10 @@ class TaskService:
         if task is None:
             raise ValueError('Task not found')
 
-        # Prevent external-source tasks from opening PRs on the global GitHub repo.
-        # In the current architecture, PR creation is allowed only for internal tasks.
-        if task.source != 'internal':
+        # Legacy guard: external tasks without mapping should not auto-open PRs.
+        # If mapping metadata exists, orchestration decides provider-specific PR flow.
+        has_local_mapping = 'Local Repo Path:' in (task.description or '')
+        if task.source != 'internal' and not has_local_mapping:
             create_pr = False
 
         queue_key = await self.queue_service.enqueue(
