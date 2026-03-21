@@ -23,64 +23,86 @@ export default function IntegrationsPage() {
   const [openaiBaseUrl, setOpenaiBaseUrl] = useState('https://api.openai.com/v1');
   const [openaiKey, setOpenaiKey] = useState('');
   const [playbookText, setPlaybookText] = useState('');
+  const [isPlaybookSaving, setIsPlaybookSaving] = useState(false);
   const [msg, setMsg] = useState('');
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    Promise.all([
+  async function loadIntegrationState() {
+    const [data, playbook] = await Promise.all([
       apiFetch<IntegrationConfig[]>('/integrations'),
       apiFetch<{ content: string }>('/integrations/playbook/content'),
-    ]).then(([data, playbook]) => {
-      setConfigs(data);
-      setPlaybookText(playbook.content || '');
-      const jira = data.find((c) => c.provider === 'jira');
-      const azure = data.find((c) => c.provider === 'azure');
-      const openai = data.find((c) => c.provider === 'openai');
-      if (jira) { setJiraBaseUrl(jira.base_url); setJiraEmail(jira.username ?? ''); }
-      if (azure) { setAzureOrgUrl(azure.base_url); setAzureProject(azure.project ?? ''); }
-      if (openai) { setOpenaiBaseUrl(openai.base_url); }
-    }).catch(() => {});
+    ]);
+    setConfigs(data);
+    setPlaybookText(playbook.content || '');
+    const jira = data.find((c) => c.provider === 'jira');
+    const azure = data.find((c) => c.provider === 'azure');
+    const openai = data.find((c) => c.provider === 'openai');
+    if (jira) { setJiraBaseUrl(jira.base_url); setJiraEmail(jira.username ?? ''); }
+    if (azure) { setAzureOrgUrl(azure.base_url); setAzureProject(azure.project ?? ''); }
+    if (openai) { setOpenaiBaseUrl(openai.base_url); }
+  }
+
+  useEffect(() => {
+    void loadIntegrationState().catch(() => {});
   }, []);
 
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (!msg) return;
+      setMsg('');
+    }, 2400);
+    return () => clearTimeout(timer);
+  }, [msg]);
+
   async function saveJira() {
-    try {
-      await apiFetch('/integrations/jira', {
+    Promise.all([
+      apiFetch('/integrations/jira', {
         method: 'PUT',
         body: JSON.stringify({ base_url: jiraBaseUrl, username: jiraEmail, secret: jiraSecret || undefined }),
-      });
+      }),
+      loadIntegrationState(),
+    ]).then(() => {
       setJiraSecret(''); setMsg('Jira integration saved');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
+    }).catch((e) => { setError(e instanceof Error ? e.message : 'Save failed'); });
   }
 
   async function saveAzure() {
-    try {
-      await apiFetch('/integrations/azure', {
+    Promise.all([
+      apiFetch('/integrations/azure', {
         method: 'PUT',
         body: JSON.stringify({ base_url: azureOrgUrl, project: azureProject, secret: azurePat || undefined }),
-      });
+      }),
+      loadIntegrationState(),
+    ]).then(() => {
       setAzurePat(''); setMsg('Azure integration saved');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
+    }).catch((e) => { setError(e instanceof Error ? e.message : 'Save failed'); });
   }
 
   async function saveOpenAI() {
-    try {
-      await apiFetch('/integrations/openai', {
+    Promise.all([
+      apiFetch('/integrations/openai', {
         method: 'PUT',
         body: JSON.stringify({ base_url: openaiBaseUrl, secret: openaiKey || undefined }),
-      });
+      }),
+      loadIntegrationState(),
+    ]).then(() => {
       setOpenaiKey('');
       setMsg('OpenAI integration saved');
-    } catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
+    }).catch((e) => { setError(e instanceof Error ? e.message : 'Save failed'); });
   }
 
   async function savePlaybook() {
     try {
+      setIsPlaybookSaving(true);
       await apiFetch('/integrations/playbook', {
         method: 'PUT',
         body: JSON.stringify({ base_url: 'tenant://playbook', secret: playbookText }),
       });
-      setMsg('Tenant playbook saved');
+      await loadIntegrationState();
+      setError('');
+      setMsg('Tenant playbook saved to DB');
     } catch (e) { setError(e instanceof Error ? e.message : 'Save failed'); }
+    finally { setIsPlaybookSaving(false); }
   }
 
   const jiraConfig = configs.find((c) => c.provider === 'jira');
@@ -211,8 +233,11 @@ export default function IntegrationsPage() {
             />
           </FieldGroup>
           <button className='button button-primary' onClick={() => void savePlaybook()} style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
-            Save Tenant Playbook
+            {isPlaybookSaving ? 'Saving...' : 'Save Tenant Playbook'}
           </button>
+          <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', marginTop: 6 }}>
+            Stored per organization in DB ({playbookConfig?.updated_at ? `updated ${new Date(playbookConfig.updated_at).toLocaleString()}` : 'not saved yet'}).
+          </div>
         </IntegrationCard>
       </div>
     </div>
