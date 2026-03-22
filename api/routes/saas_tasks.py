@@ -13,6 +13,7 @@ from schemas.saas_task import (
     AssignTaskRequest,
     AssignTaskResponse,
     AzureImportRequest,
+    JiraImportRequest,
     ImportTasksResponse,
     TaskListResponse,
     QueueTaskItem,
@@ -189,12 +190,20 @@ async def import_azure_tasks(
 
 @router.post('/import/jira', response_model=ImportTasksResponse)
 async def import_jira_tasks(
+    request: JiraImportRequest = Body(default_factory=JiraImportRequest),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> ImportTasksResponse:
     service = TaskService(db)
     try:
-        imported, skipped = await service.import_from_jira(tenant.organization_id, tenant.user_id)
+        imported, skipped = await service.import_from_jira(
+            tenant.organization_id,
+            tenant.user_id,
+            project_key=request.project_key,
+            board_id=request.board_id,
+            sprint_id=request.sprint_id,
+            state=request.state,
+        )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except httpx.HTTPStatusError as exc:

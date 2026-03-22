@@ -176,7 +176,16 @@ class TaskService:
 
         return imported, skipped
 
-    async def import_from_jira(self, organization_id: int, user_id: int) -> tuple[int, int]:
+    async def import_from_jira(
+        self,
+        organization_id: int,
+        user_id: int,
+        *,
+        project_key: str | None = None,
+        board_id: str | None = None,
+        sprint_id: str | None = None,
+        state: str | None = None,
+    ) -> tuple[int, int]:
         if self.db is None:
             raise ValueError('DB session required')
 
@@ -185,13 +194,20 @@ class TaskService:
         if config is None:
             raise ValueError('Jira integration not configured for this organization')
 
-        external_items = await self.jira_client.fetch_todo_issues(
-            {
-                'base_url': config.base_url,
-                'email': config.username or '',
-                'api_token': config.secret,
-            }
-        )
+        jira_cfg = {
+            'base_url': config.base_url,
+            'email': config.username or '',
+            'api_token': config.secret,
+        }
+        if board_id:
+            external_items = await self.jira_client.fetch_board_issues(
+                jira_cfg,
+                board_id=board_id,
+                sprint_id=sprint_id,
+                state=state,
+            )
+        else:
+            external_items = await self.jira_client.fetch_todo_issues(jira_cfg)
         imported = 0
         skipped = 0
 

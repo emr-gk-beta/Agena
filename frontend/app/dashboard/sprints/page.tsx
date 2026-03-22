@@ -34,6 +34,7 @@ type TaskRecord = { id: number };
 type IntegrationConfig = {
   provider: 'jira' | 'azure' | 'openai' | 'gemini' | 'playbook';
   base_url: string;
+  has_secret?: boolean;
 };
 const LS_AGENTS = 'tiqr_agent_configs';
 function loadAgentConfigs(): AgentConfig[] {
@@ -65,6 +66,7 @@ const sc = (s: string, i: number) => STATE_COLORS[s] ?? fallbackPalette[i % fall
 const LS_PROJECT = 'tiqr_sprint_project';
 const LS_TEAM    = 'tiqr_sprint_team';
 const LS_SPRINT  = 'tiqr_sprint_path';
+const LS_PROVIDER = 'tiqr_sprint_provider';
 
 function elapsed(from?: string, to?: string): string | null {
   if (!from) return null;
@@ -131,6 +133,7 @@ export default function SprintsPage() {
   const [project,  setProjectRaw]  = useState('');
   const [team,     setTeamRaw]     = useState('');
   const [sprint,   setSprintRaw]   = useState('');
+  const [provider, setProviderRaw] = useState<'azure' | 'jira'>('azure');
   const [items,    setItems]    = useState<WorkItem[]>([]);
   const [lpj, setLpj] = useState(false);
   const [ltm, setLtm] = useState(false);
@@ -138,6 +141,7 @@ export default function SprintsPage() {
   const [lbd, setLbd] = useState(false);
   const [imp, setImp] = useState('');
   const [hasAzure, setHasAzure] = useState(false);
+  const [hasJira, setHasJira] = useState(false);
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
   const [selected, setSelected] = useState<WorkItem | null>(null);
@@ -156,6 +160,7 @@ export default function SprintsPage() {
   const setProject = useCallback((v: string) => { setProjectRaw(v); localStorage.setItem(LS_PROJECT, v); }, []);
   const setTeam    = useCallback((v: string) => { setTeamRaw(v);    localStorage.setItem(LS_TEAM, v);    }, []);
   const setSprint  = useCallback((v: string) => { setSprintRaw(v);  localStorage.setItem(LS_SPRINT, v);  }, []);
+  const setProvider = useCallback((v: 'azure' | 'jira') => { setProviderRaw(v); localStorage.setItem(LS_PROVIDER, v); }, []);
 
   // İlk yükleme — DB'den + localStorage'dan
   useEffect(() => {
@@ -164,6 +169,7 @@ export default function SprintsPage() {
       let savedProject = localStorage.getItem(LS_PROJECT) || '';
       let savedTeam    = localStorage.getItem(LS_TEAM)    || '';
       let savedSprint  = localStorage.getItem(LS_SPRINT)  || '';
+      let savedProvider = (localStorage.getItem(LS_PROVIDER) || 'azure') as 'azure' | 'jira';
       try {
         const prefs = await loadPrefs();
         if (prefs.azure_project)     savedProject = prefs.azure_project;
@@ -177,15 +183,46 @@ export default function SprintsPage() {
       try {
         const cfgs = await apiFetch<IntegrationConfig[]>('/integrations');
         setIntegrations(cfgs ?? []);
+        const azureConnected = Boolean(cfgs.find((c) => c.provider === 'azure')?.has_secret);
+        const jiraConnected = Boolean(cfgs.find((c) => c.provider === 'jira')?.has_secret);
+        setHasAzure(azureConnected);
+        setHasJira(jiraConnected);
+        if (savedProvider === 'azure' && !azureConnected && jiraConnected) savedProvider = 'jira';
+        if (savedProvider === 'jira' && !jiraConnected && azureConnected) savedProvider = 'azure';
+        if (!azureConnected && jiraConnected) savedProvider = 'jira';
+        setProviderRaw(savedProvider);
       } catch {
         setIntegrations([]);
+        setHasAzure(false);
+        setHasJira(false);
       }
       setPreferredSprint(savedSprint);
 
       setLpj(true);
       try {
+        if (savedProvider === 'jira') {
+          const projs = await apiFetch<Opt[]>('/tasks/jira/projects');
+          setProjects(projs);
+          if (!savedProject) return;
+          setProjectRaw(savedProject);
+          const boards = await apiFetch<Opt[]>('/tasks/jira/boards?project_key=' + encodeURIComponent(savedProject));
+          setTeams(boards);
+          if (!savedTeam) return;
+          setTeamRaw(savedTeam);
+          const sps = await apiFetch<Opt[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(savedTeam));
+          setSprints(sps);
+          const current = pickCurrentSprint(sps);
+          if (current) {
+            setSprintRaw(current.path ?? current.name);
+            return;
+          }
+          if (!savedSprint) return;
+          const matched = sps.find((sp) => (sp.path ?? sp.name) === savedSprint || sp.name === savedSprint);
+          setSprintRaw((matched?.path ?? matched?.name ?? savedSprint));
+          return;
+        }
         const projs = await apiFetch<Opt[]>('/tasks/azure/projects');
-        setProjects(projs); setHasAzure(true);
+        setProjects(projs);
         if (!savedProject) return;
         setProjectRaw(savedProject);
         const tms = await apiFetch<Opt[]>('/tasks/azure/teams?project=' + encodeURIComponent(savedProject));
@@ -202,7 +239,7 @@ export default function SprintsPage() {
         if (!savedSprint) return;
         const matched = sps.find((sp) => (sp.path ?? sp.name) === savedSprint || sp.name === savedSprint);
         setSprintRaw((matched?.path ?? matched?.name ?? savedSprint));
-      } catch { setHasAzure(false); }
+      } catch {}
       finally { setLpj(false); setHydrating(false); }
     };
     void init();
@@ -210,20 +247,52 @@ export default function SprintsPage() {
 
   useEffect(() => {
     if (hydrating) return;
+    setProjectRaw('');
+    setTeamRaw('');
+    setSprintRaw('');
+    setProjects([]);
+    setTeams([]);
+    setSprints([]);
+    setItems([]);
+    setStates([]);
+    setLpj(true);
+    const run = async () => {
+      try {
+        const list = provider === 'jira'
+          ? await apiFetch<Opt[]>('/tasks/jira/projects')
+          : await apiFetch<Opt[]>('/tasks/azure/projects');
+        setProjects(list);
+      } catch (e) {
+        setErr(e instanceof Error ? e.message : t('sprints.boardError'));
+      } finally {
+        setLpj(false);
+      }
+    };
+    void run();
+  }, [provider, hydrating, t]);
+
+  useEffect(() => {
+    if (hydrating) return;
     setTeamRaw(''); setTeams([]); setSprintRaw(''); setSprints([]); setItems([]); setStates([]);
     if (!project) return;
     setLtm(true);
-    apiFetch<Opt[]>('/tasks/azure/teams?project=' + encodeURIComponent(project))
+    const url = provider === 'jira'
+      ? '/tasks/jira/boards?project_key=' + encodeURIComponent(project)
+      : '/tasks/azure/teams?project=' + encodeURIComponent(project);
+    apiFetch<Opt[]>(url)
       .then(setTeams).catch((e: unknown) => setErr(e instanceof Error ? e.message : t('sprints.teamsError')))
       .finally(() => setLtm(false));
-  }, [project]);
+  }, [project, provider, hydrating, t]);
 
   useEffect(() => {
     if (hydrating) return;
     setSprintRaw(''); setSprints([]); setItems([]);
     if (!project || !team) return;
     setLsp(true);
-    apiFetch<Opt[]>('/tasks/azure/sprints?project=' + encodeURIComponent(project) + '&team=' + encodeURIComponent(team))
+    const url = provider === 'jira'
+      ? '/tasks/jira/sprints?board_id=' + encodeURIComponent(team)
+      : '/tasks/azure/sprints?project=' + encodeURIComponent(project) + '&team=' + encodeURIComponent(team);
+    apiFetch<Opt[]>(url)
       .then((list) => {
         setSprints(list);
         const current = pickCurrentSprint(list);
@@ -241,7 +310,7 @@ export default function SprintsPage() {
         if (list.length > 0) setSprintRaw(list[0].path ?? list[0].name);
       }).catch((e: unknown) => setErr(e instanceof Error ? e.message : t('sprints.sprintsError')))
       .finally(() => setLsp(false));
-  }, [project, team, preferredSprint, t]);
+  }, [project, team, preferredSprint, provider, hydrating, t]);
 
   useEffect(() => {
     if (!preferredSprint || sprint || sprints.length === 0) return;
@@ -253,17 +322,25 @@ export default function SprintsPage() {
     setItems([]); setStates([]); setSelected(null);
     if (!sprint || !project) return;
     setLbd(true); setErr('');
-    apiFetch<string[]>('/tasks/azure/states?project=' + encodeURIComponent(project) + '&team=' + encodeURIComponent(team) + '&sprint_path=' + encodeURIComponent(sprint))
+    const statesUrl = provider === 'jira'
+      ? '/tasks/jira/states?board_id=' + encodeURIComponent(team) + '&sprint_id=' + encodeURIComponent(sprint)
+      : '/tasks/azure/states?project=' + encodeURIComponent(project) + '&team=' + encodeURIComponent(team) + '&sprint_path=' + encodeURIComponent(sprint);
+    apiFetch<string[]>(statesUrl)
       .then((fetchedStates) => {
         const active = fetchedStates.length > 0 ? fetchedStates : ['Backlog','To Do','In Progress','Done'];
         setStates(active);
         return Promise.allSettled(
           active.map(async (state) => {
+            if (provider === 'jira') {
+              const q = new URLSearchParams({ state, board_id: team, sprint_id: sprint, project_key: project });
+              const r = await apiFetch<{ items: WorkItem[] }>('/tasks/jira?' + q.toString());
+              return r.items.map((item) => ({ ...item, state: item.state || state, source: 'jira' }));
+            }
             const q = new URLSearchParams({ state, sprint_path: sprint });
             if (project) q.set('project', project);
             if (team)    q.set('team', team);
             const r = await apiFetch<{ items: WorkItem[] }>('/tasks/azure?' + q.toString());
-            return r.items.map((item) => ({ ...item, state }));
+            return r.items.map((item) => ({ ...item, state, source: 'azure' }));
           })
         );
       }).then((results) => {
@@ -273,13 +350,17 @@ export default function SprintsPage() {
         setItems(merged);
       }).catch((e: unknown) => setErr(e instanceof Error ? e.message : t('sprints.boardError')))
         .finally(() => setLbd(false));
-  }, [sprint, project, team]);
+  }, [sprint, project, team, provider, t]);
 
   function doImport(state: string) {
     setImp(state); setErr('');
-    apiFetch<ImportRes>('/tasks/import/azure', {
+    const endpoint = provider === 'jira' ? '/tasks/import/jira' : '/tasks/import/azure';
+    const body = provider === 'jira'
+      ? { project_key: project || undefined, board_id: team || undefined, sprint_id: sprint || undefined, state }
+      : { project: project || undefined, team: team || undefined, sprint_path: sprint || undefined, state };
+    apiFetch<ImportRes>(endpoint, {
       method: 'POST',
-      body: JSON.stringify({ project: project || undefined, team: team || undefined, sprint_path: sprint || undefined, state }),
+      body: JSON.stringify(body),
     }).then((r) => setMsg(t('sprints.importSuccess', { state, imported: r.imported, skipped: r.skipped })))
       .catch((e: unknown) => setErr(e instanceof Error ? e.message : t('sprints.importFailed')))
       .finally(() => setImp(''));
@@ -292,7 +373,7 @@ export default function SprintsPage() {
       if (!taskId) {
         const desc = toPlainText(item.description) || t('sprints.noDescription');
         const ctxParts = [
-          `External Source: Azure #${item.id}`,
+          `External Source: ${provider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
           options?.project ? `Project: ${options.project}` : '',
           options?.azureRepo ? `Azure Repo: ${options.azureRepo}` : '',
           options?.localRepoMapping ? `Local Repo Mapping: ${options.localRepoMapping}` : '',
@@ -306,7 +387,7 @@ export default function SprintsPage() {
         const created = await apiFetch<TaskRecord>('/tasks', {
           method: 'POST',
           body: JSON.stringify({
-            title: `[Azure #${item.id}] ${item.title}`,
+            title: `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`,
             description: `${desc}\n\n---\n${ctxParts.join('\n')}`,
           }),
         });
@@ -365,9 +446,9 @@ export default function SprintsPage() {
         <h1 style={{ fontSize: 26, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 6, marginBottom: 4 }}>
           {t('sprints.title')}
         </h1>
-        {!hasAzure && !lpj ? (
+        {((provider === 'azure' && !hasAzure) || (provider === 'jira' && !hasJira)) && !lpj ? (
           <p style={{ fontSize: 13, color: '#fbbf24', margin: 0 }}>
-            {t('sprints.noAzure')}{' '}
+            {provider === 'azure' ? t('sprints.noAzure') : t('sprints.noJira')}{' '}
             <a href="/dashboard/integrations" style={{ color: '#fbbf24', textDecoration: 'underline' }}>{t('sprints.goIntegrations')}</a>
           </p>
         ) : (
@@ -375,14 +456,47 @@ export default function SprintsPage() {
         )}
       </div>
 
+      <div style={{ display: 'flex', gap: 8 }}>
+        <button
+          onClick={() => setProvider('azure')}
+          style={{
+            padding: '6px 12px',
+            borderRadius: 999,
+            border: provider === 'azure' ? '1px solid rgba(56,189,248,0.45)' : '1px solid rgba(255,255,255,0.12)',
+            background: provider === 'azure' ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.03)',
+            color: provider === 'azure' ? '#7dd3fc' : 'rgba(255,255,255,0.58)',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Azure
+        </button>
+        <button
+          onClick={() => setProvider('jira')}
+          style={{
+            padding: '6px 12px',
+            borderRadius: 999,
+            border: provider === 'jira' ? '1px solid rgba(129,140,248,0.45)' : '1px solid rgba(255,255,255,0.12)',
+            background: provider === 'jira' ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.03)',
+            color: provider === 'jira' ? '#a5b4fc' : 'rgba(255,255,255,0.58)',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+          }}
+        >
+          Jira
+        </button>
+      </div>
+
       {/* Selectors */}
       <div style={{ position: 'sticky', top: 72, zIndex: 40, borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(3,7,18,0.92)', backdropFilter: 'blur(24px)', padding: '16px 20px', display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
         <Sel step={1} t={t} label={t('sprints.projectLabel')} value={project} onChange={setProject}
           options={projects.map((p: Opt) => ({ id: p.name, name: p.name }))}
           loading={lpj} placeholder={t('sprints.selectProject')} active={true} />
-        <Sel step={2} t={t} label={t('sprints.teamLabel')} value={team} onChange={setTeam}
-          options={teams.map((t: Opt) => ({ id: t.name, name: t.name }))}
-          loading={ltm} placeholder={project ? t('sprints.selectTeam') : t('sprints.selectTeamFirst')} active={!!project} />
+        <Sel step={2} t={t} label={provider === 'jira' ? t('sprints.boardLabel') : t('sprints.teamLabel')} value={team} onChange={setTeam}
+          options={teams.map((item: Opt) => ({ id: provider === 'jira' ? item.id : item.name, name: item.name }))}
+          loading={ltm} placeholder={project ? (provider === 'jira' ? t('sprints.selectBoard') : t('sprints.selectTeam')) : t('sprints.selectTeamFirst')} active={!!project} />
         <Sel step={3} t={t} label={t('sprints.sprintLabel')} value={sprint} onChange={setSprint}
           options={sprints.map((s: Opt) => ({
             id: s.path ?? s.name,
