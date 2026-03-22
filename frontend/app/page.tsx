@@ -173,6 +173,7 @@ export default function HomePage() {
               {[40, 65, 45, 80, 55, 90, 70, 85, 60, 95, 75, 88].map((h, i) => (
                 <div
                   key={i}
+                  className='mock-chart-bar'
                   style={{
                     flex: 1,
                     height: `${h}%`,
@@ -181,6 +182,8 @@ export default function HomePage() {
                       ? 'linear-gradient(180deg, #22c55e, #0d9488)'
                       : `rgba(13, 148, 136, ${0.2 + (i / 11) * 0.4})`,
                     transition: 'height 0.3s',
+                    animationDelay: `${(i * 0.14).toFixed(2)}s`,
+                    animationDuration: `${(2.4 + (i % 4) * 0.2).toFixed(2)}s`,
                   }}
                 />
               ))}

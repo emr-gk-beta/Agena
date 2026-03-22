@@ -322,6 +322,25 @@ body::before {
   animation: scan-line 3s linear infinite;
 }
 
+.mock-chart-bar {
+  transform-origin: center bottom;
+  will-change: transform, filter;
+  animation-name: chart-bob;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes chart-bob {
+  0%, 100% {
+    transform: translateY(0) scaleY(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: translateY(-7px) scaleY(1.08);
+    filter: brightness(1.12);
+  }
+}
+
 @keyframes scan-line {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
