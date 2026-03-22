@@ -83,7 +83,13 @@ export async function apiFetch<T>(path: string, init?: RequestInit, auth = true)
     let message = text || `Request failed: ${response.status}`;
     try {
       const parsed = JSON.parse(text) as { detail?: string };
-      if (parsed.detail) message = parsed.detail;
+      if (parsed.detail !== undefined) {
+        if (typeof parsed.detail === 'string') {
+          message = parsed.detail;
+        } else {
+          message = JSON.stringify(parsed.detail);
+        }
+      }
     } catch {}
     throw new Error(message);
   }

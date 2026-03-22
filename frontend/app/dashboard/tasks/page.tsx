@@ -62,21 +62,53 @@ export default function DashboardTasksPage() {
       if (dateFrom) qs.set('created_from', dateFrom);
       if (dateTo) qs.set('created_to', dateTo);
 
-      const [data, queueData] = await Promise.all([
-        apiFetch<{ items: TaskItem[]; total: number; page: number; page_size: number }>(`/tasks/search?${qs.toString()}`),
-        apiFetch<{
-          task_id: number;
-          title: string;
-          status: string;
-          position: number;
-          create_pr: boolean;
-          source: string;
-          created_at: string;
-        }[]>('/tasks/queue'),
-      ]);
-      setTasks(data.items);
-      setTotal(data.total);
-      setQueueItems(queueData);
+      const queuePromise = apiFetch<{
+        task_id: number;
+        title: string;
+        status: string;
+        position: number;
+        create_pr: boolean;
+        source: string;
+        created_at: string;
+      }[]>('/tasks/queue');
+
+      try {
+        const [data, queueData] = await Promise.all([
+          apiFetch<{ items: TaskItem[]; total: number; page: number; page_size: number }>(`/tasks/search?${qs.toString()}`),
+          queuePromise,
+        ]);
+        setTasks(data.items);
+        setTotal(data.total);
+        setQueueItems(queueData);
+      } catch {
+        // Backward compatibility: if /tasks/search is unavailable, use legacy /tasks.
+        const [legacyData, queueData] = await Promise.all([
+          apiFetch<TaskItem[]>('/tasks'),
+          apiFetch<{
+            task_id: number;
+            title: string;
+            status: string;
+            position: number;
+            create_pr: boolean;
+            source: string;
+            created_at: string;
+          }[]>('/tasks/queue').catch(() => []),
+        ]);
+        const fromTs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : null;
+        const toTs = dateTo ? new Date(`${dateTo}T23:59:59`).getTime() : null;
+        const filteredLegacy = legacyData.filter((t) => {
+          const matchStatus = filter === 'all' || t.status === filter;
+          const matchSearch = !search || t.title.toLowerCase().includes(search.toLowerCase());
+          const created = new Date(t.created_at).getTime();
+          const matchFrom = fromTs === null || created >= fromTs;
+          const matchTo = toTs === null || created <= toTs;
+          return matchStatus && matchSearch && matchFrom && matchTo;
+        });
+        const pagedLegacy = filteredLegacy.slice((page - 1) * pageSize, page * pageSize);
+        setTasks(pagedLegacy);
+        setTotal(filteredLegacy.length);
+        setQueueItems(queueData);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Load failed');
     }
