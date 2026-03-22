@@ -11,11 +11,13 @@ import httpx
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from models.agent_log import AgentLog
 from models.flow_run import FlowRun, FlowRunStep
 from models.task_record import TaskRecord
 from services.azure_pr_service import AzurePRService
 from services.github_service import GitHubService
 from services.integration_config_service import IntegrationConfigService
+from services.llm.provider import LLMProvider
 from services.orchestration_service import OrchestrationService
 
 logger = logging.getLogger(__name__)
@@ -153,6 +155,60 @@ def _append_lead_review_comment_marker(description: str, pr_url: str) -> str:
         out.append('')
     out.append(f'{prefix} {target}')
     return '\n'.join(out).strip()
+
+
+def _parse_task_meta_from_description(description: str) -> dict[str, str]:
+    out: dict[str, str] = {}
+    for raw in (description or '').splitlines():
+        if ':' not in raw:
+            continue
+        key, value = raw.split(':', 1)
+        out[key.strip().lower()] = value.strip()
+    return out
+
+
+async def _load_latest_code_diff(db: AsyncSession, task_id: int, organization_id: int) -> str:
+    row = await db.execute(
+        select(AgentLog.message).where(
+            AgentLog.task_id == task_id,
+            AgentLog.organization_id == organization_id,
+            AgentLog.stage == 'code_diff',
+        ).order_by(AgentLog.id.desc()).limit(1)
+    )
+    msg = row.scalar_one_or_none()
+    return str(msg or '').strip()
+
+
+async def _build_lead_llm_for_task(
+    db: AsyncSession,
+    organization_id: int,
+    task_row: TaskRecord,
+    node: dict[str, Any],
+) -> LLMProvider | None:
+    meta = _parse_task_meta_from_description(str(task_row.description or ''))
+    provider = (str(node.get('provider') or '') or meta.get('preferred agent provider') or 'openai').strip().lower()
+    if provider not in {'openai', 'gemini'}:
+        provider = 'openai'
+    model = (str(node.get('model') or '') or meta.get('preferred agent model') or '').strip() or None
+
+    cfg = await IntegrationConfigService(db).get_config(organization_id, provider)
+    key = (cfg.secret if cfg else '') or ''
+    base_url = (cfg.base_url if cfg else '') or ''
+
+    if (not key or key.startswith('your_')) and provider != 'openai':
+        fallback = await IntegrationConfigService(db).get_config(organization_id, 'openai')
+        key = (fallback.secret if fallback else '') or ''
+        base_url = (fallback.base_url if fallback else '') or ''
+        provider = 'openai'
+
+    llm = LLMProvider(
+        provider=provider,
+        api_key=key or None,
+        base_url=base_url or None,
+        small_model=model,
+        large_model=model,
+    )
+    return llm
 
 
 async def _run_agent_node(
@@ -469,6 +525,55 @@ async def _run_lead_pr_review_node(
         lead_review_marked = True
         return str(ref) if ref is not None else None
 
+    async def _build_ai_lead_review_comment() -> str:
+        code_diff = await _load_latest_code_diff(db, task_id=task_id, organization_id=organization_id)
+        meta = _parse_task_meta_from_description(str(task_row.description or ''))
+        execution_prompt = meta.get('execution prompt', '')
+        repo_playbook = meta.get('repo playbook', '')
+        tenant_playbook = meta.get('tenant playbook', '')
+
+        system_prompt = (
+            'You are a strict Lead Developer reviewing a pull request. '
+            'Use task intent, execution prompt, and code diff to produce actionable review notes. '
+            'Keep it concise and technical.'
+        )
+        user_prompt = (
+            f"Task title:\n{task_row.title}\n\n"
+            f"Task description:\n{(task_row.description or '')[:5000]}\n\n"
+            f"Execution prompt:\n{execution_prompt[:2000]}\n\n"
+            f"Repo playbook:\n{repo_playbook[:1500]}\n\n"
+            f"Tenant playbook:\n{tenant_playbook[:1500]}\n\n"
+            f"PR URL:\n{pr_url}\n\n"
+            f"Code diff snapshot:\n{code_diff[:12000] if code_diff else '(no code diff log found)'}\n\n"
+            'Return markdown with exactly these sections:\n'
+            '1) Findings\n2) Risks\n3) Decision (APPROVE or REQUEST_CHANGES)\n4) Next Actions\n'
+            'If there is not enough evidence, say so explicitly in Findings.'
+        )
+        try:
+            llm = await _build_lead_llm_for_task(db, organization_id, task_row, node)
+            if llm is None:
+                raise RuntimeError('LLM config unavailable')
+            review, usage, model, _ = await llm.generate(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                complexity_hint='normal',
+                max_output_tokens=1200,
+            )
+            if not (review or '').strip():
+                raise RuntimeError('Empty review output')
+            return (
+                '[Tiqr PR Review]\n'
+                f'_Lead AI model: {model}_\n\n'
+                f'{review.strip()}\n\n'
+                f'_Usage: total={int(usage.get("total_tokens", 0))} tokens_'
+            )
+        except Exception as exc:
+            return (
+                '[Tiqr PR Review]\n'
+                'Lead review pass completed but AI review details are unavailable.\n'
+                f'Reason: {str(exc)[:220]}'
+            )
+
     candidate_comments = [
         c for c in comments
         if c.get('content')
@@ -490,11 +595,7 @@ async def _run_lead_pr_review_node(
             task_row.description = _upsert_pr_comment_baseline(current_desc, pr_url, max_seen_id)
             await db.commit()
             current_desc = str(task_row.description or '')
-        comment_ref = await _post_lead_review_summary_once(
-            '[Tiqr PR Review] Lead Developer review pass completed. '
-            'No blocking issue detected in this pass. '
-            'Add a PR comment with requested changes, then rerun the flow for auto-fix.'
-        )
+        comment_ref = await _post_lead_review_summary_once(await _build_ai_lead_review_comment())
         return {
             'status': 'ok',
             'pr_url': pr_url,
@@ -521,10 +622,7 @@ async def _run_lead_pr_review_node(
             task_row.description = _upsert_pr_comment_baseline(current_desc, pr_url, max_seen_id)
             await db.commit()
             current_desc = str(task_row.description or '')
-        comment_ref = await _post_lead_review_summary_once(
-            '[Tiqr PR Review] Lead Developer checked this PR again. '
-            'No new blocking review comment found to auto-fix.'
-        )
+        comment_ref = await _post_lead_review_summary_once(await _build_ai_lead_review_comment())
         return {
             'status': 'ok',
             'pr_url': pr_url,
