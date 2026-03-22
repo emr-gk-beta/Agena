@@ -501,7 +501,22 @@ class TaskService:
         result = await self.db.execute(
             select(AgentLog)
             .where(AgentLog.organization_id == organization_id, AgentLog.task_id == task_id)
-            .order_by(AgentLog.created_at.asc())
+            .order_by(AgentLog.id.asc())
+        )
+        return list(result.scalars().all())
+
+    async def get_logs_since(self, organization_id: int, task_id: int, since_id: int) -> list[AgentLog]:
+        if self.db is None:
+            raise ValueError('DB session required')
+
+        result = await self.db.execute(
+            select(AgentLog)
+            .where(
+                AgentLog.organization_id == organization_id,
+                AgentLog.task_id == task_id,
+                AgentLog.id > max(0, since_id),
+            )
+            .order_by(AgentLog.id.asc())
         )
         return list(result.scalars().all())
 

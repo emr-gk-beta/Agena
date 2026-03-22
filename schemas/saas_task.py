@@ -55,6 +55,7 @@ class AssignTaskRequest(BaseModel):
 
 
 class TaskLogItem(BaseModel):
+    id: int
     stage: str
     message: str
     created_at: datetime
