@@ -14,7 +14,7 @@ const USER_CACHE_KEYS = [
   'tiqr_profile_settings',
 ] as const;
 
-function resolveApiBase(): string {
+export function resolveApiBase(): string {
   if (process.env.NEXT_PUBLIC_API_BASE_URL) return process.env.NEXT_PUBLIC_API_BASE_URL;
   if (typeof window !== 'undefined') {
     const proto = window.location.protocol;

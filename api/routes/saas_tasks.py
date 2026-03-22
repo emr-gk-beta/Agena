@@ -1,7 +1,10 @@
+import asyncio
+import json
 import httpx
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from api.dependencies import CurrentTenant, get_current_tenant
@@ -264,7 +267,50 @@ async def task_logs(
 ) -> list[TaskLogItem]:
     service = TaskService(db)
     logs = await service.get_logs(tenant.organization_id, task_id)
-    return [TaskLogItem(stage=l.stage, message=l.message, created_at=l.created_at) for l in logs]
+    return [TaskLogItem(id=l.id, stage=l.stage, message=l.message, created_at=l.created_at) for l in logs]
+
+
+@router.get('/{task_id}/logs/stream')
+async def task_logs_stream(
+    task_id: int,
+    since_id: int = Query(default=0, ge=0),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> StreamingResponse:
+    service = TaskService(db)
+    task = await service.get_task(tenant.organization_id, task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail='Task not found')
+
+    async def event_generator():
+        last_id = since_id
+        # keepalive + retry hint for reconnecting clients
+        yield 'retry: 2000\n\n'
+        while True:
+            logs = await service.get_logs_since(tenant.organization_id, task_id, last_id)
+            if logs:
+                for item in logs:
+                    last_id = max(last_id, int(item.id))
+                    payload = {
+                        'id': item.id,
+                        'stage': item.stage,
+                        'message': item.message,
+                        'created_at': item.created_at.isoformat(),
+                    }
+                    yield f"event: log\ndata: {json.dumps(payload, ensure_ascii=False)}\n\n"
+            else:
+                yield 'event: ping\ndata: {}\n\n'
+            await asyncio.sleep(1)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type='text/event-stream',
+        headers={
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive',
+            'X-Accel-Buffering': 'no',
+        },
+    )
 
 
 @router.get('/{task_id}/usage-events', response_model=list[UsageEventItem])

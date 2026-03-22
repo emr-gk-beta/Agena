@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { apiFetch, loadPrefs } from '@/lib/api';
+import { apiFetch, getToken, loadPrefs, resolveApiBase } from '@/lib/api';
 import StatusBadge from '@/components/StatusBadge';
 
 type TaskDetail = {
@@ -38,6 +38,7 @@ type TaskDetail = {
 };
 
 type TaskLog = {
+  id?: number;
   stage: string;
   message: string;
   created_at: string;
@@ -154,6 +155,7 @@ export default function TaskDetailPage() {
   const params = useParams<{ id: string }>();
   const taskId = params.id;
   const liveStripRef = useRef<HTMLDivElement | null>(null);
+  const lastLogIdRef = useRef(0);
   const [isMobile, setIsMobile] = useState(false);
   const [logFilter, setLogFilter] = useState<'all' | 'errors' | 'code'>('all');
   const [activeCodeTab, setActiveCodeTab] = useState(0);
@@ -169,6 +171,7 @@ export default function TaskDetailPage() {
   const [task, setTask] = useState<TaskDetail | null>(null);
   const [logs, setLogs] = useState<TaskLog[]>([]);
   const [error, setError] = useState('');
+  const [streamState, setStreamState] = useState<'live' | 'reconnecting' | 'offline'>('offline');
 
   async function loadData() {
     try {
@@ -195,6 +198,88 @@ export default function TaskDetailPage() {
     void loadData();
     const interval = setInterval(() => void loadData(), 5000);
     return () => clearInterval(interval);
+  }, [taskId]);
+
+  useEffect(() => {
+    const maxId = logs.reduce((acc, item) => Math.max(acc, item.id || 0), 0);
+    if (maxId > lastLogIdRef.current) lastLogIdRef.current = maxId;
+  }, [logs]);
+
+  useEffect(() => {
+    if (!taskId) return;
+    let isClosed = false;
+    let currentController: AbortController | null = null;
+    const apiBase = resolveApiBase();
+
+    const mergeLogs = (incoming: TaskLog) => {
+      setLogs((prev) => {
+        if (incoming.id && prev.some((x) => x.id === incoming.id)) return prev;
+        return [...prev, incoming].sort((a, b) => {
+          const ai = a.id || 0;
+          const bi = b.id || 0;
+          if (ai && bi) return ai - bi;
+          return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        });
+      });
+    };
+
+    const connect = async () => {
+      while (!isClosed) {
+        const token = getToken();
+        if (!token) {
+          setStreamState('offline');
+          return;
+        }
+        currentController = new AbortController();
+        try {
+          setStreamState('reconnecting');
+          const res = await fetch(`${apiBase}/tasks/${taskId}/logs/stream?since_id=${lastLogIdRef.current}`, {
+            method: 'GET',
+            headers: { Authorization: `Bearer ${token}` },
+            signal: currentController.signal,
+            cache: 'no-store',
+          });
+          if (!res.ok || !res.body) throw new Error(`stream_${res.status}`);
+          setStreamState('live');
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = '';
+          while (!isClosed) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const chunks = buffer.split('\n\n');
+            buffer = chunks.pop() || '';
+            for (const raw of chunks) {
+              const lines = raw.split('\n');
+              let eventName = '';
+              const dataParts: string[] = [];
+              for (const ln of lines) {
+                if (ln.startsWith('event:')) eventName = ln.slice(6).trim();
+                if (ln.startsWith('data:')) dataParts.push(ln.slice(5).trim());
+              }
+              if (eventName !== 'log' || dataParts.length === 0) continue;
+              try {
+                const parsed = JSON.parse(dataParts.join('\n')) as TaskLog;
+                if (parsed.id && parsed.id > lastLogIdRef.current) lastLogIdRef.current = parsed.id;
+                mergeLogs(parsed);
+              } catch {}
+            }
+          }
+        } catch {
+          if (isClosed) break;
+          setStreamState('reconnecting');
+          await new Promise((r) => setTimeout(r, 1500));
+        }
+      }
+    };
+
+    void connect();
+    return () => {
+      isClosed = true;
+      currentController?.abort();
+      setStreamState('offline');
+    };
   }, [taskId]);
 
   useEffect(() => {
@@ -675,7 +760,10 @@ export default function TaskDetailPage() {
             <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', padding: '10px 12px 8px' }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <h3 style={{ margin: 0, color: 'rgba(255,255,255,0.9)', fontSize: 15 }}>Live Logs</h3>
-                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{latestLog ? `${latestLog.stage} • ${new Date(latestLog.created_at).toLocaleTimeString()}` : 'Auto refresh: 5s'}</span>
+                <span style={{ fontSize: 12, color: streamState === 'live' ? '#22c55e' : streamState === 'reconnecting' ? '#f59e0b' : 'rgba(255,255,255,0.35)' }}>
+                  {streamState === 'live' ? 'Live stream on' : streamState === 'reconnecting' ? 'Reconnecting…' : 'Offline'}
+                  {latestLog ? ` • ${latestLog.stage} • ${new Date(latestLog.created_at).toLocaleTimeString()}` : ''}
+                </span>
               </div>
               <div style={{ display: 'flex', gap: 6, marginBottom: 8 }}>
                 {[
