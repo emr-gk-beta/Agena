@@ -73,6 +73,13 @@ class AzureImportRequest(BaseModel):
     state: str | None = 'New'
 
 
+class JiraImportRequest(BaseModel):
+    project_key: str | None = None
+    board_id: str | None = None
+    sprint_id: str | None = None
+    state: str | None = None
+
+
 class TaskDependencyUpdateRequest(BaseModel):
     depends_on_task_ids: list[int]
 

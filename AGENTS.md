@@ -344,6 +344,27 @@ curl http://localhost:8010/tasks/1/logs -H "Authorization: Bearer $TOKEN"
   - shows mode, hits, best/avg score, and top matches
   - fully localized via `frontend/lib/i18n.ts`
 
+### Jira Sprint Board Enablement
+
+- Added Jira board/sprint browsing APIs for dashboard sprint workflow:
+  - `GET /tasks/jira/projects`
+  - `GET /tasks/jira/boards?project_key=...`
+  - `GET /tasks/jira/sprints?board_id=...`
+  - `GET /tasks/jira/states?board_id=...&sprint_id=...`
+  - enhanced `GET /tasks/jira` to support `board_id`, `sprint_id`, `state`
+- Extended Jira client capabilities:
+  - `integrations/jira_client.py`
+  - project/board/sprint/state discovery + board issue retrieval
+  - Jira issue mapping now carries status/assignee/created date
+- Jira import endpoint now accepts sprint filters:
+  - `POST /tasks/import/jira` with `project_key`, `board_id`, `sprint_id`, `state`
+  - wired through `schemas/saas_task.py` + `services/task_service.py`
+- Sprint UI now supports Azure/Jira provider switch:
+  - `frontend/app/dashboard/sprints/page.tsx`
+  - provider-aware selector chain (Project -> Team/Board -> Sprint)
+  - provider-aware board loading, import, and AI task context metadata
+  - Jira integration readiness and labels localized in `frontend/lib/i18n.ts`
+
 ### PR Feedback / Review Flow Hardening
 
 - Added PR comment webhook entrypoint:

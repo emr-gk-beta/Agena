@@ -417,6 +417,10 @@ async def list_azure_states(    project: str = Query(...),
 
 @router.get('/jira', response_model=TaskListResponse)
 async def get_jira_tasks(
+    project_key: str | None = Query(default=None),
+    board_id: str | None = Query(default=None),
+    sprint_id: str | None = Query(default=None),
+    state: str | None = Query(default=None),
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> TaskListResponse:
@@ -426,10 +430,107 @@ async def get_jira_tasks(
         raise HTTPException(status_code=400, detail='Jira integration not configured for this organization')
 
     task_service = TaskService(db)
-    tasks = await task_service.jira_client.fetch_todo_issues(
+    jira_cfg = {'base_url': config.base_url, 'email': config.username or '', 'api_token': config.secret}
+    if board_id:
+        tasks = await task_service.jira_client.fetch_board_issues(
+            jira_cfg,
+            board_id=board_id,
+            sprint_id=sprint_id,
+            state=state,
+        )
+    else:
+        tasks = await task_service.jira_client.fetch_todo_issues(jira_cfg)
+    return TaskListResponse(items=tasks)
+
+
+@router.get('/jira/projects')
+async def list_jira_projects(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, str]]:
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'jira')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='Jira integration not configured')
+
+    task_service = TaskService(db)
+    projects = await task_service.jira_client.fetch_projects(
         {'base_url': config.base_url, 'email': config.username or '', 'api_token': config.secret}
     )
-    return TaskListResponse(items=tasks)
+    return [{'id': p['key'], 'name': p['name']} for p in projects if p.get('key') and p.get('name')]
+
+
+@router.get('/jira/boards')
+async def list_jira_boards(
+    project_key: str | None = Query(default=None),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, str]]:
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'jira')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='Jira integration not configured')
+
+    task_service = TaskService(db)
+    boards = await task_service.jira_client.fetch_boards(
+        {'base_url': config.base_url, 'email': config.username or '', 'api_token': config.secret},
+        project_key=project_key,
+    )
+    return [{'id': b['id'], 'name': b['name']} for b in boards if b.get('id') and b.get('name')]
+
+
+@router.get('/jira/sprints')
+async def list_jira_sprints(
+    board_id: str = Query(...),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'jira')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='Jira integration not configured')
+
+    task_service = TaskService(db)
+    sprints = await task_service.jira_client.fetch_sprints(
+        {'base_url': config.base_url, 'email': config.username or '', 'api_token': config.secret},
+        board_id=board_id,
+    )
+    return [
+        {
+            'id': s['id'],
+            'name': s['name'],
+            'path': s['id'],
+            'is_current': (s.get('state') or '').lower() == 'active',
+            'timeframe': s.get('state'),
+            'start_date': s.get('start_date') or None,
+            'finish_date': s.get('finish_date') or None,
+        }
+        for s in sprints
+        if s.get('id') and s.get('name')
+    ]
+
+
+@router.get('/jira/states')
+async def list_jira_states(
+    board_id: str = Query(...),
+    sprint_id: str | None = Query(default=None),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[str]:
+    _ = sprint_id
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'jira')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='Jira integration not configured')
+
+    task_service = TaskService(db)
+    states = await task_service.jira_client.fetch_board_states(
+        {'base_url': config.base_url, 'email': config.username or '', 'api_token': config.secret},
+        board_id=board_id,
+    )
+    if states:
+        return states
+    return ['To Do', 'In Progress', 'Done']
 
 
 @router.get('/azure', response_model=TaskListResponse)
