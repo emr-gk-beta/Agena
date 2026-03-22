@@ -30,6 +30,9 @@ interface FlowNode {
   repo?: string;
   branch?: string;
   pr_title?: string;
+  // agent execution options
+  execute_task_pipeline?: boolean;
+  create_pr?: boolean;
   // azure_update node
   new_state?: string;
   comment?: string;
@@ -93,7 +96,7 @@ const PRESET_FLOWS: Flow[] = [
     createdAt: new Date().toISOString(),
     nodes: [
       { id: 'p1', type: 'trigger', role: 'trigger', label: 'Task Intake', icon: '🧾', color: '#f59e0b', action: 'Receive task from board', waitForApproval: false, x: 60, y: 160 },
-      { id: 'p2', type: 'agent', role: 'developer', label: 'Developer Build', icon: '⚡', color: '#22c55e', action: 'Implement task and prepare changes', waitForApproval: false, x: 280, y: 160 },
+      { id: 'p2', type: 'agent', role: 'developer', label: 'Developer Build', icon: '⚡', color: '#22c55e', action: 'Implement task and prepare changes', execute_task_pipeline: true, create_pr: true, waitForApproval: false, x: 280, y: 160 },
       { id: 'p3', type: 'github', role: 'github', label: 'Open PR', icon: '🐙', color: '#6e40c9', action: 'Create pull request', github_action: 'create_pr', pr_title: 'AI: {{title}}', waitForApproval: false, x: 500, y: 160 },
       { id: 'p4', type: 'agent', role: 'lead_developer', label: 'PR Review', icon: '🧑‍💻', color: '#38bdf8', action: 'Review PR and approve or request changes', waitForApproval: true, x: 720, y: 160 },
     ],

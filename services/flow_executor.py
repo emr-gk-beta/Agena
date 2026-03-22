@@ -7,10 +7,13 @@ from datetime import datetime, timezone
 from typing import Any
 
 import httpx
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.flow_run import FlowRun, FlowRunStep
+from models.task_record import TaskRecord
 from services.integration_config_service import IntegrationConfigService
+from services.orchestration_service import OrchestrationService
 
 logger = logging.getLogger(__name__)
 
@@ -30,7 +33,7 @@ async def execute_node(
         return {'status': 'ok', 'message': 'Triggered', 'task': context.get('task', {})}
 
     elif node_type == 'agent':
-        return await _run_agent_node(node, context)
+        return await _run_agent_node(node, context, db, organization_id)
 
     elif node_type == 'http':
         return await _run_http_node(node, context)
@@ -51,12 +54,62 @@ async def execute_node(
         return {'status': 'skipped', 'message': f'Unknown node type: {node_type}'}
 
 
-async def _run_agent_node(node: dict[str, Any], context: dict[str, Any]) -> dict[str, Any]:
-    """LLM agent çalıştırır — şimdilik mock, gerçek LLM entegrasyonu sonra."""
+def _bool_val(raw: Any, default: bool = False) -> bool:
+    if raw is None:
+        return default
+    if isinstance(raw, bool):
+        return raw
+    if isinstance(raw, (int, float)):
+        return raw != 0
+    if isinstance(raw, str):
+        return raw.strip().lower() in {'1', 'true', 'yes', 'on'}
+    return default
+
+
+async def _run_agent_node(
+    node: dict[str, Any],
+    context: dict[str, Any],
+    db: AsyncSession,
+    organization_id: int,
+) -> dict[str, Any]:
+    """Agent node çalıştırır. İstenirse gerçek task pipeline tetikler."""
     task = context.get('task', {})
     action = node.get('action', '')
     role = node.get('role', 'developer')
     model = node.get('model', 'gpt-4o')
+    action_text = str(action or '').lower()
+    execute_task_pipeline = _bool_val(node.get('execute_task_pipeline'), False) or (
+        str(role).strip().lower() == 'developer' and 'pr' in action_text
+    )
+    create_pr = _bool_val(node.get('create_pr'), True)
+
+    if execute_task_pipeline:
+        raw_task_id = task.get('id')
+        try:
+            task_id = int(str(raw_task_id))
+        except Exception:
+            return {'status': 'error', 'message': f'Invalid task id for pipeline execution: {raw_task_id!r}'}
+
+        service = OrchestrationService(db)
+        result = await service.run_task_record(
+            organization_id=organization_id,
+            task_id=task_id,
+            create_pr=create_pr,
+        )
+        usage = result.usage.model_dump() if hasattr(result.usage, 'model_dump') else {
+            'prompt_tokens': int(getattr(result.usage, 'prompt_tokens', 0)),
+            'completion_tokens': int(getattr(result.usage, 'completion_tokens', 0)),
+            'total_tokens': int(getattr(result.usage, 'total_tokens', 0)),
+        }
+        return {
+            'status': 'ok',
+            'mode': 'task_pipeline',
+            'role': role,
+            'task_id': task_id,
+            'pr_url': result.pr_url,
+            'usage': usage,
+            'message': 'Task pipeline executed from flow agent node',
+        }
 
     # TODO: gerçek LLM çağrısı buraya
     result = (
@@ -110,16 +163,53 @@ async def _run_github_node(
     node: dict[str, Any], context: dict[str, Any],
     db: AsyncSession, organization_id: int,
 ) -> dict[str, Any]:
-    """GitHub PR açar / branch oluşturur."""
+    """GitHub adımı: pipeline'dan oluşan PR bilgisini doğrular/raporlar."""
     action = node.get('github_action', 'create_pr')
     task = context.get('task', {})
     repo = node.get('repo', '')
+    outputs = context.get('outputs', {})
 
-    # TODO: gerçek GitHub API entegrasyonu
+    for output in outputs.values():
+        if isinstance(output, dict) and output.get('pr_url'):
+            return {
+                'status': 'ok',
+                'action': action,
+                'repo': repo,
+                'pr_url': output.get('pr_url'),
+                'message': f'PR is ready: {output.get("pr_url")}',
+            }
+
+    raw_task_id = task.get('id')
+    try:
+        task_id = int(str(raw_task_id))
+    except Exception:
+        task_id = None
+
+    if task_id is not None:
+        row_result = await db.execute(
+            select(TaskRecord).where(
+                TaskRecord.id == task_id,
+                TaskRecord.organization_id == organization_id,
+            )
+        )
+        row = row_result.scalar_one_or_none()
+        if row and row.pr_url:
+            return {
+                'status': 'ok',
+                'action': action,
+                'repo': repo,
+                'pr_url': row.pr_url,
+                'branch_name': row.branch_name,
+                'message': f'PR already created: {row.pr_url}',
+            }
+
     return {
-        'status': 'ok',
+        'status': 'error',
         'action': action,
-        'message': f"GitHub {action} simüle edildi — repo: {repo}, task: {task.get('title', '')}",
+        'message': (
+            'PR URL not found. Run a developer node with execute_task_pipeline=true '
+            'and create_pr=true before this step.'
+        ),
     }
 
 
