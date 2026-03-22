@@ -19,6 +19,12 @@ def _azure_headers(pat: str) -> dict[str, str]:
     return {'Authorization': f'Basic {token}', 'Content-Type': 'application/json'}
 
 
+def _norm_iteration(v: str | None) -> str:
+    if not v:
+        return ''
+    return str(v).strip().replace('/', '\\').lower()
+
+
 @router.get('/azure/projects')
 async def list_azure_projects(
     tenant: CurrentTenant = Depends(get_current_tenant),
@@ -77,14 +83,17 @@ async def list_azure_sprints(
         r.raise_for_status()
         current_paths: set[str] = set()
         current_ids: set[str] = set()
+        current_names: set[str] = set()
         try:
             rc = await client.get(current_url, headers=_azure_headers(config.secret))
             if rc.status_code == 200:
                 for c in rc.json().get('value', []):
                     if c.get('path'):
-                        current_paths.add(str(c.get('path')))
+                        current_paths.add(_norm_iteration(str(c.get('path'))))
                     if c.get('id'):
                         current_ids.add(str(c.get('id')))
+                    if c.get('name'):
+                        current_names.add(_norm_iteration(str(c.get('name'))))
         except Exception:
             # Fallback silently if current sprint endpoint is unavailable
             pass
@@ -94,8 +103,10 @@ async def list_azure_sprints(
         attrs = s.get('attributes') or {}
         path = s.get('path', s['name'])
         sid = str(s.get('id', ''))
+        name_norm = _norm_iteration(s.get('name'))
+        path_norm = _norm_iteration(path)
         timeframe = str(attrs.get('timeFrame') or '').lower()
-        is_current = sid in current_ids or str(path) in current_paths or timeframe == 'current'
+        is_current = sid in current_ids or path_norm in current_paths or name_norm in current_names or timeframe == 'current'
         rows.append(
             {
                 'id': s['id'],

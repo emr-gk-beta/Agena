@@ -100,7 +100,14 @@ function pickCurrentSprint(list: Opt[]): Opt | null {
     const finish = new Date(s.finish_date).getTime();
     return Number.isFinite(start) && Number.isFinite(finish) && start <= now && now <= finish;
   });
-  return byDate || null;
+  if (byDate) return byDate;
+  const dated = list
+    .filter((s) => s.start_date)
+    .map((s) => ({ sprint: s, start: new Date(String(s.start_date)).getTime() }))
+    .filter((x) => Number.isFinite(x.start))
+    .sort((a, b) => b.start - a.start);
+  if (dated.length > 0) return dated[0].sprint;
+  return null;
 }
 
 export default function SprintsPage() {
