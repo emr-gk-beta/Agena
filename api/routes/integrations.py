@@ -162,7 +162,10 @@ async def list_github_repos(
         raise HTTPException(status_code=403, detail='GitHub access forbidden for repository listing')
     if response.status_code == 404:
         return []
-    response.raise_for_status()
+    # Do not hard-fail on non-auth 4xx (e.g. 422 on one query variant),
+    # because alternate query variants may have already produced usable data.
+    if response.status_code >= 500:
+        raise HTTPException(status_code=502, detail='GitHub repository listing failed')
 
     if not isinstance(data, list):
         return []
