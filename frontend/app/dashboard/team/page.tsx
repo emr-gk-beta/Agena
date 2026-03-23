@@ -15,7 +15,10 @@ const sc = (s: string) => STATE_COLORS[s] ?? '#5eead4';
 const LS_PROJECT  = 'tiqr_sprint_project';
 const LS_TEAM     = 'tiqr_sprint_team';
 const LS_SPRINT   = 'tiqr_sprint_path';
-const LS_MY_TEAM  = 'tiqr_my_team'; // JSON string: AzureMember[]
+const LS_PROVIDER = 'tiqr_sprint_provider';
+const LS_JIRA_PROJECT = 'tiqr_jira_project';
+const LS_JIRA_BOARD = 'tiqr_jira_board';
+const LS_JIRA_SPRINT = 'tiqr_jira_sprint';
 
 const GRADIENTS = [
   ['#0d9488','#22c55e'], ['#7c3aed','#a78bfa'], ['#0ea5e9','#38bdf8'],
@@ -30,6 +33,9 @@ const initials = (name: string) =>
 
 export default function TeamPage() {
   const { t } = useLocale();
+  const [provider,   setProvider]   = useState<'azure' | 'jira'>('azure');
+  const [hasAzure,   setHasAzure]   = useState(false);
+  const [hasJira,    setHasJira]    = useState(false);
   const [project,    setProject]    = useState('');
   const [team,       setTeam]       = useState('');
   const [sprintPath, setSprintPath] = useState('');
@@ -40,10 +46,12 @@ export default function TeamPage() {
 
   // Benim seçtiğim takım
   const [myTeam, setMyTeam] = useState<AzureMember[]>([]);
+  const [myTeamBySource, setMyTeamBySource] = useState<Record<'azure' | 'jira', AzureMember[]>>({ azure: [], jira: [] });
 
   // Arama & panel
   const [search, setSearch] = useState('');
   const [showPicker, setShowPicker] = useState(false);
+  const membersReqRef = React.useRef(0);
 
   // İş detayları
   const [workItems,    setWorkItems]    = useState<Record<string, WorkItem[]>>({});
@@ -51,55 +59,130 @@ export default function TeamPage() {
   const [loadingItems, setLoadingItems] = useState<string | null>(null);
   const [err, setErr] = useState('');
 
-  // İlk yükleme
   useEffect(() => {
-    // DB'den tercihleri çek
-    loadPrefs().then((prefs) => {
-      const p = prefs.azure_project    || localStorage.getItem(LS_PROJECT) || '';
-      const teamName = prefs.azure_team || localStorage.getItem(LS_TEAM) || '';
-      const s = prefs.azure_sprint_path || localStorage.getItem(LS_SPRINT) || '';
-      setProject(p); setTeam(teamName); setSprintPath(s);
-      if (prefs.my_team?.length) {
-        setMyTeam(prefs.my_team as AzureMember[]);
-      } else {
-        try {
-          const saved = localStorage.getItem(LS_MY_TEAM);
-          if (saved) setMyTeam(JSON.parse(saved) as AzureMember[]);
-        } catch { /* ignore */ }
-      }
-      // Tüm Azure üyelerini çek (picker için)
-      if (!p) return;
-      setLoadingAll(true);
-      apiFetch<AzureMember[]>('/tasks/azure/members')
-        .then(setAllMembers)
-        .catch((e: unknown) => setErr(e instanceof Error ? e.message : t('team.membersError')))
-        .finally(() => setLoadingAll(false));
-    }).catch((e: unknown) => {
-      if (e instanceof Error && e.message.toLowerCase().includes('invalid token')) return;
-      const p = localStorage.getItem(LS_PROJECT) || '';
-      const t2 = localStorage.getItem(LS_TEAM)    || '';
-      const s = localStorage.getItem(LS_SPRINT)  || '';
-      setProject(p); setTeam(t2); setSprintPath(s);
+    const init = async () => {
       try {
-        const saved = localStorage.getItem(LS_MY_TEAM);
-        if (saved) setMyTeam(JSON.parse(saved) as AzureMember[]);
-      } catch { /* ignore */ }
-      if (!p) return;
-      setLoadingAll(true);
-      apiFetch<AzureMember[]>('/tasks/azure/members')
-        .then(setAllMembers)
-        .catch((e: unknown) => setErr(e instanceof Error ? e.message : t('team.membersError')))
-        .finally(() => setLoadingAll(false));
-    });
+        const [prefs, integrations] = await Promise.all([
+          loadPrefs(),
+          apiFetch<Array<{ provider: string; has_secret?: boolean; base_url?: string | null; username?: string | null }>>('/integrations'),
+        ]);
+
+        const azureCfg = integrations.find((c) => c.provider === 'azure');
+        const jiraCfg = integrations.find((c) => c.provider === 'jira');
+        const azureConnected = Boolean(azureCfg && (azureCfg.has_secret || (azureCfg.base_url || '').trim().length > 0));
+        const jiraConnected = Boolean(jiraCfg && (jiraCfg.has_secret || (jiraCfg.base_url || '').trim().length > 0 || (jiraCfg.username || '').trim().length > 0));
+        setHasAzure(azureConnected);
+        setHasJira(jiraConnected);
+
+        const preferred = localStorage.getItem(LS_PROVIDER) === 'jira' ? 'jira' : 'azure';
+        const selectedProvider: 'azure' | 'jira' =
+          (preferred === 'jira' && jiraConnected) ? 'jira' :
+          (azureConnected ? 'azure' : 'jira');
+        setProvider(selectedProvider);
+
+        const rawSettings = (prefs.profile_settings || {}) as Record<string, unknown>;
+        const jiraProject = typeof rawSettings.jira_project === 'string' ? rawSettings.jira_project : '';
+        const jiraBoard = typeof rawSettings.jira_board === 'string' ? rawSettings.jira_board : '';
+        const jiraSprint = typeof rawSettings.jira_sprint_id === 'string' ? rawSettings.jira_sprint_id : '';
+        const bySourceRaw = prefs.my_team_by_source;
+        const bySource: Record<'azure' | 'jira', AzureMember[]> = {
+          azure: (bySourceRaw && Array.isArray(bySourceRaw.azure)) ? bySourceRaw.azure : (prefs.my_team || []),
+          jira: (bySourceRaw && Array.isArray(bySourceRaw.jira)) ? bySourceRaw.jira : (Array.isArray(rawSettings.my_team_jira) ? rawSettings.my_team_jira as AzureMember[] : []),
+        };
+        setMyTeamBySource(bySource);
+
+        if (selectedProvider === 'jira') {
+          const p = jiraProject || localStorage.getItem(LS_JIRA_PROJECT) || '';
+          const b = jiraBoard || localStorage.getItem(LS_JIRA_BOARD) || '';
+          const s = jiraSprint || localStorage.getItem(LS_JIRA_SPRINT) || '';
+          setProject(p);
+          setTeam(b);
+          setSprintPath(s);
+          setMyTeam(bySource.jira || []);
+        } else {
+          const p = prefs.azure_project || localStorage.getItem(LS_PROJECT) || '';
+          const tm = prefs.azure_team || localStorage.getItem(LS_TEAM) || '';
+          const s = prefs.azure_sprint_path || localStorage.getItem(LS_SPRINT) || '';
+          setProject(p);
+          setTeam(tm);
+          setSprintPath(s);
+          setMyTeam(bySource.azure || []);
+        }
+      } catch (e: unknown) {
+        if (e instanceof Error && e.message.toLowerCase().includes('invalid token')) return;
+        const preferred = localStorage.getItem(LS_PROVIDER) === 'jira' ? 'jira' : 'azure';
+        setProvider(preferred);
+        setMyTeamBySource({ azure: [], jira: [] });
+        if (preferred === 'jira') {
+          setProject(localStorage.getItem(LS_JIRA_PROJECT) || '');
+          setTeam(localStorage.getItem(LS_JIRA_BOARD) || '');
+          setSprintPath(localStorage.getItem(LS_JIRA_SPRINT) || '');
+          setMyTeam([]);
+        } else {
+          setProject(localStorage.getItem(LS_PROJECT) || '');
+          setTeam(localStorage.getItem(LS_TEAM) || '');
+          setSprintPath(localStorage.getItem(LS_SPRINT) || '');
+          setMyTeam([]);
+        }
+      }
+    };
+    void init();
   }, []);
+
+  useEffect(() => {
+    localStorage.setItem(LS_PROVIDER, provider);
+  }, [provider]);
+
+  useEffect(() => {
+    const reqId = ++membersReqRef.current;
+    setErr('');
+    setExpanded(null);
+    setWorkItems({});
+    setLoadingAll(true);
+    const run = async () => {
+      try {
+        if (provider === 'jira') {
+          if (!team || !sprintPath) {
+            if (reqId !== membersReqRef.current) return;
+            setAllMembers([]);
+            return;
+          }
+          const members = await apiFetch<AzureMember[]>(
+            '/tasks/jira/members?board_id=' + encodeURIComponent(team) + '&sprint_id=' + encodeURIComponent(sprintPath),
+          );
+          if (reqId !== membersReqRef.current) return;
+          setAllMembers(members);
+          return;
+        }
+        if (!project) {
+          if (reqId !== membersReqRef.current) return;
+          setAllMembers([]);
+          return;
+        }
+        const members = await apiFetch<AzureMember[]>('/tasks/azure/members');
+        if (reqId !== membersReqRef.current) return;
+        setAllMembers(members);
+      } catch (e: unknown) {
+        if (reqId !== membersReqRef.current) return;
+        setErr(e instanceof Error ? e.message : t('team.membersError'));
+      } finally {
+        if (reqId !== membersReqRef.current) return;
+        setLoadingAll(false);
+      }
+    };
+    void run();
+  }, [provider, project, team, sprintPath, showPicker, t]);
 
   // Takıma ekle / çıkar — DB'ye de kaydet
   function toggleMember(m: AzureMember) {
     setMyTeam((prev) => {
       const exists = prev.some((x) => x.id === m.id);
       const next = exists ? prev.filter((x) => x.id !== m.id) : [...prev, m];
-      localStorage.setItem(LS_MY_TEAM, JSON.stringify(next));
-      void savePrefs({ my_team: next });
+      setMyTeamBySource((curr) => ({
+        ...curr,
+        [provider]: next,
+      }));
+      void savePrefs({ my_team: next, my_team_source: provider });
       return next;
     });
   }
@@ -118,13 +201,20 @@ export default function TeamPage() {
     if (workItems[member.id] !== undefined || !sprintPath) return;
     setLoadingItems(member.id);
     try {
-      const items = await apiFetch<WorkItem[]>(
-        '/tasks/azure/member/workitems' +
-        '?project=' + encodeURIComponent(project) +
-        '&team=' + encodeURIComponent(team) +
-        '&sprint_path=' + encodeURIComponent(sprintPath) +
-        '&assigned_to=' + encodeURIComponent(member.uniqueName)
-      );
+      const items = provider === 'jira'
+        ? await apiFetch<WorkItem[]>(
+            '/tasks/jira/member/workitems' +
+            '?board_id=' + encodeURIComponent(team) +
+            '&sprint_id=' + encodeURIComponent(sprintPath) +
+            '&assigned_to=' + encodeURIComponent(member.uniqueName),
+          )
+        : await apiFetch<WorkItem[]>(
+            '/tasks/azure/member/workitems' +
+            '?project=' + encodeURIComponent(project) +
+            '&team=' + encodeURIComponent(team) +
+            '&sprint_path=' + encodeURIComponent(sprintPath) +
+            '&assigned_to=' + encodeURIComponent(member.uniqueName),
+          );
       setWorkItems((prev) => ({ ...prev, [member.id]: items }));
     } catch {
       setWorkItems((prev) => ({ ...prev, [member.id]: [] }));
@@ -133,7 +223,7 @@ export default function TeamPage() {
     }
   }
 
-  const hasConfig = !!(project && team);
+  const hasConfig = provider === 'jira' ? !!(team && sprintPath) : !!(project && team);
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
@@ -144,9 +234,57 @@ export default function TeamPage() {
           <h1 style={{ fontSize: 28, fontWeight: 800, color: 'rgba(255,255,255,0.95)', marginTop: 8, marginBottom: 4 }}>
             {t('team.title')}
           </h1>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            {(hasAzure || !hasJira) && (
+              <button
+                onClick={() => {
+                  setProvider('azure');
+                  setProject(localStorage.getItem(LS_PROJECT) || '');
+                  setTeam(localStorage.getItem(LS_TEAM) || '');
+                  setSprintPath(localStorage.getItem(LS_SPRINT) || '');
+                  setMyTeam(myTeamBySource.azure || []);
+                }}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  border: provider === 'azure' ? '1px solid rgba(56,189,248,0.45)' : '1px solid rgba(255,255,255,0.12)',
+                  background: provider === 'azure' ? 'rgba(56,189,248,0.12)' : 'rgba(255,255,255,0.03)',
+                  color: provider === 'azure' ? '#7dd3fc' : 'rgba(255,255,255,0.58)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {t('team.providerAzure')}
+              </button>
+            )}
+            {(hasJira || !hasAzure) && (
+              <button
+                onClick={() => {
+                  setProvider('jira');
+                  setProject(localStorage.getItem(LS_JIRA_PROJECT) || '');
+                  setTeam(localStorage.getItem(LS_JIRA_BOARD) || '');
+                  setSprintPath(localStorage.getItem(LS_JIRA_SPRINT) || '');
+                  setMyTeam(myTeamBySource.jira || []);
+                }}
+                style={{
+                  padding: '6px 12px',
+                  borderRadius: 999,
+                  border: provider === 'jira' ? '1px solid rgba(129,140,248,0.45)' : '1px solid rgba(255,255,255,0.12)',
+                  background: provider === 'jira' ? 'rgba(129,140,248,0.12)' : 'rgba(255,255,255,0.03)',
+                  color: provider === 'jira' ? '#a5b4fc' : 'rgba(255,255,255,0.58)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                {t('team.providerJira')}
+              </button>
+            )}
+          </div>
           <p style={{ color: 'rgba(255,255,255,0.35)', fontSize: 14, margin: 0 }}>
             {myTeam.length > 0
-              ? myTeam.length + ' · ' + (sprintPath ? 'Sprint' : t('team.noConfig'))
+              ? myTeam.length + ' · ' + (sprintPath ? t('team.sprintLabel') : t('team.noConfig'))
               : t('team.addEdit')}
           </p>
         </div>
@@ -161,8 +299,12 @@ export default function TeamPage() {
       {!hasConfig && (
         <div style={{ padding: '20px 24px', borderRadius: 16, border: '1px solid rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
-            <div style={{ fontWeight: 600, color: '#fbbf24', fontSize: 14 }}>{t('team.noConfig')}</div>
-            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('team.noConfigDesc')}</div>
+            <div style={{ fontWeight: 600, color: '#fbbf24', fontSize: 14 }}>
+              {provider === 'jira' ? t('team.noConfigJira') : t('team.noConfig')}
+            </div>
+            <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>
+              {provider === 'jira' ? t('team.noConfigDescJira') : t('team.noConfigDesc')}
+            </div>
           </div>
           <a href="/dashboard/profile" style={{ padding: '8px 16px', borderRadius: 10, border: '1px solid rgba(251,191,36,0.3)', background: 'rgba(251,191,36,0.1)', color: '#fbbf24', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}>
             {t('team.profile')}
@@ -194,9 +336,29 @@ export default function TeamPage() {
                   </div>
                   {sprintPath && items !== undefined && (
                     <span style={{ fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: items.length > 0 ? 'rgba(94,234,212,0.1)' : 'rgba(255,255,255,0.05)', border: '1px solid ' + (items.length > 0 ? 'rgba(94,234,212,0.25)' : 'rgba(255,255,255,0.08)'), color: items.length > 0 ? '#5eead4' : 'rgba(255,255,255,0.3)' }}>
-                      {items.length} iş
+                      {items.length} {t('team.itemsShort')}
                     </span>
                   )}
+                  <button
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      toggleMember(member);
+                    }}
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      padding: '4px 9px',
+                      borderRadius: 999,
+                      border: '1px solid rgba(248,113,113,0.35)',
+                      background: 'rgba(248,113,113,0.12)',
+                      color: '#f87171',
+                      cursor: 'pointer',
+                      flexShrink: 0,
+                    }}
+                  >
+                    {t('team.remove')}
+                  </button>
                   {sprintPath && (
                     <span style={{ fontSize: 16, color: 'rgba(255,255,255,0.2)', transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block' }}>⌄</span>
                   )}
@@ -248,7 +410,9 @@ export default function TeamPage() {
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'rgba(255,255,255,0.95)' }}>{t('team.selectTitle')}</h3>
-                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>{myTeam.length} seçili · {allMembers.length} kişi</p>
+                  <p style={{ margin: '4px 0 0', fontSize: 12, color: 'rgba(255,255,255,0.3)' }}>
+                    {t('team.selectedSummary', { selected: myTeam.length, total: allMembers.length })}
+                  </p>
                 </div>
                 <button onClick={() => setShowPicker(false)} style={{ width: 32, height: 32, borderRadius: '50%', border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.05)', color: 'rgba(255,255,255,0.5)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>×</button>
               </div>

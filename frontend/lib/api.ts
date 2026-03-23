@@ -129,6 +129,8 @@ export interface UserPrefs {
   azure_team: string | null;
   azure_sprint_path: string | null;
   my_team: AzureMember[];
+  my_team_source?: 'azure' | 'jira' | string;
+  my_team_by_source?: Record<string, AzureMember[]>;
   agents: Record<string, unknown>[];
   flows: Record<string, unknown>[];
   repo_mappings: RepoMapping[];
@@ -180,6 +182,7 @@ export async function savePrefs(partial: Partial<{
   azure_team: string;
   azure_sprint_path: string;
   my_team: AzureMember[];
+  my_team_source: 'azure' | 'jira';
   agents: Record<string, unknown>[];
   flows: Record<string, unknown>[];
   repo_mappings: RepoMapping[];
@@ -200,6 +203,7 @@ export async function savePrefs(partial: Partial<{
       azure_team:        partial.azure_team        ?? null,
       azure_sprint_path: partial.azure_sprint_path ?? null,
       my_team:           partial.my_team           ?? null,
+      my_team_source:    partial.my_team_source    ?? null,
       agents:            partial.agents            ?? null,
       flows:             partial.flows             ?? null,
       repo_mappings:     partial.repo_mappings     ?? null,

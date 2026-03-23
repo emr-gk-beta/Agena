@@ -443,6 +443,186 @@ async def get_jira_tasks(
     return TaskListResponse(items=tasks)
 
 
+@router.get('/jira/members')
+async def list_jira_sprint_members(
+    board_id: str = Query(...),
+    sprint_id: str = Query(...),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, str]]:
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'jira')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='Jira integration not configured')
+
+    base = config.base_url.rstrip('/')
+    issue_url = f"{base}/rest/agile/1.0/board/{board_id}/issue"
+    start_at = 0
+    max_results = 100
+    seen: dict[str, dict[str, str]] = {}
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        while True:
+            params = {
+                'sprint': sprint_id,
+                'fields': 'assignee',
+                'maxResults': max_results,
+                'startAt': start_at,
+            }
+            try:
+                response = await client.get(
+                    issue_url,
+                    params=params,
+                    auth=(config.username or '', config.secret),
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 401:
+                    await _notify_integration_auth_expired(db, tenant, 'Jira', 'Please update your Jira email/API token in Integrations.')
+                    raise HTTPException(status_code=401, detail='Jira credentials are invalid (email or API token)') from exc
+                raise HTTPException(status_code=502, detail='Jira members fetch failed') from exc
+
+            data = response.json()
+            issues = data.get('issues', [])
+            for issue in issues:
+                assignee = ((issue.get('fields') or {}).get('assignee') or {})
+                if not isinstance(assignee, dict):
+                    continue
+                account_id = str(assignee.get('accountId') or '').strip()
+                display = str(assignee.get('displayName') or '').strip()
+                email = str(assignee.get('emailAddress') or '').strip()
+                key = account_id or email or display
+                if not key or not display:
+                    continue
+                if key not in seen:
+                    seen[key] = {
+                        'id': key,
+                        'displayName': display,
+                        'uniqueName': key,
+                    }
+
+            total = int(data.get('total') or 0)
+            fetched = int(data.get('maxResults') or max_results)
+            start_at += fetched
+            if not issues or start_at >= total:
+                break
+
+        # Fallback: if sprint has no assigned issues, list assignable users from board's project.
+        if not seen:
+            project_key = ''
+            try:
+                board_res = await client.get(
+                    f"{base}/rest/agile/1.0/board/{board_id}",
+                    auth=(config.username or '', config.secret),
+                )
+                board_res.raise_for_status()
+                board = board_res.json() if isinstance(board_res.json(), dict) else {}
+                location = board.get('location') if isinstance(board.get('location'), dict) else {}
+                project_key = str(location.get('projectKey') or '').strip()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 401:
+                    await _notify_integration_auth_expired(db, tenant, 'Jira', 'Please update your Jira email/API token in Integrations.')
+                    raise HTTPException(status_code=401, detail='Jira credentials are invalid (email or API token)') from exc
+                project_key = ''
+
+            if project_key:
+                users_res = await client.get(
+                    f"{base}/rest/api/3/user/assignable/search",
+                    params={'project': project_key, 'maxResults': 1000},
+                    auth=(config.username or '', config.secret),
+                )
+                users_res.raise_for_status()
+                users = users_res.json()
+                if isinstance(users, list):
+                    for user in users:
+                        if not isinstance(user, dict):
+                            continue
+                        account_id = str(user.get('accountId') or '').strip()
+                        display = str(user.get('displayName') or '').strip()
+                        email = str(user.get('emailAddress') or '').strip()
+                        key = account_id or email or display
+                        if not key or not display:
+                            continue
+                        if key not in seen:
+                            seen[key] = {
+                                'id': key,
+                                'displayName': display,
+                                'uniqueName': key,
+                            }
+
+    return sorted(seen.values(), key=lambda x: x['displayName'])
+
+
+@router.get('/jira/member/workitems')
+async def list_jira_member_workitems(
+    board_id: str = Query(...),
+    sprint_id: str = Query(...),
+    assigned_to: str = Query(...),
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    service = IntegrationConfigService(db)
+    config = await service.get_config(tenant.organization_id, 'jira')
+    if config is None or not config.secret:
+        raise HTTPException(status_code=400, detail='Jira integration not configured')
+
+    url = f"{config.base_url.rstrip('/')}/rest/agile/1.0/board/{board_id}/issue"
+    start_at = 0
+    max_results = 100
+    normalized_target = assigned_to.strip().lower()
+    results: list[dict[str, Any]] = []
+
+    async with httpx.AsyncClient(timeout=30) as client:
+        while True:
+            params = {
+                'sprint': sprint_id,
+                'fields': 'summary,status,assignee',
+                'maxResults': max_results,
+                'startAt': start_at,
+            }
+            try:
+                response = await client.get(
+                    url,
+                    params=params,
+                    auth=(config.username or '', config.secret),
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                if exc.response.status_code == 401:
+                    await _notify_integration_auth_expired(db, tenant, 'Jira', 'Please update your Jira email/API token in Integrations.')
+                    raise HTTPException(status_code=401, detail='Jira credentials are invalid (email or API token)') from exc
+                raise HTTPException(status_code=502, detail='Jira member workitems fetch failed') from exc
+
+            data = response.json()
+            issues = data.get('issues', [])
+            for issue in issues:
+                fields = issue.get('fields') or {}
+                assignee = fields.get('assignee') or {}
+                if not isinstance(assignee, dict):
+                    continue
+                account_id = str(assignee.get('accountId') or '').strip().lower()
+                email = str(assignee.get('emailAddress') or '').strip().lower()
+                display = str(assignee.get('displayName') or '').strip().lower()
+                if normalized_target not in {account_id, email, display}:
+                    continue
+                status = fields.get('status') if isinstance(fields.get('status'), dict) else {}
+                results.append(
+                    {
+                        'id': str(issue.get('key') or issue.get('id') or ''),
+                        'title': str(fields.get('summary') or ''),
+                        'state': str((status or {}).get('name') or ''),
+                    }
+                )
+
+            total = int(data.get('total') or 0)
+            fetched = int(data.get('maxResults') or max_results)
+            start_at += fetched
+            if not issues or start_at >= total:
+                break
+
+    return results
+
+
 @router.get('/jira/projects')
 async def list_jira_projects(
     tenant: CurrentTenant = Depends(get_current_tenant),

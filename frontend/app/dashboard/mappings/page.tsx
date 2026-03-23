@@ -47,12 +47,15 @@ export default function RepoMappingsPage() {
   const [sourceProvider, setSourceProvider] = useState<'azure' | 'github'>('azure');
   const [projects, setProjects] = useState<Opt[]>([]);
   const [selProject, setSelProject] = useState('');
+  const [pendingProject, setPendingProject] = useState('');
   const [repos, setRepos] = useState<AzureRepo[]>([]);
   const [selRepoUrl, setSelRepoUrl] = useState('');
   const [pendingRepoUrl, setPendingRepoUrl] = useState('');
+  const [pendingRepoName, setPendingRepoName] = useState('');
   const [githubOwner, setGithubOwner] = useState('');
   const [githubRepos, setGithubRepos] = useState<GithubRepo[]>([]);
   const [selGithubRepo, setSelGithubRepo] = useState('');
+  const [pendingGithubRepo, setPendingGithubRepo] = useState('');
   const [githubRepoCount, setGithubRepoCount] = useState(0);
   const [githubRepoError, setGithubRepoError] = useState('');
   const [path, setPath] = useState('');
@@ -109,22 +112,59 @@ export default function RepoMappingsPage() {
   }, []);
 
   useEffect(() => {
+    if (!pendingProject || sourceProvider !== 'azure') return;
+    if (projects.length === 0) return;
+    const matched = projects.find((p) => p.name === pendingProject || p.id === pendingProject);
+    if (matched) {
+      setSelProject(matched.name);
+    }
+    setPendingProject('');
+  }, [pendingProject, projects, sourceProvider]);
+
+  useEffect(() => {
     if (sourceProvider !== 'azure') return;
     setRepos([]);
-    setSelRepoUrl('');
     if (!selProject) return;
     setLoadingRepos(true);
     apiFetch<AzureRepo[]>('/tasks/azure/repos?project=' + encodeURIComponent(selProject))
-      .then(setRepos)
+      .then((list) => {
+        let nextList = list;
+        const target = pendingRepoUrl || selRepoUrl;
+        if (target) {
+          const found = list.find((r) => r.remote_url === target);
+          if (!found) {
+            nextList = [
+              {
+                id: `pending:${target}`,
+                name: pendingRepoName || target.split('/').pop() || 'Selected Repo',
+                remote_url: target,
+                web_url: '',
+              },
+              ...list,
+            ];
+          } else if (pendingRepoUrl) {
+            setSelRepoUrl(found.remote_url);
+            setPendingRepoUrl('');
+            setPendingRepoName('');
+          }
+        }
+        setRepos(nextList);
+      })
       .catch(() => {})
       .finally(() => setLoadingRepos(false));
-  }, [selProject, sourceProvider]);
+  }, [selProject, sourceProvider, pendingRepoUrl, pendingRepoName, selRepoUrl]);
+
+  useEffect(() => {
+    if (sourceProvider !== 'azure') return;
+    if (!pendingRepoUrl) return;
+    if (selRepoUrl) return;
+    setSelRepoUrl(pendingRepoUrl);
+  }, [sourceProvider, pendingRepoUrl, selRepoUrl]);
 
   useEffect(() => {
     if (sourceProvider !== 'github') return;
     const reqId = ++githubFetchRef.current;
     setGithubRepos([]);
-    setSelGithubRepo('');
     setGithubRepoCount(0);
     setGithubRepoError('');
     setLoadingGithubRepos(true);
@@ -133,7 +173,18 @@ export default function RepoMappingsPage() {
     apiFetch<GithubRepo[]>(`/integrations/github/repos${query}`)
       .then((list) => {
         if (reqId !== githubFetchRef.current) return;
-        setGithubRepos(list);
+        let nextList = list;
+        if (pendingGithubRepo) {
+          const matched = list.find((r) => r.full_name.toLowerCase() === pendingGithubRepo.toLowerCase());
+          if (!matched) {
+            const repoName = pendingGithubRepo.split('/').pop() || pendingGithubRepo;
+            nextList = [{ id: `pending:${pendingGithubRepo}`, name: repoName, full_name: pendingGithubRepo, private: true }, ...list];
+          } else {
+            setSelGithubRepo(matched.full_name);
+            setPendingGithubRepo('');
+          }
+        }
+        setGithubRepos(nextList);
         setGithubRepoCount(Array.isArray(list) ? list.length : 0);
       })
       .catch((e: unknown) => {
@@ -146,7 +197,7 @@ export default function RepoMappingsPage() {
         if (reqId !== githubFetchRef.current) return;
         setLoadingGithubRepos(false);
       });
-  }, [sourceProvider, githubOwner]);
+  }, [sourceProvider, githubOwner, pendingGithubRepo]);
 
   useEffect(() => {
     if (!pendingRepoUrl) return;
@@ -154,6 +205,7 @@ export default function RepoMappingsPage() {
     if (!exists) return;
     setSelRepoUrl(pendingRepoUrl);
     setPendingRepoUrl('');
+    setPendingRepoName('');
   }, [pendingRepoUrl, repos]);
 
   async function persist(next: RepoMapping[]) {
@@ -168,14 +220,17 @@ export default function RepoMappingsPage() {
       setErr(e instanceof Error ? e.message : t('mappings.saveFailed'));
     } finally {
       setSaving(false);
-      setTimeout(() => setMsg(''), 1800);
+      setTimeout(() => setMsg(''), 2600);
     }
   }
 
   function resetForm() {
+    setPendingProject('');
     setSelRepoUrl('');
     setPendingRepoUrl('');
+    setPendingRepoName('');
     setSelGithubRepo('');
+    setPendingGithubRepo('');
     setPath('');
     setNotes('');
     setRepoPlaybook('');
@@ -183,37 +238,70 @@ export default function RepoMappingsPage() {
   }
 
   function startEdit(item: RepoMapping) {
-    const provider = item.provider === 'github' ? 'github' : 'azure';
+    const inferredGithub = Boolean(
+      item.provider === 'github' ||
+      item.github_repo_full_name ||
+      (item.github_owner && item.github_repo),
+    );
+    const provider: 'azure' | 'github' = inferredGithub ? 'github' : 'azure';
     setSourceProvider(provider);
     setEditingId(item.id);
-    setSelProject(item.azure_project || '');
-    setPendingRepoUrl(item.azure_repo_url || '');
-    setGithubOwner(item.github_owner || githubOwner);
-    setSelGithubRepo(item.github_repo_full_name || (item.github_owner && item.github_repo ? `${item.github_owner}/${item.github_repo}` : ''));
+
+    if (provider === 'azure') {
+      const rawProject = item.azure_project || '';
+      const normalizedProject = projects.find((p) => p.name === rawProject || p.id === rawProject)?.name || rawProject;
+      const rawRepoUrl = item.azure_repo_url || '';
+      const rawRepoName = item.azure_repo_name || item.name || '';
+      setSelProject(normalizedProject);
+      setPendingProject(rawProject);
+      setPendingRepoUrl(rawRepoUrl);
+      setPendingRepoName(rawRepoName);
+      setSelRepoUrl(rawRepoUrl);
+      setPendingGithubRepo('');
+      setSelGithubRepo('');
+    } else {
+      const owner = item.github_owner || githubOwner;
+      const targetGithubRepo = item.github_repo_full_name || (item.github_owner && item.github_repo ? `${item.github_owner}/${item.github_repo}` : '');
+      setGithubOwner(owner);
+      setPendingGithubRepo(targetGithubRepo);
+      setSelGithubRepo(targetGithubRepo);
+      setPendingProject('');
+      setSelProject('');
+      setPendingRepoUrl('');
+      setPendingRepoName('');
+      setSelRepoUrl('');
+    }
+
     setPath(item.local_path || '');
     setNotes(item.notes || '');
     setRepoPlaybook(item.repo_playbook || '');
   }
 
   async function upsertMapping() {
+    const currentEditing = editingId ? items.find((m) => m.id === editingId) : undefined;
     let mapping: RepoMapping;
     if (sourceProvider === 'azure') {
       const selectedRepo = repos.find((r) => r.remote_url === selRepoUrl);
-      if (!selProject || !selectedRepo || !path.trim()) return;
+      const fallbackRepoUrl = currentEditing?.azure_repo_url || '';
+      const fallbackProject = currentEditing?.azure_project || '';
+      const effectiveRepoUrl = selectedRepo?.remote_url || selRepoUrl || fallbackRepoUrl;
+      const effectiveRepoName = selectedRepo?.name || currentEditing?.azure_repo_name || currentEditing?.name || '';
+      const effectiveProject = selProject || fallbackProject;
+      if (!effectiveProject || !effectiveRepoUrl || !path.trim()) return;
       mapping = {
         id: editingId || String(Date.now()),
         provider: 'azure',
-        name: selectedRepo.name,
+        name: effectiveRepoName,
         local_path: path.trim(),
         notes: notes.trim() || undefined,
         repo_playbook: repoPlaybook.trim() || undefined,
-        azure_project: selProject,
-        azure_repo_url: selectedRepo.remote_url,
-        azure_repo_name: selectedRepo.name,
+        azure_project: effectiveProject,
+        azure_repo_url: effectiveRepoUrl,
+        azure_repo_name: effectiveRepoName,
       };
     } else {
       const selectedRepo = githubRepos.find((r) => r.full_name === selGithubRepo);
-      const fullName = selectedRepo?.full_name || selGithubRepo;
+      const fullName = selectedRepo?.full_name || selGithubRepo || currentEditing?.github_repo_full_name || '';
       if (!fullName || !path.trim()) return;
       const repoName = selectedRepo?.name || fullName.split('/').pop() || '';
       const owner = fullName.split('/')[0] || githubOwner.trim();
@@ -234,7 +322,22 @@ export default function RepoMappingsPage() {
       : [...items, mapping];
     await persist(next);
     setMsg(editingId ? t('mappings.updated') : t('mappings.saved'));
-    await runProfileScan(mapping, { silentSuccess: true });
+    const hadProfile = Boolean(repoProfiles[mapping.id]);
+    const shouldScanOnUpdate = Boolean(editingId) && (() => {
+      if (!currentEditing) return false;
+      return (
+        currentEditing.local_path !== mapping.local_path ||
+        (currentEditing.provider || 'azure') !== (mapping.provider || 'azure') ||
+        (currentEditing.azure_project || '') !== (mapping.azure_project || '') ||
+        (currentEditing.azure_repo_url || '') !== (mapping.azure_repo_url || '') ||
+        (currentEditing.github_repo_full_name || '') !== (mapping.github_repo_full_name || '')
+      );
+    })();
+    if (!editingId) {
+      await runProfileScan(mapping, { silentSuccess: true });
+    } else if (!hadProfile && shouldScanOnUpdate) {
+      await runProfileScan(mapping, { silentSuccess: true });
+    }
     resetForm();
   }
 
@@ -300,6 +403,13 @@ export default function RepoMappingsPage() {
   const empty = useMemo(() => items.length === 0, [items.length]);
   const selectedRepo = useMemo(() => repos.find((r) => r.remote_url === selRepoUrl), [repos, selRepoUrl]);
   const selectedGithubRepo = useMemo(() => githubRepos.find((r) => r.full_name === selGithubRepo), [githubRepos, selGithubRepo]);
+  const githubSelectOptions = useMemo(() => {
+    if (!selGithubRepo) return githubRepos;
+    const found = githubRepos.some((r) => r.full_name.toLowerCase() === selGithubRepo.toLowerCase());
+    if (found) return githubRepos;
+    const repoName = selGithubRepo.split('/').pop() || selGithubRepo;
+    return [{ id: `selected:${selGithubRepo}`, name: repoName, full_name: selGithubRepo, private: true }, ...githubRepos];
+  }, [githubRepos, selGithubRepo]);
   const selectedRepoMappings = useMemo(
     () => sourceProvider === 'azure'
       ? (selProject && selRepoUrl ? items.filter((m) => (m.provider || 'azure') === 'azure' && m.azure_project === selProject && m.azure_repo_url === selRepoUrl) : [])
@@ -367,7 +477,7 @@ export default function RepoMappingsPage() {
                   <option value='' style={{ background: '#0d1117' }}>
                     {!hasGithubIntegration ? t('mappings.connectGithubFirst') : (loadingGithubRepos ? t('mappings.loadingGithubRepos') : t('mappings.selectGithubRepo'))}
                   </option>
-                  {githubRepos.map((r) => <option key={r.id} value={r.full_name} style={{ background: '#0d1117' }}>{r.full_name}{r.private ? ' 🔒' : ''}</option>)}
+                  {githubSelectOptions.map((r) => <option key={r.id} value={r.full_name} style={{ background: '#0d1117' }}>{r.full_name}{r.private ? ' 🔒' : ''}</option>)}
                 </select>
                 <div style={{ fontSize: 10, color: githubRepoError ? '#fda4af' : 'rgba(255,255,255,0.45)', marginTop: 4 }}>
                   {githubRepoError || `${t('mappings.githubRepoCount')}: ${githubRepoCount}`}
@@ -416,7 +526,13 @@ export default function RepoMappingsPage() {
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, minHeight: 38 }}>
             <button
               onClick={() => void upsertMapping()}
-              disabled={saving || !path.trim() || (sourceProvider === 'azure' ? (!selProject || !selRepoUrl) : !selGithubRepo)}
+              disabled={
+                saving ||
+                !path.trim() ||
+                (sourceProvider === 'azure'
+                  ? (!editingId && (!selProject || !selRepoUrl))
+                  : (!editingId && !selGithubRepo))
+              }
               className='button button-primary'
               style={{ width: '100%' }}
             >
@@ -437,7 +553,7 @@ export default function RepoMappingsPage() {
         </div>
 
         <div style={{ borderRadius: 16, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.02)', overflow: 'hidden' }}>
-          <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'grid', gridTemplateColumns: '1fr 1.1fr 0.8fr 1fr 0.9fr 140px', gap: 12 }}>
+          <div style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)', display: 'grid', gridTemplateColumns: '1fr 1.05fr 0.75fr 0.95fr 0.85fr 130px', gap: 10 }}>
             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{t('mappings.col.source')}</span>
             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{t('mappings.col.localPath')}</span>
             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{t('mappings.col.notes')}</span>
@@ -446,13 +562,13 @@ export default function RepoMappingsPage() {
             <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, textTransform: 'uppercase', color: 'rgba(255,255,255,0.4)' }}>{t('mappings.col.action')}</span>
           </div>
 
-          {empty ? (
+              {empty ? (
             <div style={{ padding: 20, color: 'rgba(255,255,255,0.5)', fontSize: 13 }}>
               {t('mappings.empty')}
             </div>
           ) : (
             items.map((m) => (
-              <div key={m.id} style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: '1fr 1.1fr 0.8fr 1fr 0.9fr 140px', gap: 12, alignItems: 'center' }}>
+              <div key={m.id} style={{ padding: '10px 14px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'grid', gridTemplateColumns: '1fr 1.05fr 0.75fr 0.95fr 0.85fr 130px', gap: 10, alignItems: 'center' }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 700, color: (m.provider === 'github') ? '#c4b5fd' : '#7dd3fc' }}>
                     {(m.provider === 'github') ? 'GitHub' : (m.azure_project || 'Azure')}
@@ -470,25 +586,21 @@ export default function RepoMappingsPage() {
                 <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.45)', lineHeight: 1.45 }}>
                   {m.repo_playbook ? (m.repo_playbook.length > 110 ? m.repo_playbook.slice(0, 110).trimEnd() + '…' : m.repo_playbook) : '-'}
                 </div>
-                <div style={{ display: 'grid', gap: 6 }}>
+                <div style={{ display: 'grid', gap: 4 }}>
                   {repoProfiles[m.id] ? (
                     <>
-                      <div style={{ fontSize: 11, color: '#86efac', fontWeight: 700, lineHeight: 1.3 }}>
+                      <div
+                        title={`${(repoProfiles[m.id].stack || []).slice(0, 3).join(', ')} · ${(repoProfiles[m.id].scanned_by_provider || 'local')}${repoProfiles[m.id].scanned_model ? ` / ${repoProfiles[m.id].scanned_model}` : ''}`}
+                        style={{ fontSize: 11, color: '#86efac', fontWeight: 700, lineHeight: 1.25, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+                      >
                         {(repoProfiles[m.id].stack || []).slice(0, 2).join(', ') || t('mappings.profileReady')}
-                      </div>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)' }}>
+                        {' · '}
                         {(repoProfiles[m.id].scanned_by_provider || 'local')}
-                        {repoProfiles[m.id].scanned_model ? ` / ${repoProfiles[m.id].scanned_model}` : ''}
                       </div>
-                      {repoProfiles[m.id].agents_md_path && (
-                        <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.45)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {repoProfiles[m.id].agents_md_path}
-                        </div>
-                      )}
                       <button
                         onClick={() => void openAgentsEditor(m)}
                         style={{
-                          padding: '5px 8px',
+                          padding: '4px 8px',
                           borderRadius: 8,
                           border: '1px solid rgba(56,189,248,0.35)',
                           background: 'rgba(56,189,248,0.12)',
@@ -500,9 +612,6 @@ export default function RepoMappingsPage() {
                       >
                         Open AGENTS.md
                       </button>
-                      <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.38)' }}>
-                        {new Date(repoProfiles[m.id].scanned_at).toLocaleString()}
-                      </div>
                     </>
                   ) : (
                     <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)' }}>{t('mappings.notScanned')}</div>
@@ -511,7 +620,7 @@ export default function RepoMappingsPage() {
                     onClick={() => void runProfileScan(m)}
                     disabled={scanningId === m.id}
                     style={{
-                      padding: '5px 8px',
+                      padding: '4px 8px',
                       borderRadius: 8,
                       border: '1px solid rgba(34,197,94,0.35)',
                       background: 'rgba(34,197,94,0.12)',
