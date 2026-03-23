@@ -183,12 +183,18 @@ export default function SprintsPage() {
       let savedProject = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_PROJECT : LS_PROJECT) || '';
       let savedTeam    = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_BOARD : LS_TEAM) || '';
       let savedSprint  = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_SPRINT : LS_SPRINT) || '';
+      let jiraProjectPref = '';
+      let jiraBoardPref = '';
+      let jiraSprintPref = '';
       try {
         const prefs = await loadPrefs();
         const rawSettings = (prefs.profile_settings || {}) as Record<string, unknown>;
         const jiraProject = typeof rawSettings.jira_project === 'string' ? rawSettings.jira_project : '';
         const jiraBoard = typeof rawSettings.jira_board === 'string' ? rawSettings.jira_board : '';
         const jiraSprint = typeof rawSettings.jira_sprint_id === 'string' ? rawSettings.jira_sprint_id : '';
+        jiraProjectPref = jiraProject;
+        jiraBoardPref = jiraBoard;
+        jiraSprintPref = jiraSprint;
         if (savedProvider === 'jira') {
           if (jiraProject) savedProject = jiraProject;
           if (jiraBoard) savedTeam = jiraBoard;
@@ -219,6 +225,12 @@ export default function SprintsPage() {
         if (savedProvider === 'azure' && !azureConnected && jiraConnected) savedProvider = 'jira';
         if (savedProvider === 'jira' && !jiraConnected && azureConnected) savedProvider = 'azure';
         if (!azureConnected && jiraConnected) savedProvider = 'jira';
+        if (jiraConnected && (jiraProjectPref || jiraBoardPref || jiraSprintPref)) {
+          savedProvider = 'jira';
+          if (jiraProjectPref) savedProject = jiraProjectPref;
+          if (jiraBoardPref) savedTeam = jiraBoardPref;
+          if (jiraSprintPref) savedSprint = jiraSprintPref;
+        }
         setProviderRaw(savedProvider);
       } catch {
         setIntegrations([]);

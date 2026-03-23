@@ -117,9 +117,17 @@ export default function ProfilePage() {
       }
 
       if (jp) {
-        setJiraProject(jp);
+        const jiraProjectList = await apiFetch<Opt[]>('/tasks/jira/projects').catch(() => [] as Opt[]);
+        if (jiraProjectList.length) setJiraProjects(jiraProjectList);
+        let normalizedProjectKey = jp;
+        const byId = jiraProjectList.find((p) => (p.id ?? p.name) === normalizedProjectKey);
+        if (!byId) {
+          const byName = jiraProjectList.find((p) => p.name === normalizedProjectKey);
+          if (byName) normalizedProjectKey = byName.id ?? byName.name;
+        }
+        setJiraProject(normalizedProjectKey);
         if (jb) {
-          const boards = await apiFetch<Opt[]>('/tasks/jira/boards?project_key=' + encodeURIComponent(jp)).catch(() => [] as Opt[]);
+          const boards = await apiFetch<Opt[]>('/tasks/jira/boards?project_key=' + encodeURIComponent(normalizedProjectKey)).catch(() => [] as Opt[]);
           setJiraBoards(boards);
           setJiraBoard(jb);
           if (js) {
