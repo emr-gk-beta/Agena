@@ -28,6 +28,7 @@ class PreferencePayload(BaseModel):
     azure_team: str | None = None
     azure_sprint_path: str | None = None
     my_team: list[dict[str, Any]] | None = None
+    my_team_source: str | None = None
     agents: list[dict[str, Any]] | None = None
     flows: list[dict[str, Any]] | None = None
     repo_mappings: list[dict[str, Any]] | None = None
@@ -39,6 +40,8 @@ class PreferenceResponse(BaseModel):
     azure_team: str | None
     azure_sprint_path: str | None
     my_team: list[dict[str, Any]]
+    my_team_source: str
+    my_team_by_source: dict[str, list[dict[str, Any]]]
     agents: list[dict[str, Any]]
     flows: list[dict[str, Any]]
     repo_mappings: list[dict[str, Any]]
@@ -319,6 +322,73 @@ def _build_managed_agents_path(
     return out_dir / f'{scan_id}.md'
 
 
+def _safe_mapping_key(mapping_id: str) -> str:
+    return ''.join(ch if ch.isalnum() or ch in {'-', '_'} else '_' for ch in mapping_id)[:80] or 'mapping'
+
+
+def _find_latest_agents_doc(
+    organization_id: int,
+    mapping_id: str,
+    local_path: str | None = None,
+) -> Path | None:
+    safe_mapping = _safe_mapping_key(mapping_id)
+    candidates: list[Path] = []
+    if local_path:
+        try:
+            root = Path(local_path).expanduser().resolve()
+            repo_dir = root / '.tiqr' / 'agents' / safe_mapping
+            if repo_dir.exists() and repo_dir.is_dir():
+                candidates.extend(p for p in repo_dir.glob('*.md') if p.is_file())
+        except Exception:
+            pass
+    app_root = Path(__file__).resolve().parents[2]
+    legacy_dir = app_root / 'data' / 'repo_agents' / f'org_{organization_id}' / safe_mapping
+    if legacy_dir.exists() and legacy_dir.is_dir():
+        candidates.extend(p for p in legacy_dir.glob('*.md') if p.is_file())
+    if not candidates:
+        return None
+    return max(candidates, key=lambda p: p.stat().st_mtime)
+
+
+def _recover_repo_profiles_from_files(
+    organization_id: int,
+    repo_mappings: list[dict[str, Any]],
+    existing_profiles: dict[str, Any] | None,
+) -> dict[str, Any]:
+    profiles: dict[str, Any] = dict(existing_profiles or {})
+    for m in repo_mappings:
+        if not isinstance(m, dict):
+            continue
+        mapping_id = str(m.get('id') or '').strip()
+        if not mapping_id:
+            continue
+        if isinstance(profiles.get(mapping_id), dict):
+            continue
+        local_path = str(m.get('local_path') or '').strip()
+        latest = _find_latest_agents_doc(organization_id, mapping_id, local_path=local_path)
+        if latest is None:
+            continue
+        scanned_at = datetime.utcfromtimestamp(latest.stat().st_mtime).isoformat() + 'Z'
+        profiles[mapping_id] = {
+            'mapping_name': str(m.get('name') or mapping_id),
+            'azure_repo_name': str(m.get('azure_repo_name') or '') or None,
+            'local_path': local_path,
+            'stack': ['Recovered'],
+            'package_manager': None,
+            'suggested_test_commands': [],
+            'suggested_lint_commands': [],
+            'top_directories': [],
+            'top_files': [],
+            'profile_version': 1,
+            'scanned_at': scanned_at,
+            'scan_id': latest.stem,
+            'agents_md_path': str(latest),
+            'scanned_by_provider': 'recovered',
+            'scanned_model': None,
+        }
+    return profiles
+
+
 async def _get_or_create_pref(db: AsyncSession, user_id: int) -> UserPreference:
     result = await db.execute(select(UserPreference).where(UserPreference.user_id == user_id))
     pref = result.scalar_one_or_none()
@@ -369,17 +439,50 @@ async def get_preferences(
     if pref is None:
         return PreferenceResponse(
             azure_project=None, azure_team=None, azure_sprint_path=None,
-            my_team=[], agents=[], flows=[], repo_mappings=[], profile_settings={},
+            my_team=[], my_team_source='azure', my_team_by_source={'azure': [], 'jira': []},
+            agents=[], flows=[], repo_mappings=[], profile_settings={},
         )
+    profile_settings = _parse_json_obj(pref.profile_settings_json)
+    repo_mappings = _parse_json(pref.repo_mappings_json)
+    repo_profiles_raw = profile_settings.get('repo_profiles')
+    recovered_profiles = _recover_repo_profiles_from_files(
+        tenant.organization_id,
+        repo_mappings,
+        repo_profiles_raw if isinstance(repo_profiles_raw, dict) else {},
+    )
+    if recovered_profiles and recovered_profiles != (repo_profiles_raw if isinstance(repo_profiles_raw, dict) else {}):
+        profile_settings['repo_profiles'] = recovered_profiles
+        pref.profile_settings_json = json.dumps(profile_settings, ensure_ascii=False)
+        await db.commit()
+        await db.refresh(pref)
+        profile_settings = _parse_json_obj(pref.profile_settings_json)
+
+    legacy_team = _parse_json(pref.my_team_json)
+    my_team_source = str(profile_settings.get('my_team_source') or 'azure').strip().lower()
+    if my_team_source not in {'azure', 'jira'}:
+        my_team_source = 'azure'
+    raw_by_source = profile_settings.get('my_team_by_source')
+    my_team_by_source: dict[str, list[dict[str, Any]]] = {'azure': [], 'jira': []}
+    if isinstance(raw_by_source, dict):
+        for src in ('azure', 'jira'):
+            value = raw_by_source.get(src)
+            if isinstance(value, list):
+                my_team_by_source[src] = value
+    if legacy_team and not my_team_by_source.get('azure'):
+        my_team_by_source['azure'] = legacy_team
+    selected_my_team = my_team_by_source.get(my_team_source) or []
+
     return PreferenceResponse(
         azure_project=pref.azure_project,
         azure_team=pref.azure_team,
         azure_sprint_path=pref.azure_sprint_path,
-        my_team=_parse_json(pref.my_team_json),
+        my_team=selected_my_team,
+        my_team_source=my_team_source,
+        my_team_by_source=my_team_by_source,
         agents=_parse_json(pref.agents_json),
         flows=_parse_json(pref.flows_json),
-        repo_mappings=_parse_json(pref.repo_mappings_json),
-        profile_settings=_parse_json_obj(pref.profile_settings_json),
+        repo_mappings=repo_mappings,
+        profile_settings=profile_settings,
     )
 
 
@@ -397,8 +500,29 @@ async def save_preferences(
         pref.azure_team = payload.azure_team
     if payload.azure_sprint_path is not None:
         pref.azure_sprint_path = payload.azure_sprint_path
+    current_settings = _parse_json_obj(pref.profile_settings_json)
+    next_source = str(payload.my_team_source or current_settings.get('my_team_source') or 'azure').strip().lower()
+    if next_source not in {'azure', 'jira'}:
+        next_source = 'azure'
+    raw_by_source = current_settings.get('my_team_by_source')
+    by_source: dict[str, list[dict[str, Any]]] = {'azure': [], 'jira': []}
+    if isinstance(raw_by_source, dict):
+        for src in ('azure', 'jira'):
+            value = raw_by_source.get(src)
+            if isinstance(value, list):
+                by_source[src] = value
+    legacy_team = _parse_json(pref.my_team_json)
+    if legacy_team and not by_source.get('azure'):
+        by_source['azure'] = legacy_team
+
     if payload.my_team is not None:
-        pref.my_team_json = json.dumps(payload.my_team, ensure_ascii=False)
+        by_source[next_source] = payload.my_team
+        if next_source == 'azure':
+            pref.my_team_json = json.dumps(payload.my_team, ensure_ascii=False)
+        elif by_source.get('azure'):
+            pref.my_team_json = json.dumps(by_source['azure'], ensure_ascii=False)
+        else:
+            pref.my_team_json = json.dumps([], ensure_ascii=False)
     if payload.agents is not None:
         pref.agents_json = json.dumps(payload.agents, ensure_ascii=False)
     if payload.flows is not None:
@@ -406,20 +530,42 @@ async def save_preferences(
     if payload.repo_mappings is not None:
         pref.repo_mappings_json = json.dumps(payload.repo_mappings, ensure_ascii=False)
     if payload.profile_settings is not None:
-        pref.profile_settings_json = json.dumps(payload.profile_settings, ensure_ascii=False)
+        merged_settings = {**current_settings, **payload.profile_settings}
+        current_settings = merged_settings
+
+    current_settings['my_team_source'] = next_source
+    current_settings['my_team_by_source'] = by_source
+    pref.profile_settings_json = json.dumps(current_settings, ensure_ascii=False)
 
     await db.commit()
     await db.refresh(pref)
+
+    final_settings = _parse_json_obj(pref.profile_settings_json)
+    final_source = str(final_settings.get('my_team_source') or 'azure').strip().lower()
+    if final_source not in {'azure', 'jira'}:
+        final_source = 'azure'
+    final_by_source: dict[str, list[dict[str, Any]]] = {'azure': [], 'jira': []}
+    raw_final_by_source = final_settings.get('my_team_by_source')
+    if isinstance(raw_final_by_source, dict):
+        for src in ('azure', 'jira'):
+            value = raw_final_by_source.get(src)
+            if isinstance(value, list):
+                final_by_source[src] = value
+    legacy_team_after = _parse_json(pref.my_team_json)
+    if legacy_team_after and not final_by_source.get('azure'):
+        final_by_source['azure'] = legacy_team_after
 
     return PreferenceResponse(
         azure_project=pref.azure_project,
         azure_team=pref.azure_team,
         azure_sprint_path=pref.azure_sprint_path,
-        my_team=_parse_json(pref.my_team_json),
+        my_team=final_by_source.get(final_source) or [],
+        my_team_source=final_source,
+        my_team_by_source=final_by_source,
         agents=_parse_json(pref.agents_json),
         flows=_parse_json(pref.flows_json),
         repo_mappings=_parse_json(pref.repo_mappings_json),
-        profile_settings=_parse_json_obj(pref.profile_settings_json),
+        profile_settings=final_settings,
     )
 
 

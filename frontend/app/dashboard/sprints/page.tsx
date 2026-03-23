@@ -184,8 +184,9 @@ export default function SprintsPage() {
   useEffect(() => {
     setAgentConfigs(loadAgentConfigs());
     const init = async () => {
-      // Always prefer Azure on first load. Switch to Jira only if Azure is not connected.
-      let savedProvider: 'azure' | 'jira' = 'azure';
+      // Prefer saved provider, fallback to Azure.
+      const initialProvider = localStorage.getItem(LS_PROVIDER) === 'jira' ? 'jira' : 'azure';
+      let savedProvider: 'azure' | 'jira' = initialProvider;
       let savedProject = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_PROJECT : LS_PROJECT) || '';
       let savedTeam    = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_BOARD : LS_TEAM) || '';
       let savedSprint  = localStorage.getItem(savedProvider === 'jira' ? LS_JIRA_SPRINT : LS_SPRINT) || '';
@@ -479,42 +480,63 @@ export default function SprintsPage() {
       if (!validBoard || !validSprint) return;
     }
     setLbd(true); setErr('');
-    let activeStatesSnapshot: string[] = [];
     const statesUrl = provider === 'jira'
       ? '/tasks/jira/states?board_id=' + encodeURIComponent(team) + '&sprint_id=' + encodeURIComponent(sprint)
       : '/tasks/azure/states?project=' + encodeURIComponent(project) + '&team=' + encodeURIComponent(team) + '&sprint_path=' + encodeURIComponent(sprint);
-    apiFetch<string[]>(statesUrl)
-      .then((fetchedStates) => {
-        const active = fetchedStates.length > 0 ? fetchedStates : ['Backlog','To Do','In Progress','Done'];
-        activeStatesSnapshot = active;
-        setStates(active);
-        return Promise.allSettled(
-          active.map(async (state) => {
-            if (provider === 'jira') {
-              const q = new URLSearchParams({ state, board_id: team, sprint_id: sprint, project_key: project });
-              const r = await apiFetch<{ items: WorkItem[] }>('/tasks/jira?' + q.toString());
-              return r.items.map((item) => ({ ...item, state: item.state || state, source: 'jira' }));
-            }
-            const q = new URLSearchParams({ state, sprint_path: sprint });
-            if (project) q.set('project', project);
-            if (team)    q.set('team', team);
-            const r = await apiFetch<{ items: WorkItem[] }>('/tasks/azure?' + q.toString());
-            return r.items.map((item) => ({ ...item, state, source: 'azure' }));
-          })
-        );
-      }).then((results) => {
-        if (!results) return;
-        const merged: WorkItem[] = [];
-        results.forEach((r) => { if (r.status === 'fulfilled') merged.push(...r.value); });
+    const run = async () => {
+      try {
+        const fetchedStates = await apiFetch<string[]>(statesUrl);
+        const activeStates = fetchedStates.length > 0 ? fetchedStates : ['Backlog', 'To Do', 'In Progress', 'Done'];
+        setStates(activeStates);
+
+        let merged: WorkItem[] = [];
+        if (provider === 'jira') {
+          const q = new URLSearchParams({ board_id: team, sprint_id: sprint, project_key: project });
+          const r = await apiFetch<{ items: WorkItem[] }>('/tasks/jira?' + q.toString());
+          merged = r.items.map((item) => ({ ...item, source: 'jira' }));
+        } else {
+          const results = await Promise.allSettled(
+            activeStates.map(async (state) => {
+              const q = new URLSearchParams({ state, sprint_path: sprint });
+              if (project) q.set('project', project);
+              if (team) q.set('team', team);
+              const r = await apiFetch<{ items: WorkItem[] }>('/tasks/azure?' + q.toString());
+              return r.items.map((item) => ({ ...item, state, source: 'azure' }));
+            }),
+          );
+          results.forEach((r) => {
+            if (r.status === 'fulfilled') merged.push(...r.value);
+          });
+        }
+
         const alias = new Map<string, string>();
-        activeStatesSnapshot.forEach((s) => alias.set(normalizeState(s), s));
+        activeStates.forEach((s) => alias.set(normalizeState(s), s));
         const normalized = merged.map((item) => {
           const canonical = alias.get(normalizeState(item.state)) || item.state;
           return { ...item, state: canonical };
         });
+
+        if (provider === 'jira' && normalized.length > 0) {
+          const seen = new Set(activeStates.map((s) => normalizeState(s)));
+          const discovered: string[] = [];
+          normalized.forEach((item) => {
+            const name = String(item.state || '').trim();
+            const key = normalizeState(name);
+            if (name && key && !seen.has(key)) {
+              seen.add(key);
+              discovered.push(name);
+            }
+          });
+          if (discovered.length > 0) setStates([...activeStates, ...discovered]);
+        }
         setItems(normalized);
-      }).catch((e: unknown) => setErr(e instanceof Error ? e.message : t('sprints.boardError')))
-        .finally(() => setLbd(false));
+      } catch (e: unknown) {
+        setErr(e instanceof Error ? e.message : t('sprints.boardError'));
+      } finally {
+        setLbd(false);
+      }
+    };
+    void run();
   }, [sprint, project, team, provider, t]);
 
   function doImport(state: string) {
