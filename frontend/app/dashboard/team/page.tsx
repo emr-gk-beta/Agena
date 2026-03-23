@@ -39,6 +39,13 @@ export default function TeamPage() {
   const [project,    setProject]    = useState('');
   const [team,       setTeam]       = useState('');
   const [sprintPath, setSprintPath] = useState('');
+  const [providerDefaults, setProviderDefaults] = useState<{
+    azure: { project: string; team: string; sprint: string };
+    jira: { project: string; team: string; sprint: string };
+  }>({
+    azure: { project: '', team: '', sprint: '' },
+    jira: { project: '', team: '', sprint: '' },
+  });
 
   // Tüm Azure üyeleri (arama için)
   const [allMembers, setAllMembers] = useState<AzureMember[]>([]);
@@ -52,6 +59,7 @@ export default function TeamPage() {
   const [search, setSearch] = useState('');
   const [showPicker, setShowPicker] = useState(false);
   const membersReqRef = React.useRef(0);
+  const sprintResolveReqRef = React.useRef(0);
 
   // İş detayları
   const [workItems,    setWorkItems]    = useState<Record<string, WorkItem[]>>({});
@@ -74,16 +82,27 @@ export default function TeamPage() {
         setHasAzure(azureConnected);
         setHasJira(jiraConnected);
 
-        const preferred = localStorage.getItem(LS_PROVIDER) === 'jira' ? 'jira' : 'azure';
-        const selectedProvider: 'azure' | 'jira' =
-          (preferred === 'jira' && jiraConnected) ? 'jira' :
-          (azureConnected ? 'azure' : 'jira');
-        setProvider(selectedProvider);
-
         const rawSettings = (prefs.profile_settings || {}) as Record<string, unknown>;
         const jiraProject = typeof rawSettings.jira_project === 'string' ? rawSettings.jira_project : '';
         const jiraBoard = typeof rawSettings.jira_board === 'string' ? rawSettings.jira_board : '';
         const jiraSprint = typeof rawSettings.jira_sprint_id === 'string' ? rawSettings.jira_sprint_id : '';
+        const azureProject = prefs.azure_project || '';
+        const azureTeam = prefs.azure_team || '';
+        const azureSprint = prefs.azure_sprint_path || '';
+        const jiraProjectValue = jiraProject || '';
+        const jiraBoardValue = jiraBoard || '';
+        const jiraSprintValue = jiraSprint || '';
+        const hasAzureProfileSelection = Boolean(azureProject || azureTeam || azureSprint);
+        const hasJiraProfileSelection = Boolean(jiraProjectValue || jiraBoardValue || jiraSprintValue);
+        const selectedProvider: 'azure' | 'jira' =
+          (azureConnected && hasAzureProfileSelection) ? 'azure' :
+          (jiraConnected && hasJiraProfileSelection) ? 'jira' :
+          (azureConnected ? 'azure' : 'jira');
+        setProvider(selectedProvider);
+        setProviderDefaults({
+          azure: { project: azureProject, team: azureTeam, sprint: azureSprint },
+          jira: { project: jiraProjectValue, team: jiraBoardValue, sprint: jiraSprintValue },
+        });
         const bySourceRaw = prefs.my_team_by_source;
         const bySource: Record<'azure' | 'jira', AzureMember[]> = {
           azure: (bySourceRaw && Array.isArray(bySourceRaw.azure)) ? bySourceRaw.azure : (prefs.my_team || []),
@@ -92,20 +111,14 @@ export default function TeamPage() {
         setMyTeamBySource(bySource);
 
         if (selectedProvider === 'jira') {
-          const p = jiraProject || localStorage.getItem(LS_JIRA_PROJECT) || '';
-          const b = jiraBoard || localStorage.getItem(LS_JIRA_BOARD) || '';
-          const s = jiraSprint || localStorage.getItem(LS_JIRA_SPRINT) || '';
-          setProject(p);
-          setTeam(b);
-          setSprintPath(s);
+          setProject(jiraProjectValue);
+          setTeam(jiraBoardValue);
+          setSprintPath(jiraSprintValue);
           setMyTeam(bySource.jira || []);
         } else {
-          const p = prefs.azure_project || localStorage.getItem(LS_PROJECT) || '';
-          const tm = prefs.azure_team || localStorage.getItem(LS_TEAM) || '';
-          const s = prefs.azure_sprint_path || localStorage.getItem(LS_SPRINT) || '';
-          setProject(p);
-          setTeam(tm);
-          setSprintPath(s);
+          setProject(azureProject);
+          setTeam(azureTeam);
+          setSprintPath(azureSprint);
           setMyTeam(bySource.azure || []);
         }
       } catch (e: unknown) {
@@ -132,6 +145,38 @@ export default function TeamPage() {
   useEffect(() => {
     localStorage.setItem(LS_PROVIDER, provider);
   }, [provider]);
+
+  useEffect(() => {
+    const reqId = ++sprintResolveReqRef.current;
+    const run = async () => {
+      try {
+        if (provider === 'jira') {
+          if (!team) return;
+          type JiraSprint = { id?: string; name: string; path?: string; is_current?: boolean };
+          const sprints = await apiFetch<JiraSprint[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(team));
+          if (reqId !== sprintResolveReqRef.current) return;
+          const current = sprints.find((s) => s.is_current) || sprints[0];
+          if (!current) return;
+          const next = current.id ?? current.path ?? current.name;
+          if (next && next !== sprintPath) setSprintPath(next);
+          return;
+        }
+        if (!project || !team) return;
+        type AzureSprint = { name: string; path?: string; is_current?: boolean };
+        const sprints = await apiFetch<AzureSprint[]>(
+          '/tasks/azure/sprints?project=' + encodeURIComponent(project) + '&team=' + encodeURIComponent(team),
+        );
+        if (reqId !== sprintResolveReqRef.current) return;
+        const current = sprints.find((s) => s.is_current) || sprints[0];
+        if (!current) return;
+        const next = current.path ?? current.name;
+        if (next && next !== sprintPath) setSprintPath(next);
+      } catch {
+        // silent fallback: keep current sprintPath from profile
+      }
+    };
+    void run();
+  }, [provider, project, team]);
 
   useEffect(() => {
     const reqId = ++membersReqRef.current;
@@ -223,7 +268,7 @@ export default function TeamPage() {
     }
   }
 
-  const hasConfig = provider === 'jira' ? !!(team && sprintPath) : !!(project && team);
+  const hasConfig = provider === 'jira' ? !!(team && sprintPath) : !!(project && team && sprintPath);
 
   return (
     <div style={{ display: 'grid', gap: 24 }}>
@@ -239,9 +284,9 @@ export default function TeamPage() {
               <button
                 onClick={() => {
                   setProvider('azure');
-                  setProject(localStorage.getItem(LS_PROJECT) || '');
-                  setTeam(localStorage.getItem(LS_TEAM) || '');
-                  setSprintPath(localStorage.getItem(LS_SPRINT) || '');
+                  setProject(providerDefaults.azure.project);
+                  setTeam(providerDefaults.azure.team);
+                  setSprintPath(providerDefaults.azure.sprint);
                   setMyTeam(myTeamBySource.azure || []);
                 }}
                 style={{
@@ -262,9 +307,9 @@ export default function TeamPage() {
               <button
                 onClick={() => {
                   setProvider('jira');
-                  setProject(localStorage.getItem(LS_JIRA_PROJECT) || '');
-                  setTeam(localStorage.getItem(LS_JIRA_BOARD) || '');
-                  setSprintPath(localStorage.getItem(LS_JIRA_SPRINT) || '');
+                  setProject(providerDefaults.jira.project);
+                  setTeam(providerDefaults.jira.team);
+                  setSprintPath(providerDefaults.jira.sprint);
                   setMyTeam(myTeamBySource.jira || []);
                 }}
                 style={{
