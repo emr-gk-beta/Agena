@@ -61,10 +61,20 @@ async def list_github_repos(
                     if org_response.status_code == 404:
                         user_url = f'{base}/users/{quote(resolved_owner, safe="")}/repos?per_page=100&sort=updated'
                         response = await client.get(user_url, headers=headers)
-                        data = response.json() if response.status_code < 400 else []
+                        fallback_data = response.json() if response.status_code < 400 else []
+                        if isinstance(fallback_data, list) and fallback_data:
+                            data = fallback_data
+                        else:
+                            # Owner filter did not produce results; return token-visible repos.
+                            data = raw
                     else:
                         response = org_response
-                        data = response.json() if response.status_code < 400 else []
+                        fallback_data = response.json() if response.status_code < 400 else []
+                        if isinstance(fallback_data, list) and fallback_data:
+                            data = fallback_data
+                        else:
+                            # Owner filter did not produce results; return token-visible repos.
+                            data = raw
             else:
                 data = []
         else:

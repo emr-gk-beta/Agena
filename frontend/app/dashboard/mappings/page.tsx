@@ -88,7 +88,6 @@ export default function RepoMappingsPage() {
         const integrations = await apiFetch<Array<{ provider: string; has_secret?: boolean; username?: string | null }>>('/integrations');
         const github = integrations.find((c) => c.provider === 'github');
         setHasGithubIntegration(Boolean(github?.has_secret));
-        if (github?.username) setGithubOwner(github.username);
       } catch {
         setHasGithubIntegration(false);
       }
@@ -339,6 +338,7 @@ export default function RepoMappingsPage() {
               <div>
                 <div style={fieldLabelStyle}>{t('mappings.githubOwner')}</div>
                 <input value={githubOwner} onChange={(e) => setGithubOwner(e.target.value)} placeholder={t('mappings.githubOwnerPlaceholder')} style={fieldStyle} />
+                <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{t('mappings.githubOwnerHint')}</div>
               </div>
               <div>
                 <div style={fieldLabelStyle}>{t('mappings.githubRepo')}</div>
