@@ -91,6 +91,7 @@ export default function RepoMappingsPage() {
         const integrations = await apiFetch<Array<{ provider: string; has_secret?: boolean; username?: string | null }>>('/integrations');
         const github = integrations.find((c) => c.provider === 'github');
         setHasGithubIntegration(Boolean(github?.has_secret));
+        if (github?.username && github.username.trim()) setGithubOwner(github.username.trim());
       } catch {
         setHasGithubIntegration(false);
       }
