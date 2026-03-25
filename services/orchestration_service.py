@@ -274,44 +274,160 @@ class OrchestrationService:
                         f'  recommendedNextStep: {str(spec.get("recommendedNextStep",""))[:200]}'
                     )
                 else:
-                    await task_service.add_log(task.id, organization_id, 'agent', 'PM skipped (direct AI mode) — developer will work directly with source files')
-                    # Build a clear spec from task info + list source files for developer
-                    ctx = flow_state.get('context_summary', '')
-                    source_files_list = re.findall(r'--- ([\w/._-]+)', ctx)
-                    flow_state['spec'] = {
-                        'goal': task.title,
-                        'summary': task.description or task.title,
-                        'file_changes': [{'file': f, 'action': 'modify', 'description': 'Review and modify as needed for task'} for f in source_files_list[:10]],
-                        'available_source_files': source_files_list,
-                        'instruction': 'You have ALL the source files below. Find the relevant structs/functions, make the changes, and return **File: path** blocks.',
-                    }
+                    # === 2-STEP AI MODE ===
+                    # Step 2a: Plan — send agents.md, get file list + plan
+                    # Priority: 1) repo'nun kendi agents.md'si, 2) tiqr'in olusturdugu (DB/disk), 3) full scan
+                    agents_md_content = ''
+                    agents_md_source = ''
+                    repo_root = Path(routing.local_repo_path).expanduser().resolve() if routing.local_repo_path else None
 
-                # Step: Developer generate code
-                dev_ctx = flow_state.get('context_summary', '')
-                dev_has_source = '=== RELEVANT SOURCE FILES ===' in dev_ctx
-                dev_source_files = re.findall(r'--- ([\w/._-]+)', dev_ctx) if dev_has_source else []
-                await task_service.add_log(task.id, organization_id, 'agent',
-                    f'Step 3/3: Developer generating code...\n'
-                    f'  spec_goal: {str(spec.get("goal",spec.get("summary","")))[:150]}\n'
-                    f'  target_files_context: {len(dev_ctx)} chars | has_source: {dev_has_source} | files: {dev_source_files[:10]}\n'
-                    f'  system_prompt: {"DEV_DIRECT (ai mode)" if mode == "ai" else "DEV_SYSTEM (flow mode)"}\n'
-                    f'  model: {routing.preferred_agent_model or "default"} | max_output_tokens: 32000'
-                )
-                u_before = _get_usage(flow_state)
-                s_start = datetime.utcnow()
-                s_clock = time.perf_counter()
-                flow_state = await orchestrator.generate_code_node(flow_state)
-                u_after = _get_usage(flow_state)
-                dev_delta = _usage_delta(u_before, u_after)
-                s_model = (flow_state.get('model_usage') or [''])[-1]
-                gen_len = len(flow_state.get('generated_code', ''))
-                await _step_event('developer_generate', dev_delta, s_model, s_start, time.perf_counter() - s_clock)
+                    # 1) Repo'nun kendi agents.md'si
+                    if repo_root:
+                        for name in ['agents.md', 'AGENTS.md']:
+                            p = repo_root / name
+                            if p.is_file():
+                                try:
+                                    agents_md_content = p.read_text(errors='replace')
+                                    agents_md_source = f'repo:{name}'
+                                    break
+                                except Exception:
+                                    pass
 
-                # Developer output = final output
-                generated = flow_state.get('generated_code', '')
+                    # 2) Tiqr'in olusturdugu — DB profildeki path
+                    if not agents_md_content:
+                        try:
+                            pref_result = await self.db_session.execute(
+                                select(UserPreference).where(UserPreference.user_id == task.created_by_user_id)
+                            )
+                            pref = pref_result.scalar_one_or_none()
+                            if pref and pref.profile_settings_json:
+                                settings = json.loads(pref.profile_settings_json)
+                                for _mid, profile in (settings.get('repo_profiles') or {}).items():
+                                    if profile.get('local_path', '').rstrip('/') == str(repo_root).rstrip('/'):
+                                        db_path = profile.get('agents_md_path', '')
+                                        if db_path and Path(db_path).is_file():
+                                            agents_md_content = Path(db_path).read_text(errors='replace')
+                                            agents_md_source = f'db:{db_path}'
+                                            break
+                        except Exception:
+                            pass
+
+                    # 3) .tiqr directory
+                    if not agents_md_content and repo_root:
+                        tiqr_dir = repo_root / '.tiqr' / 'agents'
+                        if tiqr_dir.is_dir():
+                            for md_file in sorted(tiqr_dir.rglob('*.md'), key=lambda f: f.stat().st_mtime, reverse=True):
+                                try:
+                                    agents_md_content = md_file.read_text(errors='replace')
+                                    agents_md_source = f'.tiqr:{md_file}'
+                                    break
+                                except Exception:
+                                    pass
+
+                    # 4) Fallback — full repo scan
+                    if not agents_md_content:
+                        agents_md_content = flow_state.get('context_summary', '')
+                        agents_md_source = 'fallback:full_scan'
+
+                    await task_service.add_log(task.id, organization_id, 'agent',
+                        f'Step 2/3: AI Planning...\n'
+                        f'  agents_md: {len(agents_md_content)} chars (source: {agents_md_source})\n'
+                        f'  system_prompt: AI_PLAN_SYSTEM_PROMPT\n'
+                        f'  model: {routing.preferred_agent_model or "default"}'
+                    )
+                    u_before = _get_usage(flow_state)
+                    s_start = datetime.utcnow()
+                    s_clock = time.perf_counter()
+                    plan, plan_usage, plan_model = await orchestrator.agents.run_ai_plan(
+                        task_title=task.title,
+                        task_description=task.description or '',
+                        agents_md=agents_md_content,
+                    )
+                    orchestrator._merge_usage(flow_state, plan_usage)
+                    flow_state['model_usage'].append(plan_model)
+                    plan_delta = _usage_delta(u_before, _get_usage(flow_state))
+                    await _step_event('ai_plan', plan_delta, plan_model, s_start, time.perf_counter() - s_clock)
+
+                    plan_files = plan.get('files', [])
+                    plan_changes = plan.get('changes', [])
+                    await task_service.add_log(task.id, organization_id, 'agent',
+                        f'AI Plan result:\n'
+                        f'  model: {plan_model} | tokens: prompt={plan_delta["prompt_tokens"]} completion={plan_delta["completion_tokens"]}\n'
+                        f'  plan: {str(plan.get("plan",""))[:300]}\n'
+                        f'  files: {plan_files}\n'
+                        f'  changes: {json.dumps(plan_changes, ensure_ascii=False)[:400]}'
+                    )
+
+                    # Step 2b: Read the actual files from disk
+                    file_contents_parts: list[str] = []
+                    total_read = 0
+                    repo_root = Path(routing.local_repo_path).expanduser().resolve() if routing.local_repo_path else None
+                    for fp in plan_files:
+                        if not repo_root:
+                            break
+                        full = repo_root / fp
+                        if not full.is_file():
+                            file_contents_parts.append(f'\n--- {fp} (not found) ---\n')
+                            continue
+                        try:
+                            content = full.read_text(errors='replace')
+                            file_contents_parts.append(f'\n--- {fp} ({len(content)} chars) ---\n{content}')
+                            total_read += len(content)
+                        except Exception:
+                            file_contents_parts.append(f'\n--- {fp} (read error) ---\n')
+                    file_contents = '\n'.join(file_contents_parts)
+
+                    flow_state['spec'] = plan
+
+                # Step 3: Developer generate code
+                if mode == 'ai':
+                    # AI mode step 3: send plan + file contents
+                    await task_service.add_log(task.id, organization_id, 'agent',
+                        f'Step 3/3: Developer coding...\n'
+                        f'  plan_files: {plan_files}\n'
+                        f'  file_contents: {total_read} chars ({len(plan_files)} files)\n'
+                        f'  system_prompt: AI_CODE_SYSTEM_PROMPT\n'
+                        f'  model: {routing.preferred_agent_model or "default"} | max_output_tokens: 32000'
+                    )
+                    u_before = _get_usage(flow_state)
+                    s_start = datetime.utcnow()
+                    s_clock = time.perf_counter()
+                    generated, code_usage, code_model = await orchestrator.agents.run_ai_code(
+                        task_title=task.title,
+                        task_description=task.description or '',
+                        plan=plan,
+                        file_contents=file_contents,
+                    )
+                    orchestrator._merge_usage(flow_state, code_usage)
+                    flow_state['model_usage'].append(code_model)
+                    flow_state['generated_code'] = generated
+                    dev_delta = _usage_delta(u_before, _get_usage(flow_state))
+                    gen_len = len(generated)
+                    await _step_event('developer_generate', dev_delta, code_model, s_start, time.perf_counter() - s_clock)
+                else:
+                    # Flow mode step 3: use orchestrator node
+                    spec = flow_state.get('spec', {})
+                    dev_ctx = flow_state.get('context_summary', '')
+                    await task_service.add_log(task.id, organization_id, 'agent',
+                        f'Step 3/3: Developer generating code...\n'
+                        f'  spec_goal: {str(spec.get("goal",spec.get("summary","")))[:150]}\n'
+                        f'  target_files_context: {len(dev_ctx)} chars\n'
+                        f'  system_prompt: DEV_SYSTEM (flow mode)\n'
+                        f'  model: {routing.preferred_agent_model or "default"} | max_output_tokens: 32000'
+                    )
+                    u_before = _get_usage(flow_state)
+                    s_start = datetime.utcnow()
+                    s_clock = time.perf_counter()
+                    flow_state = await orchestrator.generate_code_node(flow_state)
+                    dev_delta = _usage_delta(u_before, _get_usage(flow_state))
+                    s_model = (flow_state.get('model_usage') or [''])[-1]
+                    gen_len = len(flow_state.get('generated_code', ''))
+                    await _step_event('developer_generate', dev_delta, s_model, s_start, time.perf_counter() - s_clock)
+                    generated = flow_state.get('generated_code', '')
+                dev_model = code_model if mode == 'ai' else (flow_state.get('model_usage') or [''])[-1]
                 await task_service.add_log(task.id, organization_id, 'agent',
                     f'Developer result:\n'
-                    f'  model: {s_model} | tokens: prompt={dev_delta["prompt_tokens"]} completion={dev_delta["completion_tokens"]}\n'
+                    f'  model: {dev_model} | tokens: prompt={dev_delta["prompt_tokens"]} completion={dev_delta["completion_tokens"]}\n'
                     f'  output_length: {gen_len} chars\n'
                     f'  output_preview:\n{generated[:800]}'
                 )
