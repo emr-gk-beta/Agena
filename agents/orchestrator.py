@@ -77,7 +77,7 @@ class AgentOrchestrator:
 
         generated_code, usage, model = await self.agents.run_developer(
             spec=spec,
-            context_summary='',
+            context_summary=ctx,
             task_description=desc,
             target_files_context=ctx,
             direct_mode=(run_mode == 'ai'),

@@ -296,11 +296,12 @@ function AssignTaskModal({
   const [selProvider, setSelProvider] = useState(agent.provider || '');
   const [selModel, setSelModel] = useState(agent.model || '');
   const [customModel, setCustomModel] = useState('');
+  const [createPr, setCreatePr] = useState(true);
   const assignable = tasks.filter((tk) => tk.status === 'queued' || tk.status === 'failed');
   const availModels = modelsForProvider(selProvider);
 
   const assignBody = () => {
-    const body: Record<string, unknown> = { create_pr: true };
+    const body: Record<string, unknown> = { create_pr: createPr };
     if (selProvider) body.agent_provider = selProvider;
     const m = selModel || customModel;
     if (m) body.agent_model = m;
@@ -324,7 +325,7 @@ function AssignTaskModal({
         method: 'POST',
         body: JSON.stringify({
           task: { title: title.trim(), description: desc.trim() || title.trim() },
-          async_mode: true, create_pr: true,
+          async_mode: true, create_pr: createPr,
           agent_provider: selProvider || undefined,
           agent_model: (selModel || customModel) || undefined,
           agent_role: agent.role || undefined,
@@ -383,6 +384,13 @@ function AssignTaskModal({
               style={{ width: '100%', padding: '7px 10px', borderRadius: 8, fontSize: 11, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink-90)', outline: 'none', boxSizing: 'border-box' }} />
           ) : null}
         </div>
+
+        {/* Create PR toggle */}
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12, fontSize: 12, color: 'var(--ink-60)', cursor: 'pointer', userSelect: 'none' }}>
+          <input type="checkbox" checked={createPr} onChange={(e) => setCreatePr(e.target.checked)}
+            style={{ accentColor: agent.color, width: 16, height: 16, cursor: 'pointer' }} />
+          {t('office.createPr')}
+        </label>
 
         {/* Tabs */}
         <div style={{ display: 'flex', gap: 4, marginBottom: 16 }}>

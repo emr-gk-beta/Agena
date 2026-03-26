@@ -267,7 +267,7 @@ class OrchestrationService:
                     )
 
                 # Step 1: Fetch context
-                total_steps = 3 if mode == 'flow' else 2
+                total_steps = 4 if mode == 'flow' else 3
                 await task_service.add_log(task.id, organization_id, 'agent', f'Step 1/{total_steps}: Fetching context & memory... (mode={mode})')
                 u_before = _get_usage(flow_state)
                 s_start = datetime.utcnow()
@@ -286,7 +286,7 @@ class OrchestrationService:
                     pm_has_source = '=== RELEVANT SOURCE FILES ===' in pm_ctx
                     source_file_names = re.findall(r'--- ([\w/._-]+)', pm_ctx) if pm_has_source else []
                     await task_service.add_log(task.id, organization_id, 'agent',
-                        f'Step 2/3: PM analyzing task...\n'
+                        f'Step 2/{total_steps}: PM analyzing task...\n'
                         f'  context_summary: {ctx_len} chars | has_source_files: {pm_has_source} | source_files: {source_file_names[:10]}\n'
                         f'  memory_hits: {mem_hits}\n'
                         f'  system_prompt: PM_SYSTEM_PROMPT (technical review agent)\n'
@@ -367,7 +367,7 @@ class OrchestrationService:
                         agents_md_source = 'fallback:full_scan'
 
                     await task_service.add_log(task.id, organization_id, 'agent',
-                        f'Step 2/3: AI Planning...\n'
+                        f'Step 2/{total_steps}: AI Planning...\n'
                         f'  agents_md: {len(agents_md_content)} chars (source: {agents_md_source})\n'
                         f'  system_prompt: AI_PLAN_SYSTEM_PROMPT\n'
                         f'  model: {routing.preferred_agent_model or "default"}'
@@ -420,7 +420,7 @@ class OrchestrationService:
                 if mode == 'ai':
                     # AI mode step 3: send plan + file contents
                     await task_service.add_log(task.id, organization_id, 'agent',
-                        f'Step 3/3: Developer coding...\n'
+                        f'Step 3/{total_steps}: Developer coding...\n'
                         f'  plan_files: {plan_files}\n'
                         f'  file_contents: {total_read} chars ({len(plan_files)} files)\n'
                         f'  system_prompt: AI_CODE_SYSTEM_PROMPT\n'
@@ -446,7 +446,7 @@ class OrchestrationService:
                     spec = flow_state.get('spec', {})
                     dev_ctx = flow_state.get('context_summary', '')
                     await task_service.add_log(task.id, organization_id, 'agent',
-                        f'Step 3/3: Developer generating code...\n'
+                        f'Step 3/{total_steps}: Developer generating code...\n'
                         f'  spec_goal: {str(spec.get("goal",spec.get("summary","")))[:150]}\n'
                         f'  target_files_context: {len(dev_ctx)} chars\n'
                         f'  system_prompt: DEV_SYSTEM (flow mode)\n'
@@ -468,9 +468,31 @@ class OrchestrationService:
                     f'  output_length: {gen_len} chars\n'
                     f'  output_preview:\n{generated[:800]}'
                 )
+                # Step 4 (flow) / Step 3 (ai): Review code
                 flow_state['reviewed_code'] = generated
-                flow_state['final_code'] = generated
-                final_len = gen_len
+                flow_state['spec'] = spec if spec else flow_state.get('spec', {})
+                review_step = total_steps
+                await task_service.add_log(task.id, organization_id, 'agent',
+                    f'Step {review_step}/{total_steps}: Reviewer checking code...\n'
+                    f'  input_length: {gen_len} chars\n'
+                    f'  system_prompt: REVIEWER_SYSTEM_PROMPT\n'
+                    f'  model: {routing.preferred_agent_model or "default"}'
+                )
+                u_before = _get_usage(flow_state)
+                s_start = datetime.utcnow()
+                s_clock = time.perf_counter()
+                flow_state = await orchestrator.review_code_node(flow_state)
+                review_delta = _usage_delta(u_before, _get_usage(flow_state))
+                s_model = (flow_state.get('model_usage') or [''])[-1]
+                await _step_event('review_code', review_delta, s_model, s_start, time.perf_counter() - s_clock)
+                reviewed = flow_state.get('reviewed_code', generated)
+                final_len = len(reviewed)
+                flow_state['final_code'] = reviewed
+                await task_service.add_log(task.id, organization_id, 'agent',
+                    f'Reviewer result:\n'
+                    f'  model: {s_model} | tokens: prompt={review_delta["prompt_tokens"]} completion={review_delta["completion_tokens"]}\n'
+                    f'  output_length: {final_len} chars'
+                )
 
                 await task_service.add_log(task.id, organization_id, 'agent', f'Flow complete: final_code={final_len} chars, tokens={flow_state.get("usage",{}).get("total_tokens",0)}')
                 state = flow_state
@@ -1240,6 +1262,30 @@ class OrchestrationService:
             chunks.append(f'Tenant Playbook:\n{playbook}')
         return '\n\n'.join(chunks)
 
+    def _get_git_info(self, root: Path) -> str:
+        """Get current branch name and recent commit log from the local repo."""
+        import subprocess
+        parts: list[str] = []
+        try:
+            branch = subprocess.run(
+                ['git', 'rev-parse', '--abbrev-ref', 'HEAD'],
+                cwd=str(root), capture_output=True, text=True, timeout=5,
+            )
+            if branch.returncode == 0 and branch.stdout.strip():
+                parts.append(f'Current Branch: {branch.stdout.strip()}')
+        except Exception:
+            pass
+        try:
+            log = subprocess.run(
+                ['git', 'log', '--oneline', '-10'],
+                cwd=str(root), capture_output=True, text=True, timeout=5,
+            )
+            if log.returncode == 0 and log.stdout.strip():
+                parts.append(f'Recent Commits:\n{log.stdout.strip()}')
+        except Exception:
+            pass
+        return '\n'.join(parts)
+
     async def _build_repo_context(
         self,
         local_repo_path: str | None,
@@ -1256,6 +1302,9 @@ class OrchestrationService:
             if not root.exists() or not root.is_dir():
                 return f'Local repo path is configured but not reachable: {repo_path}'
 
+            # Gather git branch and recent commit info
+            git_info = self._get_git_info(root)
+
             # Check for agents.md first — if exists, use it as primary context
             agents_md = root / 'agents.md'
             if agents_md.is_file():
@@ -1264,6 +1313,10 @@ class OrchestrationService:
                     if len(agents_content) > 500:  # valid agents.md
                         lines = [
                             f'Repo Root: {root}',
+                        ]
+                        if git_info:
+                            lines.append(git_info)
+                        lines += [
                             '',
                             '=== AGENTS.MD (Repository Guide) ===',
                             agents_content,
@@ -1291,6 +1344,8 @@ class OrchestrationService:
             # No agents.md — full repo scan
             relevant_files = self._find_relevant_source_files(root, task_title, task_description)
             lines = [f'Repo Root: {root}']
+            if git_info:
+                lines.append(git_info)
             if relevant_files:
                 lines.append('')
                 lines.append('=== RELEVANT SOURCE FILES ===')
@@ -1315,7 +1370,7 @@ class OrchestrationService:
         task_title: str,
         task_description: str,
     ) -> list[tuple[str, str]]:
-        """Collect ALL source files from the repository. Language agnostic."""
+        """Collect source files from the repository, prioritised by relevance to the task."""
         source_exts = {
             '.go', '.py', '.ts', '.tsx', '.js', '.jsx', '.java', '.rs', '.rb', '.cs',
             '.php', '.swift', '.kt', '.scala', '.c', '.cpp', '.h', '.hpp', '.vue',
@@ -1326,6 +1381,24 @@ class OrchestrationService:
             '.idea', '.vscode', 'target', 'bin', 'obj', '.gradle', 'Pods', 'coverage',
         }
         ignore_files = {'go.sum', 'package-lock.json', 'yarn.lock', 'pnpm-lock.yaml'}
+
+        # Extract keywords from task title + description for relevance scoring
+        raw_text = f'{task_title} {task_description}'.lower()
+        # Remove common stop words and short tokens, keep meaningful keywords
+        stop_words = {
+            'the', 'a', 'an', 'is', 'are', 'was', 'were', 'be', 'been', 'being',
+            'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could',
+            'should', 'may', 'might', 'shall', 'can', 'to', 'of', 'in', 'for',
+            'on', 'with', 'at', 'by', 'from', 'as', 'into', 'through', 'and',
+            'but', 'or', 'not', 'no', 'so', 'if', 'then', 'than', 'that', 'this',
+            'it', 'its', 'all', 'each', 'any', 'both', 'few', 'more', 'most',
+            'other', 'some', 'such', 'only', 'same', 'also', 'just', 'about',
+            'local', 'repo', 'path', 'file', 'code', 'task', 'new', 'add', 'fix',
+        }
+        keywords = [
+            w for w in re.findall(r'[a-z_][a-z0-9_]*', raw_text)
+            if len(w) > 2 and w not in stop_words
+        ]
 
         all_files: list[tuple[Path, int]] = []
         try:
@@ -1349,11 +1422,34 @@ class OrchestrationService:
         except Exception:
             return []
 
-        # Read all files — no sorting, no filtering, just read everything that fits
+        # Score each file by keyword matches in filename and content preview
+        scored: list[tuple[Path, int, float]] = []
+        for f, size in all_files:
+            rel_path_lower = str(f.relative_to(root)).lower()
+            score = 0.0
+            for kw in keywords:
+                # Filename matches are worth more than content matches
+                if kw in rel_path_lower:
+                    score += 3.0
+            # Read first 500 chars for content-based scoring
+            try:
+                with open(f, 'r', errors='replace') as fh:
+                    preview = fh.read(500).lower()
+                for kw in keywords:
+                    if kw in preview:
+                        score += 1.0
+            except Exception:
+                pass
+            scored.append((f, size, score))
+
+        # Sort by relevance score descending, then by path for stability
+        scored.sort(key=lambda x: (-x[2], str(x[0])))
+
+        # Read files in relevance order, highest-scoring first within budget
         result: list[tuple[str, str]] = []
         total_chars = 0
-        max_total = 2000000  # ~500K tokens — use the full context window
-        for f, _size in all_files:
+        max_total = self.settings.max_context_chars
+        for f, _size, _score in scored:
             try:
                 content = f.read_text(errors='replace')
                 if total_chars + len(content) > max_total:
