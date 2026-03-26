@@ -3,7 +3,7 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from models.organization import Organization
+from models.organization import Organization, slugify
 from models.organization_member import OrganizationMember
 from models.subscription import Subscription
 from models.user import User
@@ -16,12 +16,20 @@ class AuthService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    async def signup(self, payload: SignupRequest) -> tuple[str, User, int]:
+    async def signup(self, payload: SignupRequest) -> tuple[str, User, Organization]:
         existing_user = await self.db.execute(select(User).where(User.email == payload.email))
         if existing_user.scalar_one_or_none():
             raise ValueError('Email already registered')
 
-        org = Organization(name=payload.organization_name)
+        # Determine slug: use provided value or auto-generate from org name
+        slug = payload.org_slug.strip().lower() if payload.org_slug else slugify(payload.organization_name)
+
+        # Check slug uniqueness
+        existing_slug = await self.db.execute(select(Organization).where(Organization.slug == slug))
+        if existing_slug.scalar_one_or_none():
+            raise ValueError('Organization slug already taken')
+
+        org = Organization(name=payload.organization_name, slug=slug)
         self.db.add(org)
         await self.db.flush()
 
@@ -39,9 +47,9 @@ class AuthService:
         await self.db.commit()
 
         token = create_access_token(subject=user.email, org_id=org.id, user_id=user.id)
-        return token, user, org.id
+        return token, user, org
 
-    async def login(self, payload: LoginRequest) -> tuple[str, User, int]:
+    async def login(self, payload: LoginRequest) -> tuple[str, User, Organization]:
         result = await self.db.execute(select(User).where(User.email == payload.email))
         user = result.scalar_one_or_none()
         if user is None or not verify_password(payload.password, user.hashed_password):
@@ -54,5 +62,8 @@ class AuthService:
         if membership is None:
             raise ValueError('No organization membership found')
 
-        token = create_access_token(subject=user.email, org_id=membership.organization_id, user_id=user.id)
-        return token, user, membership.organization_id
+        org_row = await self.db.execute(select(Organization).where(Organization.id == membership.organization_id))
+        org = org_row.scalar_one()
+
+        token = create_access_token(subject=user.email, org_id=org.id, user_id=user.id)
+        return token, user, org

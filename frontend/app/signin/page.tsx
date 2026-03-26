@@ -3,11 +3,11 @@
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { apiFetch, isLoggedIn, setToken } from '@/lib/api';
+import { apiFetch, isLoggedIn, setToken, setOrgSlug, setOrgName } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 import LangToggle from '@/components/LangToggle';
 
-type AuthResponse = { access_token: string };
+type AuthResponse = { access_token: string; org_slug: string; org_name: string };
 
 export default function SignInPage() {
   const router = useRouter();
@@ -38,6 +38,8 @@ export default function SignInPage() {
         body: JSON.stringify({ email, password }),
       }, false);
       setToken(res.access_token);
+      if (res.org_slug) setOrgSlug(res.org_slug);
+      if (res.org_name) setOrgName(res.org_name);
       router.push(resolveNextUrl());
     } catch (err) {
       setError(err instanceof Error ? err.message : t('signin.error'));

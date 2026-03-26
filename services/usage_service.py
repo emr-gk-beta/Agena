@@ -6,12 +6,13 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.plans import get_plan
 from models.subscription import Subscription
 from models.usage_record import UsageRecord
 
 
 class UsageService:
-    FREE_TASK_LIMIT = 5
+    FREE_TASK_LIMIT = 5  # kept for backwards compat; prefer plan-based limits
 
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
@@ -52,14 +53,18 @@ class UsageService:
     async def check_task_quota(self, organization_id: int) -> None:
         sub_result = await self.db.execute(select(Subscription).where(Subscription.organization_id == organization_id))
         sub = sub_result.scalar_one_or_none()
-        plan = sub.plan_name if sub else 'free'
+        plan_name = sub.plan_name if sub else 'free'
+        plan = get_plan(plan_name)
+        limit = plan['max_tasks_per_month']
 
-        if plan == 'pro':
+        if limit == -1:  # unlimited
             return
 
         usage = await self.get_or_create_usage(organization_id)
-        if usage.tasks_used >= self.FREE_TASK_LIMIT:
-            raise PermissionError('Free plan limit reached (5 tasks/month). Upgrade to Pro.')
+        if usage.tasks_used >= limit:
+            raise PermissionError(
+                f'{plan["name"]} plan limit reached ({limit} tasks/month). Upgrade your plan.'
+            )
 
     async def increment_tasks(self, organization_id: int, delta: int = 1) -> UsageRecord:
         usage = await self.get_or_create_usage(organization_id)

@@ -13,20 +13,20 @@ router = APIRouter(prefix='/auth', tags=['auth'])
 async def signup(payload: SignupRequest, db: AsyncSession = Depends(get_db_session)) -> AuthResponse:
     service = AuthService(db)
     try:
-        token, user, org_id = await service.signup(payload)
+        token, user, org = await service.signup(payload)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return AuthResponse(access_token=token, user_id=user.id, organization_id=org_id, full_name=user.full_name or '', email=user.email)
+    return AuthResponse(access_token=token, user_id=user.id, organization_id=org.id, full_name=user.full_name or '', email=user.email, org_slug=org.slug or '', org_name=org.name or '')
 
 
 @router.post('/login', response_model=AuthResponse)
 async def login(payload: LoginRequest, db: AsyncSession = Depends(get_db_session)) -> AuthResponse:
     service = AuthService(db)
     try:
-        token, user, org_id = await service.login(payload)
+        token, user, org = await service.login(payload)
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
-    return AuthResponse(access_token=token, user_id=user.id, organization_id=org_id, full_name=user.full_name or '', email=user.email)
+    return AuthResponse(access_token=token, user_id=user.id, organization_id=org.id, full_name=user.full_name or '', email=user.email, org_slug=org.slug or '', org_name=org.name or '')
 
 
 @router.get('/me', response_model=MeResponse)
@@ -35,9 +35,12 @@ async def me(
     db: AsyncSession = Depends(get_db_session),
 ) -> MeResponse:
     from sqlalchemy import select
+    from models.organization import Organization
     from models.user import User
     result = await db.execute(select(User).where(User.id == tenant.user_id))
     user = result.scalar_one_or_none()
     if user is None:
         raise HTTPException(status_code=404, detail='User not found')
-    return MeResponse(user_id=user.id, email=user.email, full_name=user.full_name or '', organization_id=tenant.organization_id)
+    org_result = await db.execute(select(Organization).where(Organization.id == tenant.organization_id))
+    org = org_result.scalar_one_or_none()
+    return MeResponse(user_id=user.id, email=user.email, full_name=user.full_name or '', organization_id=tenant.organization_id, org_slug=org.slug if org else '', org_name=org.name if org else '')

@@ -154,7 +154,10 @@ async def get_live_agents(
     for task in running_tasks:
         log_result = await db.execute(
             select(AgentLog)
-            .where(AgentLog.task_id == task.id)
+            .where(
+                AgentLog.task_id == task.id,
+                AgentLog.organization_id == tenant.organization_id,
+            )
             .order_by(AgentLog.id.desc())
             .limit(5)
         )

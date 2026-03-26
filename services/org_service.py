@@ -6,31 +6,71 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from models.invite import Invite
+from models.organization import Organization
 from models.organization_member import OrganizationMember
 from models.user import User
+from services.quota_service import QuotaService
 
 
 class OrgService:
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
 
-    async def invite_user(self, organization_id: int, email: str) -> Invite:
+    async def invite_user(
+        self, organization_id: int, email: str, *, invited_by: int | None = None,
+    ) -> Invite:
+        quota = QuotaService(self.db)
+        await quota.check_member_quota(organization_id)
+
         invite = Invite(
             organization_id=organization_id,
             email=email,
             token=secrets.token_urlsafe(32),
             status='pending',
+            invited_by=invited_by,
         )
         self.db.add(invite)
         await self.db.commit()
         await self.db.refresh(invite)
         return invite
 
-    async def accept_invite(self, token: str, user_id: int) -> None:
+    async def validate_invite(self, token: str) -> dict:
+        """Validate a token and return invite info (no auth required)."""
+        result = await self.db.execute(select(Invite).where(Invite.token == token))
+        invite = result.scalar_one_or_none()
+        if invite is None:
+            raise ValueError('Invalid invite token')
+
+        org_result = await self.db.execute(
+            select(Organization).where(Organization.id == invite.organization_id)
+        )
+        org = org_result.scalar_one_or_none()
+
+        inviter_name = None
+        if invite.invited_by:
+            inviter_result = await self.db.execute(
+                select(User).where(User.id == invite.invited_by)
+            )
+            inviter = inviter_result.scalar_one_or_none()
+            if inviter:
+                inviter_name = inviter.full_name or inviter.email
+
+        return {
+            'email': invite.email,
+            'status': invite.status,
+            'organization_name': org.name if org else 'Unknown',
+            'organization_id': invite.organization_id,
+            'inviter_name': inviter_name,
+        }
+
+    async def accept_invite(self, token: str, user_id: int) -> Invite:
         result = await self.db.execute(select(Invite).where(Invite.token == token, Invite.status == 'pending'))
         invite = result.scalar_one_or_none()
         if invite is None:
             raise ValueError('Invalid invite token')
+
+        quota = QuotaService(self.db)
+        await quota.check_member_quota(invite.organization_id)
 
         exists = await self.db.execute(
             select(OrganizationMember).where(
@@ -48,6 +88,66 @@ class OrgService:
             )
         invite.status = 'accepted'
         await self.db.commit()
+        return invite
+
+    async def list_invites(self, organization_id: int) -> list[dict]:
+        """List all invites for an organization."""
+        result = await self.db.execute(
+            select(Invite)
+            .where(Invite.organization_id == organization_id)
+            .order_by(Invite.created_at.desc())
+        )
+        invites = result.scalars().all()
+
+        items = []
+        for inv in invites:
+            inviter_name = None
+            if inv.invited_by:
+                inviter_result = await self.db.execute(
+                    select(User).where(User.id == inv.invited_by)
+                )
+                inviter = inviter_result.scalar_one_or_none()
+                if inviter:
+                    inviter_name = inviter.full_name or inviter.email
+            items.append({
+                'id': inv.id,
+                'email': inv.email,
+                'status': inv.status,
+                'inviter_name': inviter_name,
+                'created_at': inv.created_at.isoformat() if inv.created_at else None,
+            })
+        return items
+
+    async def cancel_invite(self, invite_id: int, organization_id: int) -> None:
+        """Cancel (delete) an invite."""
+        result = await self.db.execute(
+            select(Invite).where(
+                Invite.id == invite_id,
+                Invite.organization_id == organization_id,
+            )
+        )
+        invite = result.scalar_one_or_none()
+        if invite is None:
+            raise ValueError('Invite not found')
+        await self.db.delete(invite)
+        await self.db.commit()
+
+    async def resend_invite(self, invite_id: int, organization_id: int) -> Invite:
+        """Regenerate the token for an existing invite (to resend)."""
+        result = await self.db.execute(
+            select(Invite).where(
+                Invite.id == invite_id,
+                Invite.organization_id == organization_id,
+                Invite.status == 'pending',
+            )
+        )
+        invite = result.scalar_one_or_none()
+        if invite is None:
+            raise ValueError('Invite not found or already accepted')
+        invite.token = secrets.token_urlsafe(32)
+        await self.db.commit()
+        await self.db.refresh(invite)
+        return invite
 
     async def auto_add_team_members(
         self, org_id: int, members: list[dict],
