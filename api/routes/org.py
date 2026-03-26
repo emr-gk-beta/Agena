@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import select
@@ -9,6 +11,7 @@ from core.rbac import ROLES
 from models.organization_member import OrganizationMember
 from models.user import User
 from schemas.org import InviteRequest, InviteResponse
+from services.notification_service import NotificationService
 from services.org_service import OrgService
 
 router = APIRouter(prefix='/org', tags=['organization'])
@@ -121,6 +124,35 @@ async def change_member_role(
     await db.commit()
     await db.refresh(member)
 
+    # Notify the affected user about their role change
+    notifier = NotificationService(db)
+    admin_result = await db.execute(select(User).where(User.id == tenant.user_id))
+    admin_user = admin_result.scalar_one_or_none()
+    admin_name = admin_user.full_name if admin_user else 'An admin'
+
+    # Notification to the member whose role changed
+    await notifier.notify_event(
+        organization_id=tenant.organization_id,
+        user_id=member.user_id,
+        event_type='role_changed',
+        title='Role changed',
+        message=f'Your role has been changed to {payload.role} by {admin_name}',
+        severity='info',
+        payload={'new_role': payload.role, 'changed_by': tenant.user_id},
+    )
+
+    # Notification to the admin who made the change (skip if same user)
+    if tenant.user_id != member.user_id:
+        await notifier.notify_event(
+            organization_id=tenant.organization_id,
+            user_id=tenant.user_id,
+            event_type='role_changed',
+            title='Role changed',
+            message=f"{user.full_name}'s role changed to {payload.role}",
+            severity='info',
+            payload={'new_role': payload.role, 'target_user_id': member.user_id},
+        )
+
     return MemberResponse(
         id=member.id,
         user_id=member.user_id,
@@ -128,3 +160,41 @@ async def change_member_role(
         full_name=user.full_name,
         role=member.role,
     )
+
+
+class AutoSyncTeamRequest(BaseModel):
+    members: list[dict[str, Any]]
+
+
+class AutoSyncTeamResponse(BaseModel):
+    added: int
+    invited: int
+    already_exists: int
+
+
+@router.post('/auto-sync-team', response_model=AutoSyncTeamResponse)
+async def auto_sync_team(
+    payload: AutoSyncTeamRequest,
+    tenant: CurrentTenant = Depends(require_permission('team:manage')),
+    db: AsyncSession = Depends(get_db_session),
+) -> AutoSyncTeamResponse:
+    """Manually sync the current my_team list into organization members/invites."""
+    org_svc = OrgService(db)
+    summary = await org_svc.auto_add_team_members(tenant.organization_id, payload.members)
+    await db.commit()
+
+    # Notify about newly invited members
+    invited_count = summary.get('invited', 0)
+    if invited_count > 0:
+        notif_svc = NotificationService(db)
+        await notif_svc.notify_event(
+            organization_id=tenant.organization_id,
+            user_id=tenant.user_id,
+            event_type='team_sync',
+            title='Team members synced',
+            message=f'{invited_count} new team member{"s" if invited_count != 1 else ""} invited to your organization.',
+            severity='info',
+            payload={'sync_summary': summary},
+        )
+
+    return AutoSyncTeamResponse(**summary)

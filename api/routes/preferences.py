@@ -18,6 +18,8 @@ from services.ai_usage_event_service import AIUsageEventService
 from services.integration_config_service import IntegrationConfigService
 from services.llm.cost_tracker import CostTracker
 from services.llm.provider import LLMProvider
+from services.notification_service import NotificationService
+from services.org_service import OrgService
 from services.usage_service import UsageService
 
 router = APIRouter(prefix='/preferences', tags=['preferences'])
@@ -392,8 +394,30 @@ async def save_preferences(
     current_settings['my_team_by_source'] = by_source
     pref.profile_settings_json = json.dumps(current_settings, ensure_ascii=False)
 
+    # Auto-sync team members to organization membership
+    sync_summary: dict[str, int] | None = None
+    if payload.my_team is not None and payload.my_team:
+        org_svc = OrgService(db)
+        sync_summary = await org_svc.auto_add_team_members(
+            tenant.organization_id, payload.my_team,
+        )
+
     await db.commit()
     await db.refresh(pref)
+
+    # Notify org owner about newly invited members
+    if sync_summary and sync_summary.get('invited', 0) > 0:
+        notif_svc = NotificationService(db)
+        invited_count = sync_summary['invited']
+        await notif_svc.notify_event(
+            organization_id=tenant.organization_id,
+            user_id=tenant.user_id,
+            event_type='team_sync',
+            title='Team members invited',
+            message=f'{invited_count} new team member{"s" if invited_count != 1 else ""} invited to your organization.',
+            severity='info',
+            payload={'sync_summary': sync_summary},
+        )
 
     final_settings = _parse_json_obj(pref.profile_settings_json)
     final_source = str(final_settings.get('my_team_source') or 'azure').strip().lower()
