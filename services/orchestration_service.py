@@ -486,6 +486,14 @@ class OrchestrationService:
                 s_model = (flow_state.get('model_usage') or [''])[-1]
                 await _step_event('review_code', review_delta, s_model, s_start, time.perf_counter() - s_clock)
                 reviewed = flow_state.get('reviewed_code', generated)
+                # If reviewer broke the patch format, fall back to developer output
+                if generated and reviewed:
+                    dev_has_patches = bool(re.search(r'^\+', generated, re.MULTILINE))
+                    rev_has_patches = bool(re.search(r'^\+', reviewed, re.MULTILINE))
+                    dev_has_files = bool(re.search(r'\*\*File:', generated))
+                    rev_has_files = bool(re.search(r'\*\*File:', reviewed))
+                    if dev_has_files and dev_has_patches and not rev_has_patches:
+                        reviewed = generated  # reviewer broke patch format, use developer output
                 final_len = len(reviewed)
                 flow_state['final_code'] = reviewed
                 await task_service.add_log(task.id, organization_id, 'agent',
