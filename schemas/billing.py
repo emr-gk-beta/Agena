@@ -28,3 +28,15 @@ class IyzicoCheckoutRequest(BaseModel):
 
 class IyzicoCheckoutResponse(BaseModel):
     checkout_form_content: str
+
+
+class QuotaResponse(BaseModel):
+    plan_name: str
+    plan_display_name: str
+    tasks_used: int
+    tasks_limit: int
+    members_used: int
+    members_limit: int
+    agents_limit: int
+    features: list[str]
+    tokens_used: int

@@ -44,11 +44,38 @@ export function removeToken(): void {
   if (typeof window === 'undefined') return;
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(TOKEN_EXP_KEY);
+  localStorage.removeItem('tiqr_org_slug');
+  localStorage.removeItem('tiqr_org_name');
   USER_CACHE_KEYS.forEach((k) => localStorage.removeItem(k));
 }
 
 export function isLoggedIn(): boolean {
   return getToken() !== '';
+}
+
+// ── Org slug helpers ──────────────────────────────────────────────────────────
+
+const ORG_SLUG_KEY = 'tiqr_org_slug';
+const ORG_NAME_KEY = 'tiqr_org_name';
+
+export function setOrgSlug(slug: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(ORG_SLUG_KEY, slug);
+}
+
+export function getOrgSlug(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(ORG_SLUG_KEY) ?? '';
+}
+
+export function setOrgName(name: string): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(ORG_NAME_KEY, name);
+}
+
+export function getOrgName(): string {
+  if (typeof window === 'undefined') return '';
+  return localStorage.getItem(ORG_NAME_KEY) ?? '';
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit, auth = true): Promise<T> {
@@ -62,6 +89,10 @@ export async function apiFetch<T>(path: string, init?: RequestInit, auth = true)
     const token = getToken();
     if (token) headers.Authorization = `Bearer ${token}`;
   }
+
+  // Pass tenant slug for local dev (where subdomains are unavailable)
+  const slug = getOrgSlug();
+  if (slug) headers['X-Tenant-Slug'] = slug;
 
   const response = await fetch(`${API_BASE}${path}`, {
     ...init,

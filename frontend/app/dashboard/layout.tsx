@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import { ReactNode, useEffect, useRef, useState, Suspense } from 'react';
-import { isLoggedIn, removeToken, apiFetch, listNotifications, markAllNotificationsRead, markNotificationRead, loadPrefs, savePrefs, type NotificationItem } from '@/lib/api';
+import { isLoggedIn, removeToken, apiFetch, listNotifications, markAllNotificationsRead, markNotificationRead, loadPrefs, savePrefs, getOrgSlug, getOrgName, setOrgSlug, setOrgName, type NotificationItem } from '@/lib/api';
 import OnboardingModal from '@/components/OnboardingModal';
 import WebPushBridge from '@/components/WebPushBridge';
 import { useLocale } from '@/lib/i18n';
@@ -53,6 +53,8 @@ function DashboardInner({ children }: { children: ReactNode }) {
   const [notifFilter, setNotifFilter] = useState<'all' | 'failed'>('all');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userRole, setUserRole] = useState<Role>('viewer');
+  const [orgSlug, setOrgSlugState] = useState('');
+  const [orgNameDisplay, setOrgNameDisplay] = useState('');
   const shouldOpenOnboarding = searchParams.get('onboarding') === '1' || searchParams.get('welcome') === '1';
   const lastUnreadRef = useRef<number | null>(null);
   const sidebarWidth = sidebarCollapsed ? 76 : 220;
@@ -117,9 +119,12 @@ function DashboardInner({ children }: { children: ReactNode }) {
       if (!active) return;
       setChecked(true);
 
-      apiFetch<{ full_name?: string; email: string }>('/auth/me').then((u) => {
+      apiFetch<{ full_name?: string; email: string; org_slug?: string; org_name?: string }>('/auth/me').then((u) => {
         if (!active) return;
         setUserName(u.full_name || u.email);
+        // Store org slug/name from the /me response
+        if (u.org_slug) { setOrgSlugState(u.org_slug); setOrgSlug(u.org_slug); }
+        if (u.org_name) { setOrgNameDisplay(u.org_name); setOrgName(u.org_name); }
         // Fetch current user's role from org members list
         apiFetch<Array<{ email: string; role: string }>>('/org/members').then((members) => {
           if (!active) return;
@@ -127,6 +132,10 @@ function DashboardInner({ children }: { children: ReactNode }) {
           if (me) setUserRole(me.role as Role);
         }).catch(() => {});
       }).catch(() => {});
+
+      // Initialize org info from localStorage in case /me hasn't responded yet
+      setOrgSlugState(getOrgSlug());
+      setOrgNameDisplay(getOrgName());
 
       if (typeof window !== 'undefined' && 'Notification' in window) {
         setNotifPermission(Notification.permission);
@@ -136,6 +145,11 @@ function DashboardInner({ children }: { children: ReactNode }) {
         const raw = (prefs.profile_settings || {}) as Record<string, unknown>;
         setProfileSettings(raw);
         setWebPushEnabled(raw.web_push_notifications !== false);
+        // Auto-redirect to onboarding if not completed (skip if already on onboarding page)
+        if (!raw.onboarding_completed && !pathname.startsWith('/dashboard/onboarding')) {
+          router.replace('/dashboard/onboarding');
+          return;
+        }
       } catch {
         setWebPushEnabled(true);
       }
@@ -316,6 +330,25 @@ function DashboardInner({ children }: { children: ReactNode }) {
               </div>}
             </div>
           </a>
+        )}
+
+        {/* Organization info */}
+        {!sidebarCollapsed && (orgNameDisplay || orgSlug) && (
+          <div style={{ padding: '8px 12px', marginBottom: 8, borderRadius: 10, background: 'rgba(13,148,136,0.08)', border: '1px solid rgba(13,148,136,0.15)' }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {orgNameDisplay || orgSlug}
+            </div>
+            {orgSlug && (
+              <div style={{ fontSize: 11, color: 'var(--muted)', fontFamily: 'monospace', marginTop: 2 }}>
+                {orgSlug}.tiqr.app
+              </div>
+            )}
+          </div>
+        )}
+        {sidebarCollapsed && orgSlug && (
+          <div title={`${orgNameDisplay || orgSlug} (${orgSlug}.tiqr.app)`} style={{ textAlign: 'center', marginBottom: 8, fontSize: 14, fontWeight: 800, color: 'var(--nav-active)' }}>
+            {(orgNameDisplay || orgSlug)[0]?.toUpperCase()}
+          </div>
         )}
 
         {!sidebarCollapsed && <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2, color: 'var(--muted)', textTransform: 'uppercase', padding: '0 12px', marginBottom: 8 }}>

@@ -1,13 +1,23 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { apiFetch, isLoggedIn, setToken } from '@/lib/api';
+import { apiFetch, isLoggedIn, setToken, setOrgSlug, setOrgName } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 import LangToggle from '@/components/LangToggle';
 
-type AuthResponse = { access_token: string };
+type AuthResponse = { access_token: string; org_slug: string; org_name: string };
+type CheckSlugResponse = { available: boolean; slug: string };
+
+function toSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .slice(0, 63) || '';
+}
 
 export default function SignUpPage() {
   const router = useRouter();
@@ -15,14 +25,48 @@ export default function SignUpPage() {
   const { t } = useLocale();
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
-  const [orgName, setOrgName] = useState('');
+  const [orgName, setOrgNameVal] = useState('');
+  const [orgSlug, setOrgSlugVal] = useState('');
+  const [slugEdited, setSlugEdited] = useState(false);
+  const [slugStatus, setSlugStatus] = useState<'idle' | 'checking' | 'available' | 'taken'>('idle');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const slugTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (isLoggedIn()) router.replace('/dashboard');
   }, [router]);
+
+  const checkSlug = useCallback(async (slug: string) => {
+    if (!slug || slug.length < 2) { setSlugStatus('idle'); return; }
+    setSlugStatus('checking');
+    try {
+      const res = await apiFetch<CheckSlugResponse>(`/org/check-slug?slug=${encodeURIComponent(slug)}`, undefined, false);
+      setSlugStatus(res.available ? 'available' : 'taken');
+    } catch {
+      setSlugStatus('idle');
+    }
+  }, []);
+
+  function handleOrgNameChange(val: string) {
+    setOrgNameVal(val);
+    if (!slugEdited) {
+      const auto = toSlug(val);
+      setOrgSlugVal(auto);
+      // Debounce slug check
+      if (slugTimer.current) clearTimeout(slugTimer.current);
+      slugTimer.current = setTimeout(() => void checkSlug(auto), 400);
+    }
+  }
+
+  function handleSlugChange(val: string) {
+    const clean = val.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 63);
+    setOrgSlugVal(clean);
+    setSlugEdited(true);
+    if (slugTimer.current) clearTimeout(slugTimer.current);
+    slugTimer.current = setTimeout(() => void checkSlug(clean), 400);
+  }
 
   function resolveNextUrl(): string {
     const raw = searchParams.get('next') || '';
@@ -37,9 +81,11 @@ export default function SignUpPage() {
     try {
       const res = await apiFetch<AuthResponse>('/auth/signup', {
         method: 'POST',
-        body: JSON.stringify({ email, full_name: fullName, organization_name: orgName, password }),
+        body: JSON.stringify({ email, full_name: fullName, organization_name: orgName, org_slug: orgSlug, password }),
       }, false);
       setToken(res.access_token);
+      setOrgSlug(res.org_slug);
+      setOrgName(res.org_name);
       router.push(resolveNextUrl());
     } catch (err) {
       setError(err instanceof Error ? err.message : t('signup.error'));
@@ -47,6 +93,8 @@ export default function SignUpPage() {
       setLoading(false);
     }
   }
+
+  const slugColor = slugStatus === 'available' ? '#22c55e' : slugStatus === 'taken' ? '#f87171' : 'var(--ink-30)';
 
   return (
     <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, background: '#030712', position: 'relative', overflow: 'hidden' }}>
@@ -70,18 +118,39 @@ export default function SignUpPage() {
           <p style={{ fontSize: 13, color: 'var(--ink-30)', marginBottom: 28 }}>{t('signup.subtitle')}</p>
 
           <form onSubmit={(e) => void onSubmit(e)} style={{ display: 'grid', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-              <AuthInput label={t('signup.fullName')} type='text' value={fullName} onChange={setFullName} placeholder={t('signup.fullNamePlaceholder')} />
-              <AuthInput label={t('signup.org')} type='text' value={orgName} onChange={setOrgName} placeholder={t('signup.orgPlaceholder')} />
-            </div>
+            <AuthInput label={t('signup.fullName')} type='text' value={fullName} onChange={setFullName} placeholder={t('signup.fullNamePlaceholder')} />
             <AuthInput label={t('signup.email')} type='email' value={email} onChange={setEmail} placeholder={t('signup.emailPlaceholder')} />
+
+            {/* Organization Name */}
+            <AuthInput label={t('signup.orgName')} type='text' value={orgName} onChange={handleOrgNameChange} placeholder={t('signup.orgPlaceholder')} />
+
+            {/* Organization Slug */}
+            <div>
+              <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', display: 'block', marginBottom: 6 }}>{t('signup.orgSlug')}</label>
+              <input
+                type='text' value={orgSlug} onChange={(e) => handleSlugChange(e.target.value)}
+                placeholder='acme' required
+                style={{ width: '100%', padding: '11px 14px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-90)', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                onFocus={(e) => { e.currentTarget.style.borderColor = 'rgba(139,92,246,0.5)'; }}
+                onBlur={(e) => { e.currentTarget.style.borderColor = 'var(--panel-border-3)'; }}
+              />
+              {/* Slug preview */}
+              <div style={{ marginTop: 6, fontSize: 12, color: slugColor, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{ color: 'var(--ink-30)' }}>{t('signup.slugPreview')}:</span>
+                <span style={{ fontFamily: 'monospace', fontWeight: 600 }}>{orgSlug || '...'}.tiqr.app</span>
+                {slugStatus === 'checking' && <span style={{ color: 'var(--ink-30)' }}>...</span>}
+                {slugStatus === 'available' && <span>{t('signup.slugAvailable')}</span>}
+                {slugStatus === 'taken' && <span>{t('signup.slugTaken')}</span>}
+              </div>
+            </div>
+
             <AuthInput label={t('signup.password')} type='password' value={password} onChange={setPassword} placeholder={t('signup.passwordPlaceholder')} />
 
             {error ? (
               <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: 13 }}>{error}</div>
             ) : null}
 
-            <button type='submit' disabled={loading} style={{ marginTop: 4, padding: '13px', borderRadius: 12, border: 'none', background: loading ? 'rgba(139,92,246,0.4)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: loading ? 'not-allowed' : 'pointer', letterSpacing: 0.3 }}>
+            <button type='submit' disabled={loading || slugStatus === 'taken'} style={{ marginTop: 4, padding: '13px', borderRadius: 12, border: 'none', background: loading ? 'rgba(139,92,246,0.4)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)', color: '#fff', fontWeight: 700, fontSize: 15, cursor: loading || slugStatus === 'taken' ? 'not-allowed' : 'pointer', letterSpacing: 0.3 }}>
               {loading ? t('signup.loading') : t('signup.submit')}
             </button>
           </form>

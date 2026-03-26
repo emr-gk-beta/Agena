@@ -8,10 +8,12 @@ from schemas.billing import (
     IyzicoCheckoutRequest,
     IyzicoCheckoutResponse,
     PlanChangeRequest,
+    QuotaResponse,
     StripeCheckoutRequest,
     StripeCheckoutResponse,
 )
 from services.billing_service import BillingService
+from services.quota_service import QuotaService
 from services.usage_service import UsageService
 
 router = APIRouter(prefix='/billing', tags=['billing'])
@@ -102,3 +104,13 @@ async def iyzico_webhook(
     payload = await request.json()
     service = BillingService(db)
     return await service.handle_iyzico_webhook(payload=payload, signature=x_iyzico_signature)
+
+
+@router.get('/quota', response_model=QuotaResponse)
+async def billing_quota(
+    tenant: CurrentTenant = Depends(require_permission('billing:manage')),
+    db: AsyncSession = Depends(get_db_session),
+) -> QuotaResponse:
+    quota = QuotaService(db)
+    summary = await quota.get_usage_summary(tenant.organization_id)
+    return QuotaResponse(**summary)

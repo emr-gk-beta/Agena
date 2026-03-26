@@ -1,0 +1,78 @@
+'use client';
+
+import { createContext, useContext, ReactNode, useState, useEffect } from 'react';
+
+const TENANT_SLUG_KEY = 'tiqr_tenant_slug';
+const TENANT_NAME_KEY = 'tiqr_tenant_name';
+
+/**
+ * Extract the tenant slug from the current hostname.
+ * e.g. "acme.tiqr.app" -> "acme", "localhost" -> null
+ */
+export function getTenantSlug(): string | null {
+  if (typeof window === 'undefined') return null;
+  const hostname = window.location.hostname;
+  const parts = hostname.split('.');
+  // Need at least 3 parts for a subdomain (e.g. acme.tiqr.app)
+  if (parts.length < 3) return null;
+  const sub = parts[0];
+  // Ignore common non-tenant subdomains
+  if (['www', 'localhost', 'api'].includes(sub)) return null;
+  // Ignore IP addresses
+  if (/^\d+$/.test(sub)) return null;
+  return sub;
+}
+
+/**
+ * Get the tenant slug from URL subdomain or localStorage fallback.
+ */
+export function getEffectiveTenantSlug(): string | null {
+  return getTenantSlug() || (typeof window !== 'undefined' ? localStorage.getItem(TENANT_SLUG_KEY) : null);
+}
+
+interface TenantContextValue {
+  slug: string | null;
+  orgName: string | null;
+  setTenant: (slug: string, orgName?: string) => void;
+}
+
+const TenantContext = createContext<TenantContextValue>({
+  slug: null,
+  orgName: null,
+  setTenant: () => {},
+});
+
+export function TenantProvider({ children }: { children: ReactNode }) {
+  const [slug, setSlug] = useState<string | null>(null);
+  const [orgName, setOrgName] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Try to detect from subdomain first, then localStorage
+    const detected = getTenantSlug();
+    const stored = localStorage.getItem(TENANT_SLUG_KEY);
+    const storedName = localStorage.getItem(TENANT_NAME_KEY);
+    setSlug(detected || stored);
+    setOrgName(storedName);
+  }, []);
+
+  function setTenant(newSlug: string, newOrgName?: string) {
+    setSlug(newSlug);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(TENANT_SLUG_KEY, newSlug);
+      if (newOrgName) {
+        localStorage.setItem(TENANT_NAME_KEY, newOrgName);
+        setOrgName(newOrgName);
+      }
+    }
+  }
+
+  return (
+    <TenantContext.Provider value={{ slug, orgName, setTenant }}>
+      {children}
+    </TenantContext.Provider>
+  );
+}
+
+export function useTenant() {
+  return useContext(TenantContext);
+}

@@ -8,6 +8,7 @@ import { useRole, canAccess, type Role, type Permission } from '@/lib/rbac';
 /* ── Types ──────────────────────────────────────────────────────── */
 
 type OrgMember = { id: number; user_id: number; email: string; full_name: string; role: string };
+type InviteItem = { id: number; email: string; status: string; inviter_name: string | null; created_at: string | null };
 
 /* ── Constants ──────────────────────────────────────────────────── */
 
@@ -67,6 +68,15 @@ export default function PermissionsPage() {
   const [currentEmail, setCurrentEmail] = useState('');
 
   const canManageRoles = canAccess(myRole, 'roles:manage');
+  const canManageTeam = canAccess(myRole, 'team:manage');
+
+  // Invite management state
+  const [invites, setInvites] = useState<InviteItem[]>([]);
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviting, setInviting] = useState(false);
+  const [inviteToast, setInviteToast] = useState('');
+  const [resendingId, setResendingId] = useState<number | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   const fetchMembers = useCallback(async () => {
     try {
@@ -76,10 +86,68 @@ export default function PermissionsPage() {
     setLoading(false);
   }, []);
 
+  const fetchInvites = useCallback(async () => {
+    if (!canManageTeam) return;
+    try {
+      const data = await apiFetch<InviteItem[]>('/org/invites');
+      setInvites(data);
+    } catch { /* silent */ }
+  }, [canManageTeam]);
+
   useEffect(() => {
     void fetchMembers();
+    void fetchInvites();
     apiFetch<{ email: string }>('/auth/me').then((u) => setCurrentEmail(u.email)).catch(() => {});
-  }, [fetchMembers]);
+  }, [fetchMembers, fetchInvites]);
+
+  const handleInvite = async () => {
+    if (!inviteEmail.trim()) return;
+    setInviting(true);
+    try {
+      await apiFetch('/org/invite', {
+        method: 'POST',
+        body: JSON.stringify({ email: inviteEmail.trim() }),
+      });
+      setInviteEmail('');
+      setInviteToast(t('invite.sent'));
+      setTimeout(() => setInviteToast(''), 3000);
+      void fetchInvites();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error';
+      setInviteToast(msg);
+      setTimeout(() => setInviteToast(''), 3000);
+    }
+    setInviting(false);
+  };
+
+  const handleResendInvite = async (id: number) => {
+    setResendingId(id);
+    try {
+      await apiFetch(`/org/invites/${id}/resend`, { method: 'POST' });
+      setInviteToast(t('invite.resent'));
+      setTimeout(() => setInviteToast(''), 3000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error';
+      setInviteToast(msg);
+      setTimeout(() => setInviteToast(''), 3000);
+    }
+    setResendingId(null);
+  };
+
+  const handleCancelInvite = async (id: number) => {
+    setCancellingId(id);
+    try {
+      await apiFetch(`/org/invites/${id}`, { method: 'DELETE' });
+      setInvites((prev) => prev.filter((inv) => inv.id !== id));
+      setInviteToast(t('invite.cancelled'));
+      setTimeout(() => setInviteToast(''), 3000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error';
+      setInviteToast(msg);
+      setTimeout(() => setInviteToast(''), 3000);
+    }
+    setCancellingId(null);
+  };
 
   const handleRoleChange = async (memberId: number, newRole: string) => {
     setChangingId(memberId);
@@ -298,7 +366,121 @@ export default function PermissionsPage() {
         )}
       </section>
 
-      {/* ── Section 3: Menu Visibility per Role ────────────────────── */}
+      {/* ── Section 3: Invite Management ──────────────────────────── */}
+      {canManageTeam && (
+        <section>
+          <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 6 }}>
+            {t('invite.manageTitle')}
+          </h2>
+          <p style={{ fontSize: 13, color: 'var(--ink-35)', marginBottom: 14 }}>
+            {t('invite.manageDesc')}
+          </p>
+
+          {inviteToast && (
+            <div style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontSize: 12, fontWeight: 600, marginBottom: 12 }}>
+              {inviteToast}
+            </div>
+          )}
+
+          {/* Invite form */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+            <input
+              type='email'
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder={t('invite.emailPlaceholder')}
+              onKeyDown={(e) => { if (e.key === 'Enter') void handleInvite(); }}
+              style={{
+                flex: 1, minWidth: 200, padding: '10px 14px', borderRadius: 10,
+                border: '1px solid var(--panel-border-3)', background: 'var(--glass)',
+                color: 'var(--ink-90)', fontSize: 13, outline: 'none',
+              }}
+            />
+            <button
+              onClick={() => void handleInvite()}
+              disabled={inviting || !inviteEmail.trim()}
+              style={{
+                padding: '10px 20px', borderRadius: 10, border: 'none',
+                background: inviting ? 'rgba(139,92,246,0.4)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+                color: '#fff', fontWeight: 700, fontSize: 13,
+                cursor: inviting ? 'not-allowed' : 'pointer', whiteSpace: 'nowrap',
+              }}
+            >
+              {inviting ? t('invite.sending') : t('invite.sendButton')}
+            </button>
+          </div>
+
+          {/* Invites list */}
+          {invites.length === 0 ? (
+            <div style={{ fontSize: 13, color: 'var(--ink-30)', padding: '12px 0' }}>
+              {t('invite.noInvites')}
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gap: 8 }}>
+              {invites.map((inv) => {
+                const isPending = inv.status === 'pending';
+                const statusColor = isPending ? '#f59e0b' : inv.status === 'accepted' ? '#22c55e' : '#6b7280';
+                return (
+                  <div key={inv.id} style={{
+                    display: 'flex', alignItems: 'center', gap: 14, padding: '12px 16px',
+                    borderRadius: 14, border: '1px solid var(--panel-border)', background: 'var(--panel)',
+                    flexWrap: 'wrap',
+                  }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-90)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {inv.email}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 2 }}>
+                        {inv.inviter_name && <>{t('invite.by')} {inv.inviter_name} · </>}
+                        {inv.created_at && new Date(inv.created_at).toLocaleDateString()}
+                      </div>
+                    </div>
+
+                    <span style={{
+                      padding: '3px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
+                      background: `${statusColor}18`, color: statusColor,
+                      border: `1px solid ${statusColor}40`, flexShrink: 0,
+                    }}>
+                      {t(`invite.status.${inv.status}` as Parameters<typeof t>[0])}
+                    </span>
+
+                    {isPending && (
+                      <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
+                        <button
+                          onClick={() => void handleResendInvite(inv.id)}
+                          disabled={resendingId === inv.id}
+                          style={{
+                            padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(13,148,136,0.4)',
+                            background: 'rgba(13,148,136,0.1)', color: '#0d9488',
+                            fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                            opacity: resendingId === inv.id ? 0.5 : 1,
+                          }}
+                        >
+                          {t('invite.resend')}
+                        </button>
+                        <button
+                          onClick={() => void handleCancelInvite(inv.id)}
+                          disabled={cancellingId === inv.id}
+                          style={{
+                            padding: '5px 12px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.4)',
+                            background: 'rgba(248,113,113,0.1)', color: '#f87171',
+                            fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                            opacity: cancellingId === inv.id ? 0.5 : 1,
+                          }}
+                        >
+                          {t('invite.cancel')}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* ── Section 4: Menu Visibility per Role ────────────────────── */}
       <section>
         <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 6 }}>
           {t('permissions.menuTitle')}

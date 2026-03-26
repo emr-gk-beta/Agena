@@ -24,6 +24,18 @@ type BillingStatus = {
   tokens_used: number;
 };
 
+type QuotaInfo = {
+  plan_name: string;
+  plan_display_name: string;
+  tasks_used: number;
+  tasks_limit: number;
+  members_used: number;
+  members_limit: number;
+  agents_limit: number;
+  features: string[];
+  tokens_used: number;
+};
+
 type MemoryStatus = {
   enabled: boolean;
   backend: string;
@@ -58,16 +70,19 @@ export default function DashboardOverview() {
   const [analyticsDaily, setAnalyticsDaily] = useState<AnalyticsDailyResponse | null>(null);
   const [analyticsSummary, setAnalyticsSummary] = useState<AnalyticsSummaryResponse | null>(null);
   const [analyticsModels, setAnalyticsModels] = useState<AnalyticsModelResponse | null>(null);
+  const [quota, setQuota] = useState<QuotaInfo | null>(null);
 
   useEffect(() => {
     Promise.all([
       apiFetch<TaskItem[]>('/tasks'),
       apiFetch<BillingStatus>('/billing/status'),
       apiFetch<MemoryStatus>('/memory/status'),
-    ]).then(([t, b, m]) => {
+      apiFetch<QuotaInfo>('/billing/quota'),
+    ]).then(([t, b, m, q]) => {
       setTasks(t);
       setBilling(b);
       setMemory(m);
+      setQuota(q);
     }).catch(() => {});
     Promise.all([
       fetchAnalyticsDaily(30),
@@ -147,11 +162,90 @@ export default function DashboardOverview() {
         <h1 style={{ fontSize: 32, fontWeight: 800, color: 'var(--ink-90)', marginTop: 8, marginBottom: 4 }}>
           {t('dashboard.title')}
         </h1>
-        <p style={{ color: 'var(--ink-35)', fontSize: 14 }}>
-          {t('dashboard.plan')}: <span style={{ color: '#5eead4', fontWeight: 600 }}>{billing?.plan_name ?? '—'}</span>
-          &nbsp;·&nbsp; {t('dashboard.tasksUsed')}: <span style={{ color: '#5eead4' }}>{billing?.tasks_used ?? 0}</span>
-        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+          <span style={{
+            display: 'inline-block',
+            fontSize: 11,
+            fontWeight: 800,
+            letterSpacing: 0.8,
+            textTransform: 'uppercase',
+            color: quota?.plan_name === 'enterprise' ? '#a78bfa' : quota?.plan_name === 'pro' ? '#38bdf8' : '#5eead4',
+            background: quota?.plan_name === 'enterprise' ? 'rgba(167,139,250,0.14)' : quota?.plan_name === 'pro' ? 'rgba(56,189,248,0.14)' : 'rgba(94,234,212,0.14)',
+            border: `1px solid ${quota?.plan_name === 'enterprise' ? 'rgba(167,139,250,0.35)' : quota?.plan_name === 'pro' ? 'rgba(56,189,248,0.35)' : 'rgba(94,234,212,0.35)'}`,
+            borderRadius: 999,
+            padding: '3px 10px',
+          }}>
+            {quota?.plan_display_name ?? billing?.plan_name ?? '—'}
+          </span>
+          {quota && quota.plan_name === 'free' && (
+            <Link href='/dashboard/integrations' style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: '#f59e0b',
+              background: 'rgba(245,158,11,0.12)',
+              border: '1px solid rgba(245,158,11,0.35)',
+              borderRadius: 999,
+              padding: '3px 10px',
+              textDecoration: 'none',
+            }}>
+              {t('dashboard.quota.upgrade')}
+            </Link>
+          )}
+        </div>
       </div>
+
+      {/* Quota Usage Bars */}
+      {quota && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+          {/* Tasks quota */}
+          <div style={{
+            borderRadius: 16, border: '1px solid var(--panel-border)',
+            background: 'var(--panel-alt)', padding: '16px 20px',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.7 }}>
+                {t('dashboard.quota.tasks')}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-78)' }}>
+                {quota.tasks_used} / {quota.tasks_limit === -1 ? t('dashboard.quota.unlimited') : quota.tasks_limit}
+              </span>
+            </div>
+            <div style={{ height: 6, borderRadius: 3, background: 'var(--panel-border)', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                borderRadius: 3,
+                width: quota.tasks_limit === -1 ? '5%' : `${Math.min(100, (quota.tasks_used / quota.tasks_limit) * 100)}%`,
+                background: quota.tasks_limit !== -1 && quota.tasks_used / quota.tasks_limit > 0.8 ? '#f87171' : '#5eead4',
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
+          </div>
+
+          {/* Members quota */}
+          <div style={{
+            borderRadius: 16, border: '1px solid var(--panel-border)',
+            background: 'var(--panel-alt)', padding: '16px 20px',
+          }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.7 }}>
+                {t('dashboard.quota.members')}
+              </span>
+              <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-78)' }}>
+                {quota.members_used} / {quota.members_limit === -1 ? t('dashboard.quota.unlimited') : quota.members_limit}
+              </span>
+            </div>
+            <div style={{ height: 6, borderRadius: 3, background: 'var(--panel-border)', overflow: 'hidden' }}>
+              <div style={{
+                height: '100%',
+                borderRadius: 3,
+                width: quota.members_limit === -1 ? '5%' : `${Math.min(100, (quota.members_used / quota.members_limit) * 100)}%`,
+                background: quota.members_limit !== -1 && quota.members_used / quota.members_limit > 0.8 ? '#f87171' : '#38bdf8',
+                transition: 'width 0.4s ease',
+              }} />
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* KPI Grid */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
