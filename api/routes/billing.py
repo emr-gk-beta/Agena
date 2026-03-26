@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, Header, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import CurrentTenant, get_current_tenant
+from api.dependencies import CurrentTenant, get_current_tenant, require_permission
 from core.database import get_db_session
 from schemas.billing import (
     BillingStatusResponse,
@@ -19,7 +19,7 @@ router = APIRouter(prefix='/billing', tags=['billing'])
 
 @router.get('/status', response_model=BillingStatusResponse)
 async def billing_status(
-    tenant: CurrentTenant = Depends(get_current_tenant),
+    tenant: CurrentTenant = Depends(require_permission('billing:manage')),
     db: AsyncSession = Depends(get_db_session),
 ) -> BillingStatusResponse:
     billing = BillingService(db)
@@ -37,7 +37,7 @@ async def billing_status(
 @router.post('/plan', response_model=BillingStatusResponse)
 async def change_plan(
     request: PlanChangeRequest,
-    tenant: CurrentTenant = Depends(get_current_tenant),
+    tenant: CurrentTenant = Depends(require_permission('billing:manage')),
     db: AsyncSession = Depends(get_db_session),
 ) -> BillingStatusResponse:
     billing = BillingService(db)
@@ -55,7 +55,7 @@ async def change_plan(
 @router.post('/stripe/checkout', response_model=StripeCheckoutResponse)
 async def stripe_checkout(
     request: StripeCheckoutRequest,
-    tenant: CurrentTenant = Depends(get_current_tenant),
+    tenant: CurrentTenant = Depends(require_permission('billing:manage')),
     db: AsyncSession = Depends(get_db_session),
 ) -> StripeCheckoutResponse:
     service = BillingService(db)
@@ -81,7 +81,7 @@ async def stripe_webhook(
 @router.post('/iyzico/checkout', response_model=IyzicoCheckoutResponse)
 async def iyzico_checkout(
     request: IyzicoCheckoutRequest,
-    tenant: CurrentTenant = Depends(get_current_tenant),
+    tenant: CurrentTenant = Depends(require_permission('billing:manage')),
     db: AsyncSession = Depends(get_db_session),
 ) -> IyzicoCheckoutResponse:
     service = BillingService(db)

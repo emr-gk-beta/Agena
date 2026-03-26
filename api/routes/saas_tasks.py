@@ -7,7 +7,7 @@ from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import CurrentTenant, get_current_tenant
+from api.dependencies import CurrentTenant, get_current_tenant, require_permission
 from core.database import get_db_session
 from schemas.saas_task import (
     AssignTaskRequest,
@@ -68,7 +68,7 @@ async def _to_task_response(service: TaskService, organization_id: int, task) ->
 @router.post('', response_model=TaskResponse)
 async def create_task(
     request: TaskCreateRequest,
-    tenant: CurrentTenant = Depends(get_current_tenant),
+    tenant: CurrentTenant = Depends(require_permission('tasks:write')),
     db: AsyncSession = Depends(get_db_session),
 ) -> TaskResponse:
     service = TaskService(db)
@@ -91,7 +91,7 @@ async def create_task(
 
 @router.get('', response_model=list[TaskResponse])
 async def list_tasks(
-    tenant: CurrentTenant = Depends(get_current_tenant),
+    tenant: CurrentTenant = Depends(require_permission('tasks:read')),
     db: AsyncSession = Depends(get_db_session),
 ) -> list[TaskResponse]:
     service = TaskService(db)
@@ -228,7 +228,7 @@ async def import_jira_tasks(
 @router.get('/{task_id}', response_model=TaskResponse)
 async def get_task(
     task_id: int,
-    tenant: CurrentTenant = Depends(get_current_tenant),
+    tenant: CurrentTenant = Depends(require_permission('tasks:read')),
     db: AsyncSession = Depends(get_db_session),
 ) -> TaskResponse:
     service = TaskService(db)
@@ -242,7 +242,7 @@ async def get_task(
 async def assign_task(
     task_id: int,
     payload: AssignTaskRequest = Body(default_factory=AssignTaskRequest),
-    tenant: CurrentTenant = Depends(get_current_tenant),
+    tenant: CurrentTenant = Depends(require_permission('tasks:write')),
     db: AsyncSession = Depends(get_db_session),
 ) -> AssignTaskResponse:
     service = TaskService(db)
@@ -264,7 +264,7 @@ async def assign_task(
 @router.post('/{task_id}/cancel', response_model=TaskResponse)
 async def cancel_task(
     task_id: int,
-    tenant: CurrentTenant = Depends(get_current_tenant),
+    tenant: CurrentTenant = Depends(require_permission('tasks:write')),
     db: AsyncSession = Depends(get_db_session),
 ) -> TaskResponse:
     service = TaskService(db)

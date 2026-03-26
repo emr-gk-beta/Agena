@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { apiFetch, loadPrefs, savePrefs } from '@/lib/api';
 import { useLocale, type TranslationKey } from '@/lib/i18n';
+import { useWS } from '@/lib/useWebSocket';
 
 /* ── Types ───────────────────────────────────────────────────────── */
 
@@ -639,6 +640,7 @@ function AddAgentModal({
 
 export default function OfficePage() {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const { lastEvent } = useWS();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [agentConfigs, setAgentConfigs] = useState<AgentConfig[]>([]);
   const [officeAgents, setOfficeAgents] = useState<OfficeAgent[]>([]);
@@ -732,6 +734,23 @@ export default function OfficePage() {
     const iv = setInterval(poll, 2000);
     return () => clearInterval(iv);
   }, [agentConfigs]);
+
+  // Immediate refetch on WebSocket task_status events
+  useEffect(() => {
+    if (lastEvent?.event === 'task_status' && agentConfigs.length > 0) {
+      Promise.all([
+        apiFetch<TaskItem[]>('/tasks'),
+        apiFetch<LiveResponse>('/agents/live').catch((): LiveResponse => ({ running_tasks: [], active_roles: {}, active_count: 0 })),
+      ]).then(([taskList, live]) => {
+        setTasks(taskList);
+        const agents: OfficeAgent[] = agentConfigs.map((config, idx) => {
+          const activeInfo = live.active_roles[config.role];
+          return { ...config, pixelId: idx + 1, status: activeInfo ? 'active' as const : 'idle' as const, currentTask: activeInfo?.title || null, currentStage: activeInfo?.step_label || null };
+        });
+        setOfficeAgents(agents);
+      }).catch(() => {});
+    }
+  }, [lastEvent, agentConfigs]);
 
   usePixelOfficeBridge(iframeRef, officeAgentsRef, iframeLoaded);
 

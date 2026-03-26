@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.settings import get_settings
+from services.event_bus import publish_fire_and_forget
 from integrations.azure_client import AzureDevOpsClient
 from integrations.jira_client import JiraClient
 from models.agent_log import AgentLog
@@ -533,6 +534,10 @@ class TaskService:
             payload={'create_pr': create_pr},
         )
 
+        publish_fire_and_forget(organization_id, 'task_status', {
+            'task_id': task.id, 'status': 'queued', 'title': task.title,
+        })
+
         payloads = await self.queue_service.list_payloads()
         org_queued = sum(1 for p in payloads if int(p.get('organization_id', 0) or 0) == organization_id)
         warn_threshold = 5
@@ -579,6 +584,9 @@ class TaskService:
             'cancelled',
             'Task cancelled by user' + (f' (removed {removed} queued entry)' if removed > 0 else ''),
         )
+        publish_fire_and_forget(organization_id, 'task_status', {
+            'task_id': task.id, 'status': 'cancelled', 'title': task.title,
+        })
         return task
 
     async def add_log(self, task_id: int, organization_id: int, stage: str, message: str) -> AgentLog:
