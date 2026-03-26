@@ -19,6 +19,7 @@ interface AgentConfig {
   system_prompt: string;
   enabled: boolean;
   palette?: number;
+  create_pr?: boolean;
 }
 
 // ── Pixel Character Picker ────────────────────────────────────────────────────
@@ -193,6 +194,7 @@ function loadAgents(): AgentConfig[] {
         system_prompt: p.system_prompt || '',
         enabled: p.enabled ?? true,
         palette: p.palette ?? 0,
+        create_pr: p.create_pr ?? false,
       }));
     return [...mergedDefaults, ...extras];
   } catch {
@@ -577,6 +579,18 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
               rows={3}
               style={{ ...inputStyle, resize: 'vertical', lineHeight: 1.6 }}
             />
+          </div>
+
+          {/* Create PR toggle */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
+            <div>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>Create PR</label>
+              <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 2 }}>{t('agents.createPrDesc')}</div>
+            </div>
+            <div onClick={() => onUpdate({ create_pr: !(agent.create_pr ?? false) })}
+              style={{ width: 40, height: 22, borderRadius: 999, background: (agent.create_pr ?? false) ? agent.color : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
+              <div style={{ position: 'absolute', top: 3, left: (agent.create_pr ?? false) ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
+            </div>
           </div>
         </div>
       )}
