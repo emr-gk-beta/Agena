@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from api.dependencies import CurrentTenant, get_current_tenant
+from api.dependencies import CurrentTenant, get_current_tenant, require_permission
 from core.database import get_db_session
 from schemas.integration import IntegrationConfigResponse, IntegrationConfigUpsertRequest
 from services.integration_config_service import IntegrationConfigService
@@ -260,7 +260,7 @@ async def get_playbook_content(
 async def upsert_integration(
     provider: str,
     payload: IntegrationConfigUpsertRequest,
-    tenant: CurrentTenant = Depends(get_current_tenant),
+    tenant: CurrentTenant = Depends(require_permission('integrations:manage')),
     db: AsyncSession = Depends(get_db_session),
 ) -> IntegrationConfigResponse:
     service = IntegrationConfigService(db)

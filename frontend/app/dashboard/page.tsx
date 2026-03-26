@@ -2,9 +2,20 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch } from '@/lib/api';
+import {
+  apiFetch,
+  fetchAnalyticsDaily,
+  fetchAnalyticsSummary,
+  fetchAnalyticsModels,
+  type AnalyticsDailyResponse,
+  type AnalyticsSummaryResponse,
+  type AnalyticsModelResponse,
+} from '@/lib/api';
 import { TaskItem } from '@/components/TaskTable';
 import { useLocale } from '@/lib/i18n';
+import { useWS } from '@/lib/useWebSocket';
+import LineChart from '@/components/charts/LineChart';
+import BarChart from '@/components/charts/BarChart';
 
 type BillingStatus = {
   plan_name: string;
@@ -37,12 +48,16 @@ type MemorySchema = {
 
 export default function DashboardOverview() {
   const { t } = useLocale();
+  const { lastEvent } = useWS();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [billing, setBilling] = useState<BillingStatus | null>(null);
   const [memory, setMemory] = useState<MemoryStatus | null>(null);
   const [schema, setSchema] = useState<MemorySchema | null>(null);
   const [schemaOpen, setSchemaOpen] = useState(false);
   const [schemaLoading, setSchemaLoading] = useState(false);
+  const [analyticsDaily, setAnalyticsDaily] = useState<AnalyticsDailyResponse | null>(null);
+  const [analyticsSummary, setAnalyticsSummary] = useState<AnalyticsSummaryResponse | null>(null);
+  const [analyticsModels, setAnalyticsModels] = useState<AnalyticsModelResponse | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -54,12 +69,28 @@ export default function DashboardOverview() {
       setBilling(b);
       setMemory(m);
     }).catch(() => {});
+    Promise.all([
+      fetchAnalyticsDaily(30),
+      fetchAnalyticsSummary(),
+      fetchAnalyticsModels(30),
+    ]).then(([d, s, m]) => {
+      setAnalyticsDaily(d);
+      setAnalyticsSummary(s);
+      setAnalyticsModels(m);
+    }).catch(() => {});
     const iv = setInterval(() => {
       apiFetch<TaskItem[]>('/tasks').then(setTasks).catch(() => {});
       apiFetch<MemoryStatus>('/memory/status').then(setMemory).catch(() => {});
-    }, 5000);
+    }, 30000);
     return () => clearInterval(iv);
   }, []);
+
+  // Refetch on WebSocket task_status events
+  useEffect(() => {
+    if (lastEvent?.event === 'task_status') {
+      apiFetch<TaskItem[]>('/tasks').then(setTasks).catch(() => {});
+    }
+  }, [lastEvent]);
 
   const openMemorySchema = async () => {
     setSchemaOpen(true);
@@ -275,6 +306,125 @@ export default function DashboardOverview() {
             </button>
           </div>
         </div>
+      </div>
+
+      {/* Analytics Section */}
+      <div>
+        <div style={{ fontWeight: 800, fontSize: 18, color: 'var(--ink-90)', marginBottom: 16 }}>
+          {t('dashboard.analytics.title')}
+        </div>
+
+        {/* Summary numbers */}
+        {analyticsSummary && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+            {[
+              { label: t('dashboard.analytics.totalCost'), value: `$${analyticsSummary.cost_usd.toFixed(2)}`, color: '#5eead4' },
+              { label: t('dashboard.analytics.totalTokens'), value: analyticsSummary.total_tokens.toLocaleString(), color: '#a78bfa' },
+              { label: t('dashboard.analytics.successRate'), value: `${analyticsSummary.completion_rate}%`, color: '#22c55e' },
+              { label: t('dashboard.analytics.avgDuration'), value: `${(analyticsSummary.avg_duration_ms / 1000).toFixed(1)}s`, color: '#38bdf8' },
+            ].map((s) => (
+              <div key={s.label} style={{
+                borderRadius: 14,
+                border: '1px solid var(--panel-border)',
+                background: 'var(--panel-alt)',
+                padding: '16px 18px',
+              }}>
+                <div style={{ fontSize: 11, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.7 }}>{s.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: s.color, marginTop: 6 }}>{s.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Charts row */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+          {/* Cost trend line chart */}
+          <div style={{
+            borderRadius: 16,
+            border: '1px solid var(--panel-border)',
+            background: 'var(--panel-alt)',
+            padding: 18,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-78)', marginBottom: 12 }}>
+              {t('dashboard.analytics.costTrend')}
+            </div>
+            {analyticsDaily && analyticsDaily.daily_usage.length > 0 ? (
+              <LineChart
+                data={analyticsDaily.daily_usage.map((d) => ({ label: d.date, value: Math.round(d.cost_usd * 100) / 100 }))}
+                lineColor="#5eead4"
+                fillColor="rgba(94,234,212,0.10)"
+              />
+            ) : (
+              <div style={{ color: 'var(--ink-35)', fontSize: 13, padding: 20, textAlign: 'center' }}>
+                {t('dashboard.analytics.noData')}
+              </div>
+            )}
+          </div>
+
+          {/* Task completion bar chart (last 7 days) */}
+          <div style={{
+            borderRadius: 16,
+            border: '1px solid var(--panel-border)',
+            background: 'var(--panel-alt)',
+            padding: 18,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-78)', marginBottom: 12 }}>
+              {t('dashboard.analytics.taskCompletion')}
+            </div>
+            {analyticsDaily && analyticsDaily.task_velocity.length > 0 ? (
+              <BarChart
+                data={analyticsDaily.task_velocity.slice(-7).map((d) => ({ label: d.date, value: d.completed }))}
+                barColor="#22c55e"
+              />
+            ) : (
+              <div style={{ color: 'var(--ink-35)', fontSize: 13, padding: 20, textAlign: 'center' }}>
+                {t('dashboard.analytics.noData')}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Model breakdown table */}
+        {analyticsModels && analyticsModels.models.length > 0 && (
+          <div style={{
+            borderRadius: 16,
+            border: '1px solid var(--panel-border)',
+            background: 'var(--panel-alt)',
+            padding: 18,
+          }}>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-78)', marginBottom: 12 }}>
+              {t('dashboard.analytics.modelBreakdown')}
+            </div>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: '1px solid var(--panel-border)' }}>
+                  <th style={{ textAlign: 'left', padding: '8px 10px', color: 'var(--ink-35)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.7 }}>
+                    {t('dashboard.analytics.model')}
+                  </th>
+                  <th style={{ textAlign: 'right', padding: '8px 10px', color: 'var(--ink-35)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.7 }}>
+                    {t('dashboard.analytics.calls')}
+                  </th>
+                  <th style={{ textAlign: 'right', padding: '8px 10px', color: 'var(--ink-35)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.7 }}>
+                    {t('dashboard.analytics.tokens')}
+                  </th>
+                  <th style={{ textAlign: 'right', padding: '8px 10px', color: 'var(--ink-35)', fontWeight: 600, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.7 }}>
+                    {t('dashboard.analytics.cost')}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {analyticsModels.models.map((m) => (
+                  <tr key={m.model} style={{ borderBottom: '1px solid var(--panel-alt)' }}>
+                    <td style={{ padding: '8px 10px', color: '#5eead4', fontFamily: 'monospace', fontWeight: 600 }}>{m.model}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--ink-78)' }}>{m.count}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', color: 'var(--ink-78)' }}>{m.total_tokens.toLocaleString()}</td>
+                    <td style={{ padding: '8px 10px', textAlign: 'right', color: '#a78bfa', fontWeight: 700 }}>${m.cost_usd.toFixed(4)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Quick links */}

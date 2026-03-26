@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { apiFetch, loadPrefs, savePrefs, type AzureMember } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
+import { useRole, canAccess } from '@/lib/rbac';
 type WorkItem = { id: string; title: string; state: string };
 
 const STATE_COLORS: Record<string, string> = {
@@ -33,6 +34,7 @@ const initials = (name: string) =>
 
 export default function TeamPage() {
   const { t } = useLocale();
+  const [tab, setTab] = useState<'sprint' | 'org'>('sprint');
   const [provider,   setProvider]   = useState<'azure' | 'jira'>('azure');
   const [hasAzure,   setHasAzure]   = useState(false);
   const [hasJira,    setHasJira]    = useState(false);
@@ -280,6 +282,28 @@ export default function TeamPage() {
             {t('team.title')}
           </h1>
           <div style={{ display: 'flex', gap: 8, marginBottom: 8 }}>
+            {/* Main tabs: Sprint Team vs Organization */}
+            <button onClick={() => setTab('sprint')}
+              style={{
+                padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                border: tab === 'sprint' ? '1px solid rgba(94,234,212,0.45)' : '1px solid var(--panel-border-3)',
+                background: tab === 'sprint' ? 'rgba(94,234,212,0.12)' : 'var(--panel-alt)',
+                color: tab === 'sprint' ? '#5eead4' : 'var(--ink-58)',
+              }}>
+              Sprint
+            </button>
+            <button onClick={() => setTab('org')}
+              style={{
+                padding: '6px 12px', borderRadius: 999, fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                border: tab === 'org' ? '1px solid rgba(167,139,250,0.45)' : '1px solid var(--panel-border-3)',
+                background: tab === 'org' ? 'rgba(167,139,250,0.12)' : 'var(--panel-alt)',
+                color: tab === 'org' ? '#a78bfa' : 'var(--ink-58)',
+              }}>
+              {t('team.tabOrg')}
+            </button>
+
+            {tab === 'sprint' && <>
+            <div style={{ width: 1, background: 'var(--panel-border)', margin: '0 4px' }} />
             {(hasAzure || !hasJira) && (
               <button
                 onClick={() => {
@@ -326,14 +350,17 @@ export default function TeamPage() {
                 {t('team.providerJira')}
               </button>
             )}
+            </>}
           </div>
           <p style={{ color: 'var(--ink-35)', fontSize: 14, margin: 0 }}>
-            {myTeam.length > 0
-              ? myTeam.length + ' · ' + (sprintPath ? t('team.sprintLabel') : t('team.noConfig'))
-              : t('team.addEdit')}
+            {tab === 'org'
+              ? t('team.orgDesc')
+              : myTeam.length > 0
+                ? myTeam.length + ' · ' + (sprintPath ? t('team.sprintLabel') : t('team.noConfig'))
+                : t('team.addEdit')}
           </p>
         </div>
-        {hasConfig && (
+        {tab === 'sprint' && hasConfig && (
           <button onClick={() => setShowPicker(true)}
             style={{ flexShrink: 0, padding: '10px 18px', borderRadius: 12, border: '1px solid rgba(13,148,136,0.3)', background: 'rgba(13,148,136,0.1)', color: '#5eead4', fontWeight: 700, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ fontSize: 16 }}>+</span> {t('team.addEdit')}
@@ -341,7 +368,11 @@ export default function TeamPage() {
         )}
       </div>
 
-      {!hasConfig && (
+      {/* Organization tab */}
+      {tab === 'org' && <OrgMembersPanel t={t} />}
+
+      {/* Sprint tab content */}
+      {tab === 'sprint' && !hasConfig && (
         <div style={{ padding: '20px 24px', borderRadius: 16, border: '1px solid rgba(251,191,36,0.2)', background: 'rgba(251,191,36,0.06)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div>
             <div style={{ fontWeight: 600, color: '#fbbf24', fontSize: 14 }}>
@@ -357,12 +388,12 @@ export default function TeamPage() {
         </div>
       )}
 
-      {err && (
+      {tab === 'sprint' && err && (
         <div style={{ padding: '12px 16px', borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: 13 }}>{err}</div>
       )}
 
       {/* Benim takımım — kart listesi */}
-      {myTeam.length > 0 ? (
+      {tab === 'sprint' && myTeam.length > 0 ? (
         <div style={{ display: 'grid', gap: 8 }}>
           {myTeam.map((member) => {
             const isExpanded = expanded === member.id;
@@ -513,6 +544,151 @@ export default function TeamPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/* ── Org Members & Role Management Panel ────────────────────────── */
+
+type OrgMember = { id: number; user_id: number; email: string; full_name: string; role: string };
+
+const ROLE_OPTIONS = [
+  { value: 'owner', label: 'Owner', color: '#f59e0b', desc: 'Tam yetki' },
+  { value: 'admin', label: 'Admin', color: '#a78bfa', desc: 'Takım & entegrasyon yönetimi' },
+  { value: 'member', label: 'Member', color: '#38bdf8', desc: 'Task oluşturma & çalıştırma' },
+  { value: 'viewer', label: 'Viewer', color: '#6b7280', desc: 'Sadece izleme' },
+];
+
+function OrgMembersPanel({ t }: { t: (key: Parameters<ReturnType<typeof useLocale>['t']>[0]) => string }) {
+  const { role: myRole } = useRole();
+  const [members, setMembers] = useState<OrgMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [changingId, setChangingId] = useState<number | null>(null);
+  const [toast, setToast] = useState('');
+
+  const canManageRoles = canAccess(myRole, 'roles:manage');
+
+  const fetchMembers = useCallback(async () => {
+    try {
+      const data = await apiFetch<OrgMember[]>('/org/members');
+      setMembers(data);
+    } catch { /* silent */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { void fetchMembers(); }, [fetchMembers]);
+
+  const handleRoleChange = async (memberId: number, newRole: string) => {
+    setChangingId(memberId);
+    try {
+      await apiFetch(`/org/members/${memberId}/role`, {
+        method: 'PUT',
+        body: JSON.stringify({ role: newRole }),
+      });
+      setMembers((prev) => prev.map((m) => m.id === memberId ? { ...m, role: newRole } : m));
+      setToast(t('team.roleChanged'));
+      setTimeout(() => setToast(''), 2000);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Error';
+      setToast(msg);
+      setTimeout(() => setToast(''), 3000);
+    }
+    setChangingId(null);
+  };
+
+  if (loading) return (
+    <div style={{ display: 'grid', gap: 8 }}>
+      <Skel /><Skel opacity={0.7} /><Skel opacity={0.4} />
+    </div>
+  );
+
+  return (
+    <div style={{ display: 'grid', gap: 16 }}>
+      <div style={{ fontSize: 13, color: 'var(--ink-35)' }}>{t('team.orgDesc')}</div>
+
+      {toast && (
+        <div style={{ padding: '8px 14px', borderRadius: 10, background: 'rgba(34,197,94,0.12)', border: '1px solid rgba(34,197,94,0.3)', color: '#22c55e', fontSize: 12, fontWeight: 600 }}>
+          {toast}
+        </div>
+      )}
+
+      <div style={{ display: 'grid', gap: 8 }}>
+        {members.map((member) => {
+          const roleInfo = ROLE_OPTIONS.find((r) => r.value === member.role) || ROLE_OPTIONS[2];
+          const isChanging = changingId === member.id;
+          return (
+            <div key={member.id} style={{
+              display: 'flex', alignItems: 'center', gap: 14, padding: '14px 18px',
+              borderRadius: 14, border: `1px solid var(--panel-border)`, background: 'var(--panel)',
+              opacity: isChanging ? 0.6 : 1, transition: 'opacity 0.2s',
+            }}>
+              {/* Avatar */}
+              <div style={{
+                width: 40, height: 40, borderRadius: '50%',
+                background: grad(member.full_name || member.email),
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 13, fontWeight: 800, color: '#fff', flexShrink: 0,
+              }}>
+                {initials(member.full_name || member.email)}
+              </div>
+
+              {/* Info */}
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-90)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                  {member.full_name || member.email}
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--ink-35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {member.email}
+                </div>
+              </div>
+
+              {/* Role selector */}
+              {canManageRoles ? (
+                <select
+                  value={member.role}
+                  onChange={(e) => void handleRoleChange(member.id, e.target.value)}
+                  disabled={isChanging}
+                  style={{
+                    padding: '6px 10px', borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    border: `1px solid ${roleInfo.color}40`,
+                    background: `${roleInfo.color}15`, color: roleInfo.color,
+                    cursor: 'pointer', outline: 'none', appearance: 'auto',
+                    flexShrink: 0,
+                  }}
+                >
+                  {ROLE_OPTIONS.map((r) => (
+                    <option key={r.value} value={r.value}>{r.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <span style={{
+                  padding: '5px 12px', borderRadius: 10, fontSize: 12, fontWeight: 700,
+                  background: `${roleInfo.color}15`, color: roleInfo.color,
+                  border: `1px solid ${roleInfo.color}40`, flexShrink: 0,
+                }}>
+                  {roleInfo.label}
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Permission matrix legend */}
+      <div style={{ borderRadius: 14, border: '1px solid var(--panel-border)', background: 'var(--panel-alt)', padding: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 10 }}>
+          {t('team.orgMembers')}
+        </div>
+        <div style={{ display: 'grid', gap: 6 }}>
+          {ROLE_OPTIONS.map((r) => (
+            <div key={r.value} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
+              <span style={{ width: 8, height: 8, borderRadius: 4, background: r.color, flexShrink: 0 }} />
+              <span style={{ fontWeight: 700, color: r.color, minWidth: 60 }}>{r.label}</span>
+              <span style={{ color: 'var(--ink-35)' }}>{r.desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }

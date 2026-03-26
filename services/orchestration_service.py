@@ -29,6 +29,7 @@ from services.integration_config_service import IntegrationConfigService
 from services.llm.cost_tracker import CostTracker
 from services.local_repo_service import LocalRepoService
 from services.notification_service import NotificationService
+from services.event_bus import publish_fire_and_forget
 from services.task_service import TaskService
 from services.usage_service import UsageService
 
@@ -81,6 +82,10 @@ class OrchestrationService:
 
         task.status = 'running'
         await self.db_session.commit()
+
+        publish_fire_and_forget(organization_id, 'task_status', {
+            'task_id': task_id, 'status': 'running', 'title': task.title,
+        })
 
         routing = self._extract_task_routing(task)
 
@@ -664,6 +669,10 @@ class OrchestrationService:
             task.branch_name = branch_name
             await self.db_session.commit()
 
+            publish_fire_and_forget(organization_id, 'task_status', {
+                'task_id': task.id, 'status': 'completed', 'title': task.title,
+            })
+
             await usage_service.increment_tokens(organization_id, int(usage.get('total_tokens', 0)))
             run_finished_at = datetime.utcnow()
             duration_sec = round(time.perf_counter() - run_started_clock, 2)
@@ -732,6 +741,11 @@ class OrchestrationService:
             task.status = 'failed'
             task.failure_reason = str(exc)
             await self.db_session.commit()
+
+            publish_fire_and_forget(organization_id, 'task_status', {
+                'task_id': task.id, 'status': 'failed', 'title': task.title,
+            })
+
             usage = state.get('usage', {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0})
             run_finished_at = datetime.utcnow()
             duration_sec = round(time.perf_counter() - run_started_clock, 2)

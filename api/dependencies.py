@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Callable
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -8,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db_session
+from core.rbac import has_permission
 from models.organization_member import OrganizationMember
 from models.user import User
 from security.jwt import decode_token
@@ -23,6 +25,7 @@ class CurrentTenant:
     user_id: int
     organization_id: int
     email: str
+    role: str
 
 
 def get_queue_service() -> QueueService:
@@ -65,7 +68,32 @@ async def get_current_tenant(
             OrganizationMember.user_id == user_id,
         )
     )
-    if member_result.scalar_one_or_none() is None:
+    member = member_result.scalar_one_or_none()
+    if member is None:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='No organization access')
 
-    return CurrentTenant(user_id=user_id, organization_id=org_id, email=email)
+    return CurrentTenant(user_id=user_id, organization_id=org_id, email=email, role=member.role or 'member')
+
+
+def require_permission(permission: str) -> Callable:
+    """FastAPI dependency factory that checks the current tenant's role against
+    the RBAC permission matrix.  Usage::
+
+        @router.post('/something')
+        async def endpoint(
+            tenant: CurrentTenant = Depends(require_permission('billing:manage')),
+        ):
+            ...
+    """
+
+    async def _check(
+        tenant: CurrentTenant = Depends(get_current_tenant),
+    ) -> CurrentTenant:
+        if not has_permission(tenant.role, permission):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f'Permission denied: {permission}',
+            )
+        return tenant
+
+    return _check

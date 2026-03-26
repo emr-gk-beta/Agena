@@ -4,7 +4,7 @@ import core.http  # noqa: F401 – apply SSL patch before any httpx clients are 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.routes import agents, auth, billing, flows, github, integrations, memory, notifications, org, preferences, saas_tasks, tasks, usage_events, webhooks
+from api.routes import agents, analytics, auth, billing, flows, github, integrations, memory, notifications, org, preferences, saas_tasks, tasks, usage_events, webhooks, ws
 from core.database import engine
 from core.logging import configure_logging
 from core.settings import get_settings
@@ -25,6 +25,7 @@ app.add_middleware(
     allow_headers=['*'],
 )
 
+app.include_router(analytics.router)
 app.include_router(auth.router)
 app.include_router(org.router)
 app.include_router(billing.router)
@@ -39,6 +40,7 @@ app.include_router(notifications.router)
 app.include_router(usage_events.router)
 app.include_router(memory.router)
 app.include_router(webhooks.router)
+app.include_router(ws.router)
 
 
 @app.on_event('startup')

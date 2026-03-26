@@ -13,6 +13,7 @@ from core.logging import configure_logging
 from core.settings import get_settings
 from models.task_record import TaskRecord
 from db import models  # noqa: F401
+from services.event_bus import publish_fire_and_forget
 from services.orchestration_service import OrchestrationService
 from services.queue_service import QueueService
 from services.task_service import TaskService
@@ -108,6 +109,10 @@ async def _run_single_task(payload: dict) -> None:
             logger.info('Skipping terminal task id=%s status=%s', task.id, task.status)
             return
 
+        publish_fire_and_forget(organization_id, 'task_status', {
+            'task_id': task_id, 'status': 'picked_up', 'title': task.title,
+        })
+
         lock_scope = None
         for line in (task.description or '').splitlines():
             if line.lower().startswith('local repo path:'):
@@ -146,6 +151,9 @@ async def _run_single_task(payload: dict) -> None:
                     task.failure_reason = 'Repo lock busy for too long; task aborted after retries'
                     await session.commit()
                     await task_service.add_log(task.id, organization_id, 'failed', task.failure_reason)
+                    publish_fire_and_forget(organization_id, 'task_status', {
+                        'task_id': task_id, 'status': 'failed', 'title': task.title,
+                    })
                     return
                 await task_service.add_log(task.id, organization_id, 'queued', 'Repo lock busy, re-queued')
                 task.status = 'queued'
@@ -206,6 +214,12 @@ async def _run_safe(payload: dict) -> None:
         await _run_single_task(payload)
     except Exception:
         logger.exception('Worker failed payload=%s', payload)
+        org_id = int(payload.get('organization_id', 0) or 0)
+        t_id = int(payload.get('task_id', 0) or 0)
+        if org_id > 0 and t_id > 0:
+            publish_fire_and_forget(org_id, 'task_status', {
+                'task_id': t_id, 'status': 'failed', 'title': '',
+            })
 
 
 if __name__ == '__main__':

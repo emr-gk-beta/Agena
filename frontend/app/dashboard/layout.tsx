@@ -7,6 +7,8 @@ import { isLoggedIn, removeToken, apiFetch, listNotifications, markAllNotificati
 import OnboardingModal from '@/components/OnboardingModal';
 import WebPushBridge from '@/components/WebPushBridge';
 import { useLocale } from '@/lib/i18n';
+import { RoleContext, canAccess, type Role } from '@/lib/rbac';
+import { WebSocketProvider } from '@/lib/useWebSocket';
 
 const NOTIF_EVENT = 'tiqr:notification';
 const NOTIF_SYNC_EVENT = 'tiqr:notification-sync';
@@ -16,21 +18,21 @@ const LS_SIDEBAR_COLLAPSED = 'tiqr_sidebar_collapsed';
 const PRIMARY_NAV_KEYS = [
   { href: '/dashboard', key: 'nav.overview', icon: '🧭' },
   { href: '/dashboard/office', key: 'nav.office', icon: '🏢' },
-  { href: '/dashboard/tasks', key: 'nav.tasks', icon: '✅' },
-  { href: '/dashboard/sprints', key: 'nav.sprints', icon: '🗂' },
-  { href: '/dashboard/team', key: 'nav.team', icon: '👥' },
+  { href: '/dashboard/tasks', key: 'nav.tasks', icon: '✅', permission: 'tasks:read' as const },
+  { href: '/dashboard/sprints', key: 'nav.sprints', icon: '🗂', permission: 'tasks:read' as const },
+  { href: '/dashboard/team', key: 'nav.team', icon: '👥', permission: 'team:manage' as const },
   { href: '/dashboard/agents', key: 'nav.agents', icon: '🤖' },
   { href: '/dashboard/flows', key: 'nav.flows', icon: '🧠' },
   { href: '/dashboard/templates', key: 'nav.templates', icon: '🧩' },
   { href: '/dashboard/mappings', key: 'nav.mappings', icon: '🔗' },
-  { href: '/dashboard/integrations', key: 'nav.integrations', icon: '🔌' },
-] as const;
+  { href: '/dashboard/integrations', key: 'nav.integrations', icon: '🔌', permission: 'integrations:manage' as const },
+];
 
 const SECONDARY_NAV_KEYS = [
   { href: '/dashboard/notifications', key: 'nav.notifications', icon: '🔔' },
-  { href: '/dashboard/usage', key: 'nav.usage', icon: '📊' },
+  { href: '/dashboard/usage', key: 'nav.usage', icon: '📊', permission: 'billing:manage' as const },
   { href: '/dashboard/profile', key: 'nav.profile', icon: '👤' },
-] as const;
+];
 
 function DashboardInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -49,6 +51,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
   const [notifLoading, setNotifLoading] = useState(false);
   const [notifFilter, setNotifFilter] = useState<'all' | 'failed'>('all');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [userRole, setUserRole] = useState<Role>('viewer');
   const shouldOpenOnboarding = searchParams.get('onboarding') === '1' || searchParams.get('welcome') === '1';
   const lastUnreadRef = useRef<number | null>(null);
   const sidebarWidth = sidebarCollapsed ? 76 : 220;
@@ -116,6 +119,12 @@ function DashboardInner({ children }: { children: ReactNode }) {
       apiFetch<{ full_name?: string; email: string }>('/auth/me').then((u) => {
         if (!active) return;
         setUserName(u.full_name || u.email);
+        // Fetch current user's role from org members list
+        apiFetch<Array<{ email: string; role: string }>>('/org/members').then((members) => {
+          if (!active) return;
+          const me = members.find((m) => m.email === u.email);
+          if (me) setUserRole(me.role as Role);
+        }).catch(() => {});
       }).catch(() => {});
 
       if (typeof window !== 'undefined' && 'Notification' in window) {
@@ -259,6 +268,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
   if (!checked) return null;
 
   return (
+    <RoleContext.Provider value={{ role: userRole }}>
     <div style={{ display: 'flex', minHeight: '100vh', paddingTop: 72 }}>
       {/* Sidebar */}
       <aside style={{
@@ -312,7 +322,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
         </div>}
 
         <nav style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {PRIMARY_NAV_KEYS.map((item) => {
+          {PRIMARY_NAV_KEYS.filter((item) => !item.permission || canAccess(userRole, item.permission)).map((item) => {
             const active = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
             return (
               <Link key={item.href} href={item.href} title={t(item.key)} style={{
@@ -333,7 +343,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
         </nav>
 
         <div style={{ marginTop: 10, borderTop: '1px solid var(--panel-border)', paddingTop: 10, display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {SECONDARY_NAV_KEYS.map((item) => {
+          {SECONDARY_NAV_KEYS.filter((item) => !item.permission || canAccess(userRole, item.permission)).map((item) => {
             const active = pathname === item.href || pathname.startsWith(item.href);
             const isNotificationItem = item.href === '/dashboard/notifications';
             const hasUnread = isNotificationItem && unreadCount > 0;
@@ -524,13 +534,16 @@ function DashboardInner({ children }: { children: ReactNode }) {
       )}
       <WebPushBridge />
     </div>
+    </RoleContext.Provider>
   );
 }
 
 export default function DashboardLayout({ children }: { children: ReactNode }) {
   return (
-    <Suspense fallback={null}>
-      <DashboardInner>{children}</DashboardInner>
-    </Suspense>
+    <WebSocketProvider>
+      <Suspense fallback={null}>
+        <DashboardInner>{children}</DashboardInner>
+      </Suspense>
+    </WebSocketProvider>
   );
 }

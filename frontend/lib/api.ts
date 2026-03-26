@@ -470,3 +470,61 @@ export async function getFlowVersion(flowId: string, versionId: number): Promise
 export async function getAgentAnalytics(persist = true): Promise<AgentAnalyticsResponse> {
   return apiFetch<AgentAnalyticsResponse>(`/flows/analytics/agents?persist=${persist ? '1' : '0'}`);
 }
+
+// ── Dashboard Analytics helpers ──────────────────────────────────────────────
+
+export interface AnalyticsDailyStatItem {
+  date: string;
+  count: number;
+  total_tokens: number;
+  cost_usd: number;
+  avg_duration_ms: number;
+}
+
+export interface AnalyticsTaskVelocityItem {
+  date: string;
+  completed: number;
+  failed: number;
+  queued: number;
+  total: number;
+}
+
+export interface AnalyticsDailyResponse {
+  daily_usage: AnalyticsDailyStatItem[];
+  task_velocity: AnalyticsTaskVelocityItem[];
+}
+
+export interface AnalyticsModelItem {
+  model: string;
+  count: number;
+  total_tokens: number;
+  cost_usd: number;
+}
+
+export interface AnalyticsModelResponse {
+  models: AnalyticsModelItem[];
+}
+
+export interface AnalyticsSummaryResponse {
+  period: string;
+  ai_call_count: number;
+  total_tokens: number;
+  cost_usd: number;
+  avg_duration_ms: number;
+  task_total: number;
+  task_completed: number;
+  task_failed: number;
+  completion_rate: number;
+}
+
+export async function fetchAnalyticsDaily(days = 30): Promise<AnalyticsDailyResponse> {
+  return apiFetch<AnalyticsDailyResponse>(`/analytics/daily?days=${days}`);
+}
+
+export async function fetchAnalyticsSummary(): Promise<AnalyticsSummaryResponse> {
+  return apiFetch<AnalyticsSummaryResponse>('/analytics/summary');
+}
+
+export async function fetchAnalyticsModels(days = 30): Promise<AnalyticsModelResponse> {
+  return apiFetch<AnalyticsModelResponse>(`/analytics/models?days=${days}`);
+}
