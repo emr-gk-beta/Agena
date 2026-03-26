@@ -31,6 +31,7 @@ DEFAULT_EVENT_PREFS: dict[str, dict[str, bool]] = {
     'approval_decision': {'in_app': True, 'email': False, 'web_push': True, 'slack': False, 'teams': False},
     'integration_auth_expired': {'in_app': True, 'email': True, 'web_push': True, 'slack': True, 'teams': True},
     'queue_backlog_warning': {'in_app': True, 'email': False, 'web_push': True, 'slack': True, 'teams': True},
+    'role_changed': {'in_app': True, 'email': True, 'web_push': True, 'slack': False, 'teams': False},
 }
 
 

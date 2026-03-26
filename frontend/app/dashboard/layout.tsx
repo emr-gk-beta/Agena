@@ -26,6 +26,7 @@ const PRIMARY_NAV_KEYS = [
   { href: '/dashboard/templates', key: 'nav.templates', icon: '🧩' },
   { href: '/dashboard/mappings', key: 'nav.mappings', icon: '🔗' },
   { href: '/dashboard/integrations', key: 'nav.integrations', icon: '🔌', permission: 'integrations:manage' as const },
+  { href: '/dashboard/permissions', key: 'nav.permissions', icon: '🛡', permission: 'roles:manage' as const },
 ];
 
 const SECONDARY_NAV_KEYS = [
