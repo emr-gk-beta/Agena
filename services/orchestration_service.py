@@ -851,9 +851,19 @@ class OrchestrationService:
             raise
 
     def _build_pr_payload(self, task: dict[str, Any], reviewed_code: str, local_repo_path: str | None = None) -> CreatePRRequest:
-        branch_suffix = datetime.utcnow().strftime('%Y%m%d%H%M%S')
-        safe_id = re.sub(r'[^a-zA-Z0-9_-]', '-', task.get('id', 'task'))
-        branch_name = f'ai-task/{safe_id}-{branch_suffix}'
+        # Build branch name from external ID + title slug
+        title = str(task.get('title', '') or '')
+        desc = str(task.get('description', '') or '')
+
+        # Extract external ID (e.g. "Azure #61717" or "Jira #123")
+        ext_match = re.search(r'(?:Azure|Jira|GitHub)\s*#(\d+)', f'{title} {desc}')
+        ext_id = f'AB#{ext_match.group(1)}' if ext_match else str(task.get('id', 'task'))
+
+        # Create slug from title (remove [Azure #xxx] prefix, slugify)
+        clean_title = re.sub(r'\[.*?#\d+\]\s*', '', title).strip()
+        title_slug = re.sub(r'[^a-zA-Z0-9]+', '-', clean_title).strip('-').lower()[:50]
+
+        branch_name = f'feature/{ext_id}-{title_slug}' if title_slug else f'feature/{ext_id}'
 
         parsed_files = self._parse_reviewed_output_to_files(reviewed_code, local_repo_path=local_repo_path)
         if not parsed_files:
