@@ -911,7 +911,9 @@ class OrchestrationService:
                 if applied:
                     final_content = applied
                 else:
-                    continue  # Skip if patch application failed
+                    # Patch apply failed — skip this file but log it
+                    logger.warning(f'Patch apply failed for {clean_path}, skipping')
+                    continue
 
             # Detect partial output (contains "unchanged" markers)
             elif not is_patch:
@@ -1064,7 +1066,11 @@ class OrchestrationService:
                 for i in range(len(result_lines) - len(orig_sequence) + 1):
                     all_match = True
                     for j, expected in enumerate(orig_sequence):
-                        if result_lines[i + j].rstrip() != expected.rstrip():
+                        # Normalize: strip trailing whitespace, collapse internal whitespace for comparison
+                        orig_norm = result_lines[i + j].rstrip()
+                        exp_norm = expected.rstrip()
+                        # Also try stripped comparison (model may add/remove leading tabs)
+                        if orig_norm != exp_norm and orig_norm.strip() != exp_norm.strip():
                             all_match = False
                             break
                     if all_match:
