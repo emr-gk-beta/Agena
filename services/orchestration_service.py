@@ -386,8 +386,8 @@ class OrchestrationService:
                                     agents_md_content = p.read_text(errors='replace')
                                     agents_md_source = f'repo:{name}'
                                     break
-                                except Exception:
-                                    pass
+                                except Exception as _e:
+                                    logger.warning('Failed to read agents.md from repo root: %s', _e)
 
                     # 2) Tiqr'in olusturdugu — DB profildeki path
                     if not agents_md_content:
@@ -405,8 +405,8 @@ class OrchestrationService:
                                             agents_md_content = Path(db_path).read_text(errors='replace')
                                             agents_md_source = f'db:{db_path}'
                                             break
-                        except Exception:
-                            pass
+                        except Exception as _e:
+                            logger.warning('Failed to read agents.md from DB profile: %s', _e)
 
                     # 3) .tiqr directory
                     if not agents_md_content and repo_root:
@@ -417,8 +417,8 @@ class OrchestrationService:
                                     agents_md_content = md_file.read_text(errors='replace')
                                     agents_md_source = f'.tiqr:{md_file}'
                                     break
-                                except Exception:
-                                    pass
+                                except Exception as _e:
+                                    logger.warning('Failed to read agents.md from .tiqr dir: %s', _e)
 
                     # 4) Fallback — full repo scan
                     if not agents_md_content:
