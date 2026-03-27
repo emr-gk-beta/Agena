@@ -359,11 +359,14 @@ export default function ProfilePage() {
             />
           </div>
           <ProfileInput
-            label='Default branch prefix'
+            label='Branch Pattern'
             value={profileSettings.branch_prefix}
             onChange={(v) => { setProfileSettings((p) => ({ ...p, branch_prefix: v })); setSaved(false); }}
-            placeholder='ai/task'
+            placeholder='feature/{ext_id}-{title_slug}'
           />
+          <div style={{ fontSize: 10, color: 'var(--ink-25)', marginTop: -8, padding: '0 2px', lineHeight: 1.5 }}>
+            Placeholders: {'{ext_id}'} (AB#61717), {'{title_slug}'} (merchant-status), {'{id}'} (task id), {'{timestamp}'} (20260327)
+          </div>
           <ProfileInput
             label='Queue warning threshold'
             value={String(profileSettings.queue_warn_threshold)}

@@ -556,7 +556,7 @@ class OrchestrationService:
             )
             pr_url = None
             branch_name = None
-            pr_payload = self._build_pr_payload(task=payload, reviewed_code=final_code, local_repo_path=routing.local_repo_path)
+            pr_payload = await self._build_pr_payload(task=payload, reviewed_code=final_code, local_repo_path=routing.local_repo_path)
             await task_service.add_log(
                 task.id,
                 organization_id,
@@ -850,8 +850,8 @@ class OrchestrationService:
                 await task_service.add_log(task.id, organization_id, 'notify', 'Failure email sent')
             raise
 
-    def _build_pr_payload(self, task: dict[str, Any], reviewed_code: str, local_repo_path: str | None = None) -> CreatePRRequest:
-        # Build branch name from external ID + title slug
+    async def _build_pr_payload(self, task: dict[str, Any], reviewed_code: str, local_repo_path: str | None = None) -> CreatePRRequest:
+        # Build branch name from pattern (user configurable via profile settings)
         title = str(task.get('title', '') or '')
         desc = str(task.get('description', '') or '')
 
@@ -863,7 +863,31 @@ class OrchestrationService:
         clean_title = re.sub(r'\[.*?#\d+\]\s*', '', title).strip()
         title_slug = re.sub(r'[^a-zA-Z0-9]+', '-', clean_title).strip('-').lower()[:50]
 
-        branch_name = f'feature/{ext_id}-{title_slug}' if title_slug else f'feature/{ext_id}'
+        timestamp = datetime.utcnow().strftime('%Y%m%d%H%M%S')
+        task_id = str(task.get('id', 'task'))
+
+        # Read branch pattern from user profile settings
+        branch_pattern = 'feature/{ext_id}-{title_slug}'  # default
+        try:
+            user_id = task.get('created_by_user_id')
+            if user_id and self.db_session:
+                from models.user_preference import UserPreference
+                pref_result = await self.db_session.execute(
+                    select(UserPreference).where(UserPreference.user_id == user_id)
+                )
+                pref = pref_result.scalar_one_or_none()
+                if pref and pref.profile_settings_json:
+                    ps = json.loads(pref.profile_settings_json)
+                    custom_pattern = str(ps.get('branch_prefix', '') or '').strip()
+                    if custom_pattern:
+                        branch_pattern = custom_pattern
+        except Exception:
+            pass
+
+        # Replace placeholders
+        branch_name = branch_pattern.replace('{ext_id}', ext_id).replace('{title_slug}', title_slug).replace('{id}', task_id).replace('{timestamp}', timestamp)
+        # Sanitize branch name
+        branch_name = re.sub(r'[^a-zA-Z0-9/_#.-]', '-', branch_name).strip('-')
 
         parsed_files = self._parse_reviewed_output_to_files(reviewed_code, local_repo_path=local_repo_path)
         if not parsed_files:
