@@ -173,8 +173,8 @@ class TaskService:
                     description=item.description,
                 )
                 imported += 1
-            except PermissionError:
-                break
+            except PermissionError as pe:
+                raise ValueError(f'Task quota exceeded: {pe}') from pe
 
         return imported, skipped
 
@@ -235,8 +235,8 @@ class TaskService:
                     description=item.description,
                 )
                 imported += 1
-            except PermissionError:
-                break
+            except PermissionError as pe:
+                raise ValueError(f'Task quota exceeded: {pe}') from pe
 
         return imported, skipped
 
