@@ -346,6 +346,7 @@ class OrchestrationService:
                     agents_pkg_dir = ''
 
                     # 1) Tiqr data dir'deki agents.md (scan sonucu)
+                    # Prefer profiles that have agents_pkg_dir (split format) over legacy
                     if routing.local_repo_path:
                         try:
                             from models.user_preference import UserPreference
@@ -358,13 +359,21 @@ class OrchestrationService:
                             if pref and pref.profile_settings_json:
                                 import json as _json
                                 ps = _json.loads(pref.profile_settings_json)
+                                best_prof = None
                                 for _mid, _prof in (ps.get('repo_profiles') or {}).items():
                                     md_path = _prof.get('agents_md_path', '')
                                     if md_path and Path(md_path).is_file():
-                                        agents_md_content = Path(md_path).read_text(errors='replace')
-                                        agents_md_source = f'db:{Path(md_path).name}'
-                                        agents_pkg_dir = _prof.get('agents_pkg_dir', '')
-                                        break
+                                        # Prefer profile with pkg_dir
+                                        if _prof.get('agents_pkg_dir') and Path(_prof['agents_pkg_dir']).is_dir():
+                                            best_prof = _prof
+                                            break
+                                        if best_prof is None:
+                                            best_prof = _prof
+                                if best_prof:
+                                    md_path = best_prof['agents_md_path']
+                                    agents_md_content = Path(md_path).read_text(errors='replace')
+                                    agents_md_source = f'db:{Path(md_path).name}'
+                                    agents_pkg_dir = best_prof.get('agents_pkg_dir', '')
                         except Exception as _amd_err:
                             logger.error(f'Failed to read agents.md from DB: {_amd_err}')
 
@@ -498,6 +507,18 @@ class OrchestrationService:
                         plan=plan,
                         file_contents=file_contents,
                     )
+                    # Retry once on refusal
+                    if generated.strip().lower().startswith("i'm sorry") or len(generated.strip()) < 100:
+                        await task_service.add_log(task.id, organization_id, 'agent',
+                            f'Developer refused or empty output ({len(generated)} chars), retrying...')
+                        generated, code_usage2, code_model = await orchestrator.agents.run_ai_code(
+                            task_title=task.title,
+                            task_description=task.description or '',
+                            plan=plan,
+                            file_contents=file_contents,
+                        )
+                        orchestrator._merge_usage(flow_state, code_usage2)
+                        flow_state['model_usage'].append(code_model)
                     orchestrator._merge_usage(flow_state, code_usage)
                     flow_state['model_usage'].append(code_model)
                     flow_state['generated_code'] = generated
@@ -1187,45 +1208,13 @@ class OrchestrationService:
         self, index_md: str, pkg_dir: str, title: str, description: str,
         loaded_pkgs: list[str],
     ) -> str:
-        """Build planner context from index + relevant package signature files."""
-        text = f'{title} {description}'.lower()
-        keywords = set(w for w in re.findall(r'[a-z_]{3,}', text) if w not in {
-            'the', 'and', 'for', 'that', 'this', 'with', 'from', 'are', 'was', 'not',
-            'but', 'have', 'has', 'been', 'will', 'should', 'would', 'could', 'can',
-            'bir', 'ile', 'olan', 'icin', 'gibi', 'daha', 'var', 'yok', 'hem',
-            'task', 'azure', 'jira', 'local', 'repo', 'path',
-        })
+        """Build planner context: index with compact signatures.
 
-        parts = [index_md, '', '## Relevant Package Signatures', '']
-        pkg_path = Path(pkg_dir)
-        total_loaded = 0
-        for md_file in sorted(pkg_path.glob('*.md')):
-            pkg_name = md_file.stem.replace('__', '/')
-            # Check if any keyword matches the package name
-            pkg_lower = pkg_name.lower()
-            if any(kw in pkg_lower for kw in keywords):
-                try:
-                    content = md_file.read_text(errors='replace')
-                    parts.append(content)
-                    parts.append('')
-                    loaded_pkgs.append(pkg_name)
-                    total_loaded += len(content)
-                except Exception:
-                    pass
-
-        # If no packages matched, load all (safety fallback)
-        if not loaded_pkgs:
-            for md_file in sorted(pkg_path.glob('*.md')):
-                try:
-                    content = md_file.read_text(errors='replace')
-                    parts.append(content)
-                    parts.append('')
-                    loaded_pkgs.append(md_file.stem.replace('__', '/'))
-                except Exception:
-                    pass
-
-        logger.info(f'Planner context: {len(loaded_pkgs)} packages loaded, keywords={keywords}')
-        return '\n'.join(parts)
+        The index now contains compact signatures (struct/func names per file,
+        no field bodies) which is enough for the planner to pick the right files.
+        """
+        loaded_pkgs.append('(compact index)')
+        return index_md
 
     def _trim_agents_md(self, agents_md: str, title: str, description: str) -> str:
         """Trim agents.md to reduce token usage by keeping only relevant Code Signatures.

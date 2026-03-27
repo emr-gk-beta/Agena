@@ -320,20 +320,30 @@ def generate_agents_md(scan_data: dict[str, Any], repo_name: str) -> str:
             lines.append(f'| `{sf["path"]}` | {sf["lang"]} | {sf["lines"]} | {sf["size"]:,}B |')
         lines.append('')
 
-    # Signatures — package index only (details in separate files)
+    # Signatures — compact format (struct/func names only, no field bodies)
     sigs = scan_data.get('signatures', [])
     if sigs:
-        by_pkg = _group_by_package(sigs)
-        lines.append('## Packages')
-        lines.append('| Package | Files | Structs | Functions |')
-        lines.append('|---------|-------|---------|-----------|')
-        for pkg, pkg_sigs in sorted(by_pkg.items()):
-            files = len(set(s['file'] for s in pkg_sigs))
-            structs = sum(1 for s in pkg_sigs if s.get('kind') in ('struct', 'interface', 'class', 'type'))
-            funcs = sum(1 for s in pkg_sigs if s.get('kind') in ('func', 'function', 'method', 'fn'))
-            lines.append(f'| `{pkg}` | {files} | {structs} | {funcs} |')
+        lines.append('## Code Signatures (compact)')
         lines.append('')
-        lines.append('> Detailed signatures are in separate package files. The planner loads only relevant packages.')
+
+        by_file: dict[str, list[dict]] = {}
+        for s in sigs:
+            by_file.setdefault(s['file'], []).append(s)
+
+        for file_path, file_sigs in sorted(by_file.items()):
+            sig_parts: list[str] = []
+            for s in file_sigs:
+                kind = s.get('kind', '')
+                name = s.get('name', '')
+                sig = s.get('signature', '')
+                if kind in ('struct', 'interface', 'class', 'type'):
+                    sig_parts.append(f'{kind} {name}')
+                elif sig:
+                    sig_parts.append(sig)
+                else:
+                    sig_parts.append(f'{kind} {name}')
+            lines.append(f'`{file_path}`: {" | ".join(sig_parts)}')
+        lines.append('')
 
     return '\n'.join(lines)
 
