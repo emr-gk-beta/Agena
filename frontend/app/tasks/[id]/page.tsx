@@ -500,7 +500,7 @@ export default function TaskDetailPage() {
     if (!taskId) return;
     try {
       setIsRerunBusy(true);
-      await apiFetch('/tasks/' + taskId + '/assign', { method: 'POST', body: JSON.stringify({ create_pr: defaultCreatePr, mode: task?.last_mode || undefined }) });
+      await apiFetch('/tasks/' + taskId + '/assign', { method: 'POST', body: JSON.stringify({ create_pr: defaultCreatePr, mode: task?.last_mode || 'ai' }) });
       setSelectedRunIndex(-1);
       await loadData();
     } catch (err) {

@@ -471,7 +471,7 @@ class OrchestrationService:
                         f'  plan_files: {plan_files}\n'
                         f'  file_contents: {total_read} chars ({len(plan_files)} files)\n'
                         f'  system_prompt: AI_CODE_SYSTEM_PROMPT\n'
-                        f'  model: {routing.preferred_agent_model or "default"} | max_output_tokens: 32000'
+                        f'  model: {routing.preferred_agent_model or "default"} | max_output_tokens: 128000'
                     )
                     u_before = _get_usage(flow_state)
                     s_start = datetime.utcnow()
@@ -497,7 +497,7 @@ class OrchestrationService:
                         f'  spec_goal: {str(spec.get("goal",spec.get("summary","")))[:150]}\n'
                         f'  target_files_context: {len(dev_ctx)} chars\n'
                         f'  system_prompt: DEV_SYSTEM (flow mode)\n'
-                        f'  model: {routing.preferred_agent_model or "default"} | max_output_tokens: 32000'
+                        f'  model: {routing.preferred_agent_model or "default"} | max_output_tokens: 128000'
                     )
                     u_before = _get_usage(flow_state)
                     s_start = datetime.utcnow()

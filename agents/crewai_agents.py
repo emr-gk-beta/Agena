@@ -18,6 +18,17 @@ from services.llm.provider import LLMProvider
 
 logger = logging.getLogger(__name__)
 
+# Centralized output token limits per agent role.
+# Adjust these values to control max generation length for each step.
+AGENT_TOKEN_LIMITS: dict[str, int] = {
+    'context': 2_000,
+    'pm': 16_000,
+    'planner': 8_000,
+    'developer': 128_000,
+    'reviewer': 128_000,
+    'finalizer': 128_000,
+}
+
 
 class CrewAIAgentRunner:
     def __init__(self, llm_provider: LLMProvider | None = None) -> None:
@@ -34,7 +45,7 @@ class CrewAIAgentRunner:
             system_prompt=FETCH_CONTEXT_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='simple',
-            max_output_tokens=1200,
+            max_output_tokens=AGENT_TOKEN_LIMITS['context'],
         )
         return content, usage, model
 
@@ -54,7 +65,7 @@ class CrewAIAgentRunner:
             system_prompt=PM_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='normal',
-            max_output_tokens=8000,
+            max_output_tokens=AGENT_TOKEN_LIMITS['pm'],
         )
         spec = self._safe_json(content)
         return spec, usage, model
@@ -73,7 +84,7 @@ class CrewAIAgentRunner:
             system_prompt=AI_PLAN_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='high',
-            max_output_tokens=4000,
+            max_output_tokens=AGENT_TOKEN_LIMITS['planner'],
         )
         return self._safe_json(content), usage, model
 
@@ -83,13 +94,17 @@ class CrewAIAgentRunner:
         for c in plan.get('changes', []):
             changes_text += f'- {c.get("file","")}: {c.get("description","")}\n'
 
+        file_list = '\n'.join(f'  - {c.get("file","")}' for c in plan.get('changes', []))
         prompt = (
             f'TASK: {task_title}\n'
             f'DESCRIPTION: {task_description}\n\n'
             f'IMPLEMENTATION PLAN:\n{plan.get("plan", "")}\n\n'
             f'CHANGES TO MAKE:\n{changes_text}\n\n'
             f'SOURCE FILES TO MODIFY:\n{file_contents}\n\n'
-            'Implement ALL the changes described above. Return **File: path** blocks with code.'
+            f'CRITICAL REQUIREMENT: You MUST produce a **File: path** + ``` patch block for EVERY file listed below. '
+            f'Do NOT stop after the first file. Do NOT skip any file. '
+            f'There are {len(plan.get("changes", []))} files that need changes:\n{file_list}\n\n'
+            f'Output a separate **File: path** block for EACH of the {len(plan.get("changes", []))} files above.'
         )
         return await self._run_with_crewai_or_llm(
             role='Developer Agent',
@@ -97,7 +112,7 @@ class CrewAIAgentRunner:
             system_prompt=AI_CODE_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='high',
-            max_output_tokens=128000,
+            max_output_tokens=AGENT_TOKEN_LIMITS['developer'],
             skip_cache=True,
         )
 
@@ -119,7 +134,7 @@ class CrewAIAgentRunner:
             system_prompt=DEV_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='high',
-            max_output_tokens=32000,
+            max_output_tokens=AGENT_TOKEN_LIMITS['developer'],
             skip_cache=True,
         )
 
@@ -137,7 +152,7 @@ class CrewAIAgentRunner:
             system_prompt=REVIEWER_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='normal',
-            max_output_tokens=32000,
+            max_output_tokens=AGENT_TOKEN_LIMITS['reviewer'],
         )
 
     async def finalize(self, reviewed_code: str) -> tuple[str, dict[str, int], str]:
@@ -154,7 +169,7 @@ class CrewAIAgentRunner:
             system_prompt=FINALIZE_SYSTEM_PROMPT,
             user_prompt=prompt,
             complexity_hint='simple',
-            max_output_tokens=32000,
+            max_output_tokens=AGENT_TOKEN_LIMITS['finalizer'],
         )
 
     async def _run_with_crewai_or_llm(
