@@ -1013,7 +1013,13 @@ class OrchestrationService:
             return None
 
     def _apply_patch(self, local_repo_path: str, rel_path: str, patch_content: str) -> str | None:
-        """Apply a patch-style output (@@ context +additions -deletions) to the original file."""
+        """Apply a patch-style output (@@ context +additions -deletions) to the original file.
+
+        Strategy: Extract ALL context lines from each hunk and find the UNIQUE
+        position in the file where they all match consecutively. This prevents
+        matching the wrong location when the same line appears in multiple functions.
+        Only additions (+) are inserted; deletions (-) are applied; context ( ) is kept.
+        """
         try:
             original_path = Path(local_repo_path).expanduser().resolve() / rel_path
             if not original_path.is_file():
@@ -1036,8 +1042,7 @@ class OrchestrationService:
                         hunks.append(current_hunk)
                     current_hunk = []
                     continue
-                if current_hunk is not None:
-                    current_hunk.append(line)
+                current_hunk.append(line)
             if current_hunk:
                 hunks.append(current_hunk)
 
@@ -1045,60 +1050,63 @@ class OrchestrationService:
                 return None
 
             result_lines = list(original_lines)
+            # Apply hunks in reverse order so line numbers stay correct
+            applied_hunks: list[tuple[int, int, list[str]]] = []
 
             for hunk in hunks:
-                # Extract context lines (lines starting with space) to find position
-                context_lines = []
+                # Separate context+deletion lines (what's in the original) from additions
+                # Context lines start with ' ', deletions with '-', additions with '+'
+                orig_sequence: list[str] = []  # lines that should exist in original (context + deletions)
                 for hl in hunk:
                     if hl.startswith(' '):
-                        context_lines.append(hl[1:])  # strip leading space
+                        orig_sequence.append(hl[1:])
+                    elif hl.startswith('-'):
+                        orig_sequence.append(hl[1:])
+                    # '+' lines are NOT in original
 
-                if not context_lines:
+                if not orig_sequence:
                     continue
 
-                # Find the context in original — match first context line
+                # Find the unique position where ALL orig_sequence lines match consecutively
                 match_start = -1
-                first_ctx = context_lines[0]
-                for i, orig_line in enumerate(result_lines):
-                    if orig_line.rstrip() == first_ctx.rstrip():
-                        # Verify subsequent context lines match too
-                        all_match = True
-                        ctx_idx = 0
-                        for j in range(i, min(i + len(hunk), len(result_lines))):
-                            while ctx_idx < len(hunk) and not hunk[ctx_idx].startswith(' '):
-                                ctx_idx += 1
-                            if ctx_idx >= len(hunk):
-                                break
-                            expected = hunk[ctx_idx][1:]  # strip leading space
-                            if result_lines[j].rstrip() != expected.rstrip():
-                                all_match = False
-                                break
-                            ctx_idx += 1
-                        if all_match:
-                            match_start = i
+                candidates = 0
+                for i in range(len(result_lines) - len(orig_sequence) + 1):
+                    all_match = True
+                    for j, expected in enumerate(orig_sequence):
+                        if result_lines[i + j].rstrip() != expected.rstrip():
+                            all_match = False
+                            break
+                    if all_match:
+                        match_start = i
+                        candidates += 1
+                        if candidates > 1:
+                            # Multiple matches — ambiguous, try with more strict matching
                             break
 
                 if match_start == -1:
-                    logger.warning(f'Patch: could not find context match for hunk in {rel_path}')
+                    logger.warning(f'Patch: no context match for hunk in {rel_path}, skipping')
                     continue
 
-                # Apply the hunk: rebuild lines at match position
+                if candidates > 1:
+                    logger.warning(f'Patch: {candidates} matches for hunk in {rel_path}, using first')
+
+                # Build replacement: walk hunk lines, keep context, add additions, skip deletions
                 new_section: list[str] = []
-                orig_idx = match_start
                 for hl in hunk:
                     if hl.startswith('+'):
-                        new_section.append(hl[1:])  # add new line (strip +)
+                        new_section.append(hl[1:])  # add new line
                     elif hl.startswith('-'):
-                        orig_idx += 1  # skip deleted line
+                        pass  # skip deleted line (it's in orig_sequence, will be replaced)
                     elif hl.startswith(' '):
-                        new_section.append(hl[1:])  # keep context line
-                        orig_idx += 1
-                    else:
-                        new_section.append(hl)  # unknown prefix, keep as-is
-                        orig_idx += 1
+                        new_section.append(hl[1:])  # keep context line as-is
+                    # ignore lines without prefix (shouldn't happen)
 
-                # Replace the section
-                result_lines[match_start:orig_idx] = new_section
+                applied_hunks.append((match_start, match_start + len(orig_sequence), new_section))
+
+            # Apply hunks from bottom to top so earlier positions aren't shifted
+            applied_hunks.sort(key=lambda x: x[0], reverse=True)
+            for start, end, replacement in applied_hunks:
+                result_lines[start:end] = replacement
 
             result = '\n'.join(result_lines)
             if not result.endswith('\n'):
