@@ -85,12 +85,12 @@ type LiveResponse = {
 
 /* ── Provider / Model constants ─────────────────────────────────── */
 
-const PROVIDERS: { id: string; label: string; icon: string; desc: string }[] = [
-  { id: 'openai', label: 'OpenAI', icon: '⚡', desc: 'GPT-4o, GPT-5, o3...' },
-  { id: 'gemini', label: 'Gemini', icon: '✦', desc: 'Gemini 2.5 Pro/Flash' },
-  { id: 'codex_cli', label: 'Codex CLI', icon: '⌘', desc: 'Local CLI agent' },
-  { id: 'claude_cli', label: 'Claude CLI', icon: '✎', desc: 'Claude Code CLI' },
-  { id: 'custom', label: 'Custom', icon: '🔧', desc: 'Custom endpoint' },
+const PROVIDERS: { id: string; icon: string }[] = [
+  { id: 'openai', icon: '⚡' },
+  { id: 'gemini', icon: '✦' },
+  { id: 'codex_cli', icon: '⌘' },
+  { id: 'claude_cli', icon: '✎' },
+  { id: 'custom', icon: '🔧' },
 ];
 
 const OPENAI_MODELS = [
@@ -429,7 +429,7 @@ function AssignTaskModal({
             {PROVIDERS.map((p) => (
               <button key={p.id} onClick={() => { setSelProvider(p.id); setSelModel(''); setCustomModel(''); }}
                 style={{ padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 600, cursor: 'pointer', border: selProvider === p.id ? `1px solid ${agent.color}60` : '1px solid var(--panel-border-2)', background: selProvider === p.id ? `${agent.color}15` : 'var(--panel)', color: selProvider === p.id ? agent.color : 'var(--ink-50)' }}>
-                {p.icon} {p.label}
+                {p.icon} {t(`office.provider.${p.id}` as TranslationKey)}
               </button>
             ))}
           </div>
@@ -697,8 +697,8 @@ function AddAgentModal({
                   }}>
                   <div style={{ width: 40, height: 40, borderRadius: 12, background: provider === p.id ? `${color}20` : 'var(--panel-alt)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20, flexShrink: 0 }}>{p.icon}</div>
                   <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: provider === p.id ? color : 'var(--ink-90)' }}>{p.label}</div>
-                    <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 2 }}>{p.desc}</div>
+                    <div style={{ fontSize: 14, fontWeight: 700, color: provider === p.id ? color : 'var(--ink-90)' }}>{t(`office.provider.${p.id}` as TranslationKey)}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 2 }}>{t(`office.providerDesc.${p.id}` as TranslationKey)}</div>
                   </div>
                   {provider === p.id && <div style={{ marginLeft: 'auto', color: color, fontSize: 18 }}>✓</div>}
                 </button>
@@ -968,7 +968,7 @@ export default function OfficePage() {
             </div>
           )}
           <iframe ref={iframeRef} src="/pixel-office/index.html" onLoad={() => setIframeLoaded(true)}
-            style={{ width: '100%', height: '100%', border: 'none', display: iframeLoaded ? 'block' : 'none' }} title="Pixel Office" />
+            style={{ width: '100%', height: '100%', border: 'none', display: iframeLoaded ? 'block' : 'none' }} title={t('office.title')} />
         </div>
 
         {/* ── Side panel ── */}

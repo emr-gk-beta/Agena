@@ -40,7 +40,7 @@ function saveSecretPreview(provider: string, preview: string) {
 }
 
 export default function IntegrationsPage() {
-  const { t, lang } = useLocale();
+  const { t } = useLocale();
   const [activeTab, setActiveTab] = useState<'ai' | 'task' | 'notifications' | 'cli'>('ai');
   const [cliBridgeStatus, setCliBridgeStatus] = useState<{ ok: boolean; codex: boolean; claude: boolean; codex_auth?: boolean; claude_auth?: boolean } | null>(null);
   const [jiraBaseUrl, setJiraBaseUrl] = useState('');
@@ -73,175 +73,90 @@ export default function IntegrationsPage() {
   const [error, setError] = useState('');
   const [help, setHelp] = useState<{ title: string; steps: string[]; link?: string; note?: string } | null>(null);
 
-  const helpByProvider: Record<IntegrationConfig['provider'], { title: string; steps: string[]; link?: string; note?: string }> = lang === 'tr'
-    ? {
-      jira: {
-        title: 'Jira Nasıl Bağlanır?',
-        steps: [
-          'Base URL: https://sirketin.atlassian.net',
-          'Email: Atlassian hesabınla giriş yaptığın e-mail',
-          'API Token oluştur: Atlassian Security > API tokens',
-          'Bu tokenı API Token alanına yapıştırıp Kaydet',
-          'Sonra Sprint ekranında Jira sekmesini aç',
-        ],
-        link: 'https://id.atlassian.com/manage-profile/security/api-tokens',
-        note: 'Not: Jira şifresi değil, API token gerekir.',
-      },
-      azure: {
-        title: 'Azure DevOps Nasıl Bağlanır?',
-        steps: [
-          'Organization URL gir: https://dev.azure.com/ORG_ADI',
-          'Project alanına Azure proje adını yaz',
-          'Personal Access Token (PAT) üret',
-          'PAT alanına yapıştırıp Kaydet',
-          'Sprint ekranında Azure Project/Team/Sprint seç',
-        ],
-        link: 'https://learn.microsoft.com/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate',
-      },
-      github: {
-        title: 'GitHub Nasıl Bağlanır?',
-        steps: [
-          'Base URL: https://api.github.com',
-          'Owner/Org alanına kullanıcı/organizasyon adını yaz',
-          'PAT oluştur (repo okuma/yazma yetkileri)',
-          'Token alanına yapıştırıp Kaydet',
-          'Repo Mapping ekranında repoları otomatik yükle',
-        ],
-        link: 'https://docs.github.com/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token',
-      },
-      openai: {
-        title: 'OpenAI Nasıl Bağlanır?',
-        steps: [
-          'Base URL: https://api.openai.com/v1',
-          'OpenAI API key oluştur',
-          'API key alanına yapıştırıp Kaydet',
-          'Agent/model ayarlarında OpenAI model seç',
-        ],
-        link: 'https://platform.openai.com/api-keys',
-      },
-      gemini: {
-        title: 'Gemini Nasıl Bağlanır?',
-        steps: [
-          'Base URL: https://generativelanguage.googleapis.com',
-          'Google AI Studio veya GCP üzerinden API key al',
-          'API key alanına yapıştırıp Kaydet',
-          'Agent ayarlarında provider olarak Gemini seç',
-        ],
-        link: 'https://ai.google.dev/gemini-api/docs/api-key',
-      },
-      slack: {
-        title: 'Slack Nasıl Bağlanır?',
-        steps: [
-          'Slack kanalında Incoming Webhook oluştur',
-          'Webhook URL\'ini kopyala',
-          'Slack Webhook alanına yapıştırıp Kaydet',
-          'Notifications sekmesinden test bildirimi gönder',
-        ],
-        link: 'https://api.slack.com/messaging/webhooks',
-      },
-      teams: {
-        title: 'Microsoft Teams Nasıl Bağlanır?',
-        steps: [
-          'Teams kanalında Incoming Webhook connector ekle',
-          'Webhook URL\'ini kopyala',
-          'Teams Webhook alanına yapıştırıp Kaydet',
-          'Notifications sekmesinden test bildirimi gönder',
-        ],
-        link: 'https://learn.microsoft.com/microsoftteams/platform/webhooks-and-connectors/how-to/connectors-using',
-      },
-      playbook: {
-        title: 'Tenant Playbook Nedir?',
-        steps: [
-          'Repo/tenant bazında kod yazım kurallarını buraya yaz',
-          'AI task çalışırken bu kuralları prompt context olarak okur',
-          'Kısa, net ve maddeli kurallar yazman önerilir',
-        ],
-      },
-    }
-    : {
-      jira: {
-        title: 'How to Connect Jira',
-        steps: [
-          'Base URL: https://yourcompany.atlassian.net',
-          'Email: your Atlassian account email',
-          'Create API token from Atlassian Security',
-          'Paste token into API Token field and Save',
-          'Open Jira tab in Sprint screen',
-        ],
-        link: 'https://id.atlassian.com/manage-profile/security/api-tokens',
-        note: 'Note: Jira password is not enough; API token is required.',
-      },
-      azure: {
-        title: 'How to Connect Azure DevOps',
-        steps: [
-          'Enter Organization URL: https://dev.azure.com/ORG_NAME',
-          'Enter your Azure project name',
-          'Create a Personal Access Token (PAT)',
-          'Paste PAT and Save',
-          'Pick project/team/sprint on Sprint screen',
-        ],
-        link: 'https://learn.microsoft.com/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate',
-      },
-      github: {
-        title: 'How to Connect GitHub',
-        steps: [
-          'Base URL: https://api.github.com',
-          'Enter Owner/Org name',
-          'Create PAT (repo read/write scopes)',
-          'Paste token and Save',
-          'Load repos automatically in Repo Mapping',
-        ],
-        link: 'https://docs.github.com/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token',
-      },
-      openai: {
-        title: 'How to Connect OpenAI',
-        steps: [
-          'Base URL: https://api.openai.com/v1',
-          'Create OpenAI API key',
-          'Paste key and Save',
-          'Select OpenAI model in agent settings',
-        ],
-        link: 'https://platform.openai.com/api-keys',
-      },
-      gemini: {
-        title: 'How to Connect Gemini',
-        steps: [
-          'Base URL: https://generativelanguage.googleapis.com',
-          'Create API key in Google AI Studio / GCP',
-          'Paste key and Save',
-          'Select Gemini provider in agent settings',
-        ],
-        link: 'https://ai.google.dev/gemini-api/docs/api-key',
-      },
-      slack: {
-        title: 'How to Connect Slack',
-        steps: [
-          'Create an Incoming Webhook for your Slack channel',
-          'Copy webhook URL',
-          'Paste into Slack Webhook and Save',
-          'Send a test event from Notifications tab',
-        ],
-        link: 'https://api.slack.com/messaging/webhooks',
-      },
-      teams: {
-        title: 'How to Connect Microsoft Teams',
-        steps: [
-          'Add an Incoming Webhook connector to Teams channel',
-          'Copy webhook URL',
-          'Paste into Teams Webhook and Save',
-          'Send a test event from Notifications tab',
-        ],
-        link: 'https://learn.microsoft.com/microsoftteams/platform/webhooks-and-connectors/how-to/connectors-using',
-      },
-      playbook: {
-        title: 'What is Tenant Playbook?',
-        steps: [
-          'Define tenant/repo-specific coding rules here',
-          'AI reads these rules while executing tasks',
-          'Keep rules short, concrete, and bullet-based',
-        ],
-      },
-    };
+  const helpByProvider: Record<IntegrationConfig['provider'], { title: string; steps: string[]; link?: string; note?: string }> = {
+    jira: {
+      title: t('integrations.helpJiraTitle'),
+      steps: [
+        t('integrations.helpJiraStep1'),
+        t('integrations.helpJiraStep2'),
+        t('integrations.helpJiraStep3'),
+        t('integrations.helpJiraStep4'),
+        t('integrations.helpJiraStep5'),
+      ],
+      link: 'https://id.atlassian.com/manage-profile/security/api-tokens',
+      note: t('integrations.helpJiraNote'),
+    },
+    azure: {
+      title: t('integrations.helpAzureTitle'),
+      steps: [
+        t('integrations.helpAzureStep1'),
+        t('integrations.helpAzureStep2'),
+        t('integrations.helpAzureStep3'),
+        t('integrations.helpAzureStep4'),
+        t('integrations.helpAzureStep5'),
+      ],
+      link: 'https://learn.microsoft.com/azure/devops/organizations/accounts/use-personal-access-tokens-to-authenticate',
+    },
+    github: {
+      title: t('integrations.helpGithubTitle'),
+      steps: [
+        t('integrations.helpGithubStep1'),
+        t('integrations.helpGithubStep2'),
+        t('integrations.helpGithubStep3'),
+        t('integrations.helpGithubStep4'),
+        t('integrations.helpGithubStep5'),
+      ],
+      link: 'https://docs.github.com/authentication/keeping-your-account-and-data-secure/creating-a-personal-access-token',
+    },
+    openai: {
+      title: t('integrations.helpOpenaiTitle'),
+      steps: [
+        t('integrations.helpOpenaiStep1'),
+        t('integrations.helpOpenaiStep2'),
+        t('integrations.helpOpenaiStep3'),
+        t('integrations.helpOpenaiStep4'),
+      ],
+      link: 'https://platform.openai.com/api-keys',
+    },
+    gemini: {
+      title: t('integrations.helpGeminiTitle'),
+      steps: [
+        t('integrations.helpGeminiStep1'),
+        t('integrations.helpGeminiStep2'),
+        t('integrations.helpGeminiStep3'),
+        t('integrations.helpGeminiStep4'),
+      ],
+      link: 'https://ai.google.dev/gemini-api/docs/api-key',
+    },
+    slack: {
+      title: t('integrations.helpSlackTitle'),
+      steps: [
+        t('integrations.helpSlackStep1'),
+        t('integrations.helpSlackStep2'),
+        t('integrations.helpSlackStep3'),
+        t('integrations.helpSlackStep4'),
+      ],
+      link: 'https://api.slack.com/messaging/webhooks',
+    },
+    teams: {
+      title: t('integrations.helpTeamsTitle'),
+      steps: [
+        t('integrations.helpTeamsStep1'),
+        t('integrations.helpTeamsStep2'),
+        t('integrations.helpTeamsStep3'),
+        t('integrations.helpTeamsStep4'),
+      ],
+      link: 'https://learn.microsoft.com/microsoftteams/platform/webhooks-and-connectors/how-to/connectors-using',
+    },
+    playbook: {
+      title: t('integrations.helpPlaybookTitle'),
+      steps: [
+        t('integrations.helpPlaybookStep1'),
+        t('integrations.helpPlaybookStep2'),
+        t('integrations.helpPlaybookStep3'),
+      ],
+    },
+  };
 
   async function loadIntegrationState() {
     const [data, playbook] = await Promise.all([
@@ -289,15 +204,15 @@ export default function IntegrationsPage() {
   }, [msg]);
 
   async function deleteIntegration(provider: string) {
-    if (!confirm(`${provider} entegrasyonunu silmek istediğinize emin misiniz?`)) return;
+    if (!confirm(t('integrations.deleteConfirm').replace('{provider}', provider))) return;
     try {
       await apiFetch(`/integrations/${provider}`, { method: 'DELETE' });
       setConfigs((prev) => prev.filter((c) => c.provider !== provider));
       // Clear local previews
       localStorage.removeItem(`${SECRET_PREVIEW_LS_PREFIX}${provider}`);
-      setMsg(`${provider} entegrasyonu silindi`);
+      setMsg(t('integrations.deleted').replace('{provider}', provider));
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Silme başarısız');
+      setError(e instanceof Error ? e.message : t('integrations.deleteFailed'));
     }
   }
 
@@ -353,7 +268,7 @@ export default function IntegrationsPage() {
     }).catch((e) => {
       const message = e instanceof Error ? e.message : t('integrations.saveFailed');
       if (message.includes('Unsupported provider: github')) {
-        setError('Backend henüz yeni kodla çalışmıyor. Lütfen backend servisini restart et.');
+        setError(t('integrations.backendRestartRequired'));
         return;
       }
       setError(message);
@@ -454,8 +369,8 @@ export default function IntegrationsPage() {
         method: 'POST',
         body: JSON.stringify({
           event_type: 'task_completed',
-          title: 'Integration Test Notification',
-          message: 'Slack/Teams/Web notifications test event',
+          title: t('integrations.testNotificationTitle'),
+          message: t('integrations.testNotificationMessage'),
           severity: 'success',
         }),
       });
@@ -581,14 +496,14 @@ export default function IntegrationsPage() {
             color: activeTab === 'cli' ? '#c084fc' : 'var(--ink-58)',
           }}
         >
-          CLI Agents
+          {t('integrations.tabCli')}
         </button>
       </div>
 
       <div className='integrations-grid'>
         {/* OpenAI */}
         {activeTab === 'ai' && <IntegrationCard
-          title='OpenAI'
+          title={t('integrations.providerOpenai')}
           icon='⚡'
           color='#34d399'
           connected={openaiConfig?.has_secret ?? false}
@@ -596,7 +511,7 @@ export default function IntegrationsPage() {
           onHelp={() => setHelp(helpByProvider.openai)}
         >
           <FieldGroup label={t('integrations.baseUrl')}>
-            <input value={openaiBaseUrl} onChange={(e) => setOpenaiBaseUrl(e.target.value)} placeholder='https://api.openai.com/v1' />
+            <input value={openaiBaseUrl} onChange={(e) => setOpenaiBaseUrl(e.target.value)} placeholder={t('integrations.openaiBaseUrlPlaceholder')} />
           </FieldGroup>
           <FieldGroup label={t('integrations.apiKey')}>
             <input
@@ -611,14 +526,14 @@ export default function IntegrationsPage() {
           </button>
           {configs.find(c => c.provider === 'openai')?.has_secret && (
             <button onClick={() => void deleteIntegration('openai')} style={{ width: '100%', marginTop: 6, padding: '8px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-              🗑 OpenAI bağlantısını sil
+              {t('integrations.deleteOpenaiConnection')}
             </button>
           )}
         </IntegrationCard>}
 
         {/* Gemini */}
         {activeTab === 'ai' && <IntegrationCard
-          title='Gemini'
+          title={t('integrations.providerGemini')}
           icon='✨'
           color='#22d3ee'
           connected={geminiConfig?.has_secret ?? false}
@@ -626,7 +541,7 @@ export default function IntegrationsPage() {
           onHelp={() => setHelp(helpByProvider.gemini)}
         >
           <FieldGroup label={t('integrations.baseUrl')}>
-            <input value={geminiBaseUrl} onChange={(e) => setGeminiBaseUrl(e.target.value)} placeholder='https://generativelanguage.googleapis.com' />
+            <input value={geminiBaseUrl} onChange={(e) => setGeminiBaseUrl(e.target.value)} placeholder={t('integrations.geminiBaseUrlPlaceholder')} />
           </FieldGroup>
           <FieldGroup label={t('integrations.apiKey')}>
             <input
@@ -643,7 +558,7 @@ export default function IntegrationsPage() {
 
         {/* Azure DevOps */}
         {activeTab === 'task' && <IntegrationCard
-          title='Azure DevOps'
+          title={t('integrations.providerAzure')}
           icon='🔷'
           color='#60a5fa'
           connected={azureConfig?.has_secret ?? false}
@@ -651,7 +566,7 @@ export default function IntegrationsPage() {
           onHelp={() => setHelp(helpByProvider.azure)}
         >
           <FieldGroup label={t('integrations.azureOrgUrl')}>
-            <input value={azureOrgUrl} onChange={(e) => setAzureOrgUrl(e.target.value)} placeholder='https://dev.azure.com/your-org' />
+            <input value={azureOrgUrl} onChange={(e) => setAzureOrgUrl(e.target.value)} placeholder={t('integrations.azureOrgUrlPlaceholder')} />
           </FieldGroup>
           <FieldGroup label={t('integrations.project')}>
             <input value={azureProject} onChange={(e) => setAzureProject(e.target.value)} placeholder={t('integrations.projectPlaceholder')} />
@@ -669,14 +584,14 @@ export default function IntegrationsPage() {
           </button>
           {configs.find(c => c.provider === 'azure')?.has_secret && (
             <button onClick={() => void deleteIntegration('azure')} style={{ width: '100%', marginTop: 6, padding: '8px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-              🗑 Azure bağlantısını sil
+              {t('integrations.deleteAzureConnection')}
             </button>
           )}
         </IntegrationCard>}
 
         {/* GitHub */}
         {activeTab === 'task' && <IntegrationCard
-          title='GitHub'
+          title={t('integrations.providerGithub')}
           icon='🐙'
           color='#a78bfa'
           connected={githubConfig?.has_secret ?? false}
@@ -684,7 +599,7 @@ export default function IntegrationsPage() {
           onHelp={() => setHelp(helpByProvider.github)}
         >
           <FieldGroup label={t('integrations.baseUrl')}>
-            <input value={githubBaseUrl} onChange={(e) => setGithubBaseUrl(e.target.value)} placeholder='https://api.github.com' />
+            <input value={githubBaseUrl} onChange={(e) => setGithubBaseUrl(e.target.value)} placeholder={t('integrations.githubBaseUrlPlaceholder')} />
           </FieldGroup>
           <FieldGroup label={t('integrations.githubOwner')}>
             <input value={githubOwner} onChange={(e) => setGithubOwner(e.target.value)} placeholder={t('integrations.githubOwnerPlaceholder')} />
@@ -702,14 +617,14 @@ export default function IntegrationsPage() {
           </button>
           {configs.find(c => c.provider === 'github')?.has_secret && (
             <button onClick={() => void deleteIntegration('github')} style={{ width: '100%', marginTop: 6, padding: '8px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-              🗑 GitHub bağlantısını sil
+              {t('integrations.deleteGithubConnection')}
             </button>
           )}
         </IntegrationCard>}
 
         {/* Jira */}
         {activeTab === 'task' && <IntegrationCard
-          title='Jira'
+          title={t('integrations.providerJira')}
           icon='🟦'
           color='#818cf8'
           connected={jiraConfig?.has_secret ?? false}
@@ -717,10 +632,10 @@ export default function IntegrationsPage() {
           onHelp={() => setHelp(helpByProvider.jira)}
         >
           <FieldGroup label={t('integrations.baseUrl')}>
-            <input value={jiraBaseUrl} onChange={(e) => setJiraBaseUrl(e.target.value)} placeholder='https://your-company.atlassian.net' />
+            <input value={jiraBaseUrl} onChange={(e) => setJiraBaseUrl(e.target.value)} placeholder={t('integrations.jiraBaseUrlPlaceholder')} />
           </FieldGroup>
           <FieldGroup label={t('integrations.email')}>
-            <input value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} placeholder='you@company.com' />
+            <input value={jiraEmail} onChange={(e) => setJiraEmail(e.target.value)} placeholder={t('integrations.jiraEmailPlaceholder')} />
           </FieldGroup>
           <FieldGroup label={t('integrations.apiToken')}>
             <input
@@ -735,14 +650,14 @@ export default function IntegrationsPage() {
           </button>
           {configs.find(c => c.provider === 'jira')?.has_secret && (
             <button onClick={() => void deleteIntegration('jira')} style={{ width: '100%', marginTop: 6, padding: '8px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.3)', background: 'rgba(248,113,113,0.08)', color: '#f87171', fontSize: 12, cursor: 'pointer', fontWeight: 600 }}>
-              🗑 Jira bağlantısını sil
+              {t('integrations.deleteJiraConnection')}
             </button>
           )}
         </IntegrationCard>}
 
         {/* Tenant Playbook */}
         {activeTab === 'ai' && <IntegrationCard
-          title='Tenant Playbook'
+          title={t('integrations.providerPlaybook')}
           icon='📘'
           color='#f59e0b'
           connected={playbookConfig?.has_secret ?? false}
@@ -766,7 +681,7 @@ export default function IntegrationsPage() {
         </IntegrationCard>}
 
         {activeTab === 'notifications' && <IntegrationCard
-          title='Slack'
+          title={t('integrations.providerSlack')}
           icon='💬'
           color='#22c55e'
           connected={slackConfig?.has_secret ?? false}
@@ -787,7 +702,7 @@ export default function IntegrationsPage() {
         </IntegrationCard>}
 
         {activeTab === 'notifications' && <IntegrationCard
-          title='Microsoft Teams'
+          title={t('integrations.providerTeams')}
           icon='🟪'
           color='#60a5fa'
           connected={teamsConfig?.has_secret ?? false}
@@ -851,7 +766,7 @@ export default function IntegrationsPage() {
                 <div style={{ borderRadius: 12, border: '1px solid var(--panel-border-2)', padding: '14px 16px', background: 'var(--panel)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 20 }}>⌘</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Codex CLI</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{t('integrations.codexCliTitle')}</span>
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
                       background: cliBridgeStatus?.codex ? 'rgba(34,197,94,0.12)' : 'rgba(248,113,113,0.12)',
@@ -940,7 +855,7 @@ export default function IntegrationsPage() {
                       <div id='codex-callback-section' style={{ display: 'none', gap: 6 }}>
                         <div style={{ fontSize: 11, color: '#f59e0b', lineHeight: 1.5 }}>{t('integrations.codexCallbackHint')}</div>
                         <div style={{ display: 'flex', gap: 6 }}>
-                          <input id='codex-callback-url' type='text' placeholder='http://localhost:1455/auth/callback?code=...' style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: 'var(--glass)', color: 'var(--ink)', fontSize: 10, fontFamily: 'monospace' }} />
+                          <input id='codex-callback-url' type='text' placeholder={t('integrations.codexCallbackPlaceholder')} style={{ flex: 1, padding: '7px 10px', borderRadius: 8, border: '1px solid rgba(245,158,11,0.4)', background: 'var(--glass)', color: 'var(--ink)', fontSize: 10, fontFamily: 'monospace' }} />
                           <button className='button button-primary' style={{ padding: '7px 12px', fontSize: 11, flexShrink: 0 }} onClick={() => {
                             const cbUrl = (document.getElementById('codex-callback-url') as HTMLInputElement)?.value;
                             if (!cbUrl || !cbUrl.includes('code=')) { setError(t('integrations.validCallbackRequired')); return; }
@@ -959,7 +874,7 @@ export default function IntegrationsPage() {
                       </div>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}><div style={{ flex: 1, height: 1, background: 'var(--panel-border-3)' }} /> {t('integrations.or')} <div style={{ flex: 1, height: 1, background: 'var(--panel-border-3)' }} /></div>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <input id='codex-key' type='password' placeholder='OpenAI API Key (sk-...)' style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink)', fontSize: 12 }} />
+                        <input id='codex-key' type='password' placeholder={t('integrations.codexApiKeyPlaceholder')} style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink)', fontSize: 12 }} />
                         <button className='button button-outline' style={{ padding: '7px 14px', fontSize: 12 }} onClick={() => {
                           const key = (document.getElementById('codex-key') as HTMLInputElement)?.value;
                           if (!key) { setError(t('integrations.apiKeyRequired')); return; }
@@ -975,7 +890,7 @@ export default function IntegrationsPage() {
                 <div style={{ borderRadius: 12, border: '1px solid var(--panel-border-2)', padding: '14px 16px', background: 'var(--panel)' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
                     <span style={{ fontSize: 20 }}>◆</span>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>Claude CLI</span>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{t('integrations.claudeCliTitle')}</span>
                     <span style={{
                       fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999,
                       background: cliBridgeStatus?.claude ? 'rgba(34,197,94,0.12)' : 'rgba(248,113,113,0.12)',
@@ -1017,7 +932,7 @@ export default function IntegrationsPage() {
                       }}>{t('integrations.connectWithAnthropic')}</button>
                       <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 11, color: 'var(--muted)' }}><div style={{ flex: 1, height: 1, background: 'var(--panel-border-3)' }} /> {t('integrations.or')} <div style={{ flex: 1, height: 1, background: 'var(--panel-border-3)' }} /></div>
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <input id='claude-key' type='password' placeholder='Anthropic API Key (sk-ant-...)' style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink)', fontSize: 12 }} />
+                        <input id='claude-key' type='password' placeholder={t('integrations.claudeApiKeyPlaceholder')} style={{ flex: 1, padding: '7px 12px', borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink)', fontSize: 12 }} />
                         <button className='button button-outline' style={{ padding: '7px 14px', fontSize: 12 }} onClick={() => {
                           const key = (document.getElementById('claude-key') as HTMLInputElement)?.value;
                           if (!key) { setError(t('integrations.apiKeyRequired')); return; }
@@ -1108,7 +1023,7 @@ export default function IntegrationsPage() {
                 rel='noreferrer'
                 style={{ display: 'inline-block', marginTop: 12, color: '#93c5fd', fontSize: 12, textDecoration: 'underline' }}
               >
-                {lang === 'tr' ? 'Dokümantasyonu Aç' : 'Open Documentation'}
+                {t('integrations.openDocumentation')}
               </a>
             )}
           </div>
@@ -1150,7 +1065,7 @@ function IntegrationCard({
 }: {
   title: string; icon: string; color: string; connected: boolean; updatedAt?: string; children: React.ReactNode; onHelp?: () => void;
 }) {
-  const { t, lang } = useLocale();
+  const { t } = useLocale();
   const borderColor = connected ? 'rgba(34,197,94,0.72)' : `${color}20`;
   const bgColor = connected ? 'rgba(34,197,94,0.08)' : `${color}06`;
   const glow = connected ? '0 0 0 1px rgba(34,197,94,0.28), 0 0 28px rgba(34,197,94,0.22), inset 0 0 22px rgba(34,197,94,0.08)' : 'none';
@@ -1186,7 +1101,7 @@ function IntegrationCard({
           <button
             type='button'
             onClick={onHelp}
-            title={lang === 'tr' ? 'Yardım' : 'Help'}
+            title={t('integrations.help')}
             style={{
               marginLeft: 'auto',
               width: 24,

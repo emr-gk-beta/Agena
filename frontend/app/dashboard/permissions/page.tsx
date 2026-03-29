@@ -113,7 +113,7 @@ export default function PermissionsPage() {
       setTimeout(() => setInviteToast(''), 3000);
       void fetchInvites();
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Error';
+      const msg = e instanceof Error ? e.message : t('permissions.errorDefault');
       setInviteToast(msg);
       setTimeout(() => setInviteToast(''), 3000);
     }
@@ -127,7 +127,7 @@ export default function PermissionsPage() {
       setInviteToast(t('invite.resent'));
       setTimeout(() => setInviteToast(''), 3000);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Error';
+      const msg = e instanceof Error ? e.message : t('permissions.errorDefault');
       setInviteToast(msg);
       setTimeout(() => setInviteToast(''), 3000);
     }
@@ -142,7 +142,7 @@ export default function PermissionsPage() {
       setInviteToast(t('invite.cancelled'));
       setTimeout(() => setInviteToast(''), 3000);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Error';
+      const msg = e instanceof Error ? e.message : t('permissions.errorDefault');
       setInviteToast(msg);
       setTimeout(() => setInviteToast(''), 3000);
     }
@@ -160,7 +160,7 @@ export default function PermissionsPage() {
       setToast(t('permissions.roleChanged'));
       setTimeout(() => setToast(''), 2000);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Error';
+      const msg = e instanceof Error ? e.message : t('permissions.errorDefault');
       setToast(msg);
       setTimeout(() => setToast(''), 3000);
     }

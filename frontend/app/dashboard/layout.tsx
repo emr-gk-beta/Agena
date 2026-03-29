@@ -6,6 +6,7 @@ import { ReactNode, useEffect, useRef, useState, Suspense } from 'react';
 import { isLoggedIn, removeToken, apiFetch, listNotifications, markAllNotificationsRead, markNotificationRead, loadPrefs, savePrefs, getOrgSlug, getOrgName, setOrgSlug, setOrgName, type NotificationItem } from '@/lib/api';
 import OnboardingModal from '@/components/OnboardingModal';
 import WebPushBridge from '@/components/WebPushBridge';
+import LangToggle from '@/components/LangToggle';
 import { useLocale } from '@/lib/i18n';
 import { RoleContext, canAccess, type Role } from '@/lib/rbac';
 import { WebSocketProvider } from '@/lib/useWebSocket';
@@ -540,6 +541,9 @@ function DashboardInner({ children }: { children: ReactNode }) {
         </div>
 
         <div style={{ marginTop: 'auto', display: 'flex', flexDirection: 'column', gap: 8, padding: '16px 0', borderTop: '1px solid var(--panel-border)' }}>
+          <div style={{ display: 'flex', justifyContent: sidebarCollapsed ? 'center' : 'flex-start' }}>
+            <LangToggle style={{ width: sidebarCollapsed ? 44 : '100%' }} />
+          </div>
           <button
             onClick={openNotifications}
             title={t('notifications.section')}
