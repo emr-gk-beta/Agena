@@ -289,3 +289,20 @@ Execution is blocked when free quota is exhausted.
 5. Watch status updates (5s polling)
 6. Open generated PR
 7. Upgrade plan
+
+## Open Source
+
+This repository is open-source under the MIT License.
+
+- License: [LICENSE](./LICENSE)
+- Contributing: [CONTRIBUTING.md](./CONTRIBUTING.md)
+- Code of Conduct: [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)
+- Security: [SECURITY.md](./SECURITY.md)
+
+## Donate / Sponsor
+
+If Tiqr helps your team, you can support development:
+
+- GitHub Sponsors: https://github.com/sponsors/aozyildirim
+
+After pushing this repo public, GitHub will also show a **Sponsor** button automatically because `.github/FUNDING.yml` is included.
