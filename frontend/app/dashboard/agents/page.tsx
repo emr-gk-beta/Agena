@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { loadPrefs, savePrefs, getAgentAnalytics } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
 
@@ -21,6 +21,34 @@ interface AgentConfig {
   palette?: number;
   create_pr?: boolean;
 }
+
+const BUILTIN_ROLE_KEYS = {
+  manager: {
+    label: 'agents.role.manager.label',
+    description: 'agents.role.manager.description',
+    prompt: 'agents.role.manager.prompt',
+  },
+  pm: {
+    label: 'agents.role.pm.label',
+    description: 'agents.role.pm.description',
+    prompt: 'agents.role.pm.prompt',
+  },
+  lead_developer: {
+    label: 'agents.role.leadDeveloper.label',
+    description: 'agents.role.leadDeveloper.description',
+    prompt: 'agents.role.leadDeveloper.prompt',
+  },
+  developer: {
+    label: 'agents.role.developer.label',
+    description: 'agents.role.developer.description',
+    prompt: 'agents.role.developer.prompt',
+  },
+  qa: {
+    label: 'agents.role.qa.label',
+    description: 'agents.role.qa.description',
+    prompt: 'agents.role.qa.prompt',
+  },
+} as const;
 
 // ── Pixel Character Picker ────────────────────────────────────────────────────
 const PALETTE_COUNT = 10;
@@ -100,94 +128,106 @@ const GEMINI_MODELS = [
   { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
 ];
 
-const DEFAULT_AGENTS: AgentConfig[] = [
-  {
-    role: 'manager',
-    label: 'Manager',
-    icon: '👔',
-    color: '#f59e0b',
-    description: 'Manages project execution, priorities, and team coordination',
-    provider: '',
-    model: '',
-    custom_model: '',
-    system_prompt: 'You are a project manager. Analyze work items, prioritize them, and suggest ownership.',
-    enabled: true,
-    palette: 0,
-  },
-  {
-    role: 'pm',
-    label: 'Product Manager',
-    icon: '📋',
-    color: '#a78bfa',
-    description: 'Analyzes product requirements, writes user stories, and defines acceptance criteria',
-    provider: '',
-    model: '',
-    custom_model: '',
-    system_prompt: 'You are a product manager. Analyze work from the user perspective and define acceptance criteria.',
-    enabled: true,
-    palette: 1,
-  },
-  {
-    role: 'lead_developer',
-    label: 'Lead Developer',
-    icon: '🧑‍💻',
-    color: '#38bdf8',
-    description: 'Performs technical analysis, architecture decisions, and code review guidance',
-    provider: '',
-    model: '',
-    custom_model: '',
-    system_prompt: 'You are a lead developer. Analyze tasks technically, propose implementation plans, and identify risks.',
-    enabled: true,
-    palette: 2,
-  },
-  {
-    role: 'developer',
-    label: 'Developer',
-    icon: '⚡',
-    color: '#22c55e',
-    description: 'Implements code changes and prepares pull request outputs',
-    provider: '',
-    model: '',
-    custom_model: '',
-    system_prompt: 'You are a software developer. Implement the task and prepare changes suitable for a PR.',
-    enabled: true,
-    palette: 3,
-  },
-  {
-    role: 'qa',
-    label: 'QA Engineer',
-    icon: '🔍',
-    color: '#f472b6',
-    description: 'Designs test scenarios, finds bugs, and improves quality confidence',
-    provider: '',
-    model: '',
-    custom_model: '',
-    system_prompt: 'You are a QA engineer. Test the work item, define scenarios, and cover edge cases.',
-    enabled: true,
-    palette: 4,
-  },
-];
+function defaultAgents(t: ReturnType<typeof useLocale>['t']): AgentConfig[] {
+  return [
+    {
+      role: 'manager',
+      label: t('agents.role.manager.label'),
+      icon: '👔',
+      color: '#f59e0b',
+      description: t('agents.role.manager.description'),
+      provider: '',
+      model: '',
+      custom_model: '',
+      system_prompt: t('agents.role.manager.prompt'),
+      enabled: true,
+      palette: 0,
+    },
+    {
+      role: 'pm',
+      label: t('agents.role.pm.label'),
+      icon: '📋',
+      color: '#a78bfa',
+      description: t('agents.role.pm.description'),
+      provider: '',
+      model: '',
+      custom_model: '',
+      system_prompt: t('agents.role.pm.prompt'),
+      enabled: true,
+      palette: 1,
+    },
+    {
+      role: 'lead_developer',
+      label: t('agents.role.leadDeveloper.label'),
+      icon: '🧑‍💻',
+      color: '#38bdf8',
+      description: t('agents.role.leadDeveloper.description'),
+      provider: '',
+      model: '',
+      custom_model: '',
+      system_prompt: t('agents.role.leadDeveloper.prompt'),
+      enabled: true,
+      palette: 2,
+    },
+    {
+      role: 'developer',
+      label: t('agents.role.developer.label'),
+      icon: '⚡',
+      color: '#22c55e',
+      description: t('agents.role.developer.description'),
+      provider: '',
+      model: '',
+      custom_model: '',
+      system_prompt: t('agents.role.developer.prompt'),
+      enabled: true,
+      palette: 3,
+    },
+    {
+      role: 'qa',
+      label: t('agents.role.qa.label'),
+      icon: '🔍',
+      color: '#f472b6',
+      description: t('agents.role.qa.description'),
+      provider: '',
+      model: '',
+      custom_model: '',
+      system_prompt: t('agents.role.qa.prompt'),
+      enabled: true,
+      palette: 4,
+    },
+  ];
+}
 
 const LS_AGENTS = 'tiqr_agent_configs';
 
-function loadAgents(): AgentConfig[] {
-  if (typeof window === 'undefined') return DEFAULT_AGENTS;
+function localizedAgentLabel(agent: AgentConfig, t: ReturnType<typeof useLocale>['t']) {
+  const keys = BUILTIN_ROLE_KEYS[agent.role as keyof typeof BUILTIN_ROLE_KEYS];
+  return keys ? t(keys.label) : (agent.label || t('agents.customAgent'));
+}
+
+function localizedAgentDescription(agent: AgentConfig, t: ReturnType<typeof useLocale>['t']) {
+  const keys = BUILTIN_ROLE_KEYS[agent.role as keyof typeof BUILTIN_ROLE_KEYS];
+  return keys ? t(keys.description) : (agent.description || t('agents.customAgentDesc'));
+}
+
+function loadAgents(defaults: AgentConfig[], t: ReturnType<typeof useLocale>['t']): AgentConfig[] {
+  if (typeof window === 'undefined') return defaults;
   try {
     const saved = localStorage.getItem(LS_AGENTS);
-    if (!saved) return DEFAULT_AGENTS;
+    if (!saved) return defaults;
     const parsed = JSON.parse(saved) as Partial<AgentConfig>[];
-    const mergedDefaults = DEFAULT_AGENTS.map((def) => {
+    const mergedDefaults = defaults.map((def) => {
       const found = parsed.find((p) => p.role === def.role);
       return found ? { ...def, ...found } : def;
     });
     const extras = parsed
-      .filter((p) => p.role && !DEFAULT_AGENTS.some((d) => d.role === p.role))
+      .filter((p) => p.role && !defaults.some((d) => d.role === p.role))
       .map((p) => ({
         role: String(p.role),
-        label: p.label || 'Custom Agent',
+        label: p.label || t('agents.customAgent'),
         icon: p.icon || '🤖',
         color: p.color || '#5eead4',
-        description: p.description || 'Custom agent',
+        description: p.description || t('agents.customAgentDesc'),
         provider: (p.provider as AgentConfig['provider']) || 'custom',
         model: p.model || '',
         custom_model: p.custom_model || '',
@@ -198,7 +238,7 @@ function loadAgents(): AgentConfig[] {
       }));
     return [...mergedDefaults, ...extras];
   } catch {
-    return DEFAULT_AGENTS;
+    return defaults;
   }
 }
 
@@ -241,7 +281,8 @@ function AgentCharIcon({ palette, color, size }: { palette: number; color: strin
 
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function AgentsPage() {
-  const [agents, setAgents] = useState<AgentConfig[]>(DEFAULT_AGENTS);
+  const { t } = useLocale();
+  const [agents, setAgents] = useState<AgentConfig[]>([]);
   const [editing, setEditing] = useState<AgentRole | null>(null);
   const [editModalAgent, setEditModalAgent] = useState<AgentConfig | null>(null);
   const [saving, setSaving] = useState(false);
@@ -262,16 +303,16 @@ export default function AgentsPage() {
     enabled: true,
     palette: 0,
   });
-  const { t } = useLocale();
+  const defaults = useMemo(() => defaultAgents(t), [t]);
 
   useEffect(() => {
     const boot = async () => {
-      setAgents(loadAgents());
+      setAgents(loadAgents(defaults, t));
       try {
         const prefs = await loadPrefs();
         if (prefs.agents?.length) {
           localStorage.setItem(LS_AGENTS, JSON.stringify(prefs.agents));
-          const merged = loadAgents();
+          const merged = loadAgents(defaults, t);
           setAgents(merged);
           saveAgents(merged);
         }
@@ -290,7 +331,7 @@ export default function AgentsPage() {
       }
     };
     void boot();
-  }, []);
+  }, [defaults, t]);
 
   function updateAgent(role: AgentRole, patch: Partial<AgentConfig>) {
     setAgents((prev) => {
@@ -418,7 +459,7 @@ export default function AgentsPage() {
               <div key={a.role} style={{ borderRadius: 10, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: 8, minHeight: 128 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
                   <AgentCharIcon palette={a.palette ?? 0} color={a.color} size={24} />
-                  <span style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 12 }}>{a.label}</span>
+                  <span style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 12 }}>{localizedAgentLabel(a, t)}</span>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, fontSize: 11 }}>
                   <MetricChip label={t('agents.analyticsCoverage')} value={`${m.coveragePct}%`} />
@@ -511,7 +552,7 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t }: {
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             <AgentCharIcon palette={a.palette ?? 0} color={color} size={44} />
             <div>
-              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink-90)' }}>{isNew ? t('agents.createTitle') : a.label}</div>
+              <div style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink-90)' }}>{isNew ? t('agents.createTitle') : localizedAgentLabel(a, t)}</div>
               <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>{a.role || '...'}</div>
             </div>
           </div>
@@ -553,7 +594,15 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t }: {
               {(['openai', 'gemini', 'custom', 'codex_cli', 'claude_cli'] as const).map((p) => (
                 <button key={p} onClick={() => setA((v) => ({ ...v, provider: p, model: '', custom_model: '' }))}
                   style={{ padding: '10px', borderRadius: 12, border: a.provider === p ? `2px solid ${color}` : '1px solid var(--panel-border-2)', background: a.provider === p ? `${color}10` : 'var(--panel)', color: a.provider === p ? 'var(--ink-90)' : 'var(--ink-35)', fontWeight: a.provider === p ? 700 : 500, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s' }}>
-                  {p === 'openai' ? '⚡ OpenAI' : p === 'gemini' ? '✦ Gemini' : p === 'codex_cli' ? '⌘ Codex CLI' : p === 'claude_cli' ? '✎ Claude CLI' : '🔧 Custom'}
+                  {p === 'openai'
+                    ? `⚡ ${t('agents.providerOpenai')}`
+                    : p === 'gemini'
+                      ? `✦ ${t('agents.providerGemini')}`
+                      : p === 'codex_cli'
+                        ? `⌘ ${t('agents.providerCodexCli')}`
+                        : p === 'claude_cli'
+                          ? `✎ ${t('agents.providerClaudeCli')}`
+                          : `🔧 ${t('agents.providerCustom')}`}
                 </button>
               ))}
             </div>
@@ -593,14 +642,14 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t }: {
                 style={{ width: 40, height: 22, borderRadius: 999, background: (a.create_pr ?? false) ? color : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
                 <div style={{ position: 'absolute', top: 3, left: (a.create_pr ?? false) ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </div>
-              <div style={{ fontSize: 12, color: 'var(--ink-50)' }}>Create PR</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-50)' }}>{t('agents.toggleCreatePr')}</div>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, flex: 1 }}>
               <div onClick={() => setA((v) => ({ ...v, enabled: !v.enabled }))}
                 style={{ width: 40, height: 22, borderRadius: 999, background: a.enabled ? '#22c55e' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
                 <div style={{ position: 'absolute', top: 3, left: a.enabled ? 21 : 3, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
               </div>
-              <div style={{ fontSize: 12, color: 'var(--ink-50)' }}>Enabled</div>
+              <div style={{ fontSize: 12, color: 'var(--ink-50)' }}>{t('agents.toggleEnabled')}</div>
             </div>
           </div>
 
@@ -661,7 +710,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
         <AgentCharIcon palette={agent.palette ?? 0} color={agent.color} size={36} />
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 2, minWidth: 0, flexWrap: 'wrap' }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink-90)' }}>{agent.label}</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink-90)' }}>{localizedAgentLabel(agent, t)}</span>
             {agent.provider && agent.model ? (
               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 999, background: agent.color + '18', border: '1px solid ' + agent.color + '35', color: agent.color, maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {agent.provider === 'openai' ? '⚡' : agent.provider === 'gemini' ? '✦' : agent.provider === 'codex_cli' ? '⌘' : '✎'} {agent.model || agent.custom_model}
@@ -673,7 +722,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
             )}
             <span style={{ marginLeft: 'auto', fontSize: 12, color: 'var(--ink-25)', transform: isEditing ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s', display: 'inline-block', flexShrink: 0 }}>⌄</span>
           </div>
-          <div style={{ fontSize: 11, color: 'var(--ink-35)', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 30 }}>{agent.description}</div>
+          <div style={{ fontSize: 11, color: 'var(--ink-35)', lineHeight: 1.35, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', minHeight: 30 }}>{localizedAgentDescription(agent, t)}</div>
         </div>
         {/* Toggle */}
         <div onClick={(e) => { e.stopPropagation(); onUpdate({ enabled: !agent.enabled }); }}
@@ -698,7 +747,13 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
               {(['openai', 'gemini', 'custom', 'codex_cli'] as const).map((p) => (
                 <button key={p} onClick={() => onUpdate({ provider: p, model: '', custom_model: '' })}
                   style={{ padding: '8px 9px', borderRadius: 10, border: '1px solid ' + (agent.provider === p ? agent.color + '60' : 'var(--panel-border-2)'), background: agent.provider === p ? agent.color + '12' : 'var(--panel)', color: agent.provider === p ? 'var(--ink-90)' : 'var(--ink-35)', fontWeight: agent.provider === p ? 700 : 500, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s' }}>
-                  {p === 'openai' ? '⚡ OpenAI' : p === 'gemini' ? '✦ Gemini' : p === 'codex_cli' ? '⌘ Codex CLI' : '✎ Custom'}
+                  {p === 'openai'
+                    ? `⚡ ${t('agents.providerOpenai')}`
+                    : p === 'gemini'
+                      ? `✦ ${t('agents.providerGemini')}`
+                      : p === 'codex_cli'
+                        ? `⌘ ${t('agents.providerCodexCli')}`
+                        : `✎ ${t('agents.providerCustom')}`}
                 </button>
               ))}
             </div>
@@ -747,7 +802,7 @@ function AgentCard({ agent, isEditing, onEdit, onUpdate }: {
           {/* Create PR toggle */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 0' }}>
             <div>
-              <label style={{ ...labelStyle, marginBottom: 0 }}>Create PR</label>
+              <label style={{ ...labelStyle, marginBottom: 0 }}>{t('agents.toggleCreatePr')}</label>
               <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 2 }}>{t('agents.createPrDesc')}</div>
             </div>
             <div onClick={() => onUpdate({ create_pr: !(agent.create_pr ?? false) })}

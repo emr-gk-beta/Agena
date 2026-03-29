@@ -312,7 +312,7 @@ export default function TeamPage() {
                 background: tab === 'sprint' ? 'rgba(94,234,212,0.12)' : 'var(--panel-alt)',
                 color: tab === 'sprint' ? '#5eead4' : 'var(--ink-58)',
               }}>
-              Sprint
+              {t('team.sprintLabel')}
             </button>
             <button onClick={() => setTab('org')}
               style={{
@@ -620,11 +620,11 @@ type OrgMember = { id: number; user_id: number; email: string; full_name: string
 type PendingInvite = { id: number; email: string; status: string; created_at?: string };
 
 const ROLE_OPTIONS = [
-  { value: 'owner', label: 'Owner', color: '#f59e0b', desc: 'Tam yetki' },
-  { value: 'admin', label: 'Admin', color: '#a78bfa', desc: 'Takım & entegrasyon yönetimi' },
-  { value: 'member', label: 'Member', color: '#38bdf8', desc: 'Task oluşturma & çalıştırma' },
-  { value: 'viewer', label: 'Viewer', color: '#6b7280', desc: 'Sadece izleme' },
-];
+  { value: 'owner', color: '#f59e0b' },
+  { value: 'admin', color: '#a78bfa' },
+  { value: 'member', color: '#38bdf8' },
+  { value: 'viewer', color: '#6b7280' },
+] as const;
 
 function OrgMembersPanel({ t }: { t: (key: Parameters<ReturnType<typeof useLocale>['t']>[0]) => string }) {
   const { role: myRole } = useRole();
@@ -661,7 +661,7 @@ function OrgMembersPanel({ t }: { t: (key: Parameters<ReturnType<typeof useLocal
       setToast(t('team.roleChanged'));
       setTimeout(() => setToast(''), 2000);
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'Error';
+      const msg = e instanceof Error ? e.message : t('team.errorDefault');
       setToast(msg);
       setTimeout(() => setToast(''), 3000);
     }
@@ -729,7 +729,7 @@ function OrgMembersPanel({ t }: { t: (key: Parameters<ReturnType<typeof useLocal
                   }}
                 >
                   {ROLE_OPTIONS.map((r) => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
+                    <option key={r.value} value={r.value}>{t(`role.${r.value}` as const)}</option>
                   ))}
                 </select>
               ) : (
@@ -738,7 +738,7 @@ function OrgMembersPanel({ t }: { t: (key: Parameters<ReturnType<typeof useLocal
                   background: `${roleInfo.color}15`, color: roleInfo.color,
                   border: `1px solid ${roleInfo.color}40`, flexShrink: 0,
                 }}>
-                  {roleInfo.label}
+                  {t(`role.${roleInfo.value}` as const)}
                 </span>
               )}
             </div>
@@ -774,7 +774,7 @@ function OrgMembersPanel({ t }: { t: (key: Parameters<ReturnType<typeof useLocal
                 background: 'rgba(245,158,11,0.12)', color: '#f59e0b',
                 border: '1px solid rgba(245,158,11,0.3)', flexShrink: 0,
               }}>
-                Pending
+                {t('invite.status.pending')}
               </span>
             </div>
           ))}
@@ -790,8 +790,8 @@ function OrgMembersPanel({ t }: { t: (key: Parameters<ReturnType<typeof useLocal
           {ROLE_OPTIONS.map((r) => (
             <div key={r.value} style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 12 }}>
               <span style={{ width: 8, height: 8, borderRadius: 4, background: r.color, flexShrink: 0 }} />
-              <span style={{ fontWeight: 700, color: r.color, minWidth: 60 }}>{r.label}</span>
-              <span style={{ color: 'var(--ink-35)' }}>{r.desc}</span>
+              <span style={{ fontWeight: 700, color: r.color, minWidth: 60 }}>{t(`role.${r.value}` as const)}</span>
+              <span style={{ color: 'var(--ink-35)' }}>{t(`team.roleDesc.${r.value}` as const)}</span>
             </div>
           ))}
         </div>

@@ -74,72 +74,108 @@ interface DryRunStep {
   durationMs: number;
 }
 
-const AGENT_PRESETS: { role: AgentRole; label: string; icon: string; color: string }[] = [
-  { role: 'manager',        label: 'Manager',         icon: '👔', color: '#f59e0b' },
-  { role: 'pm',             label: 'Product Manager', icon: '📋', color: '#a78bfa' },
-  { role: 'lead_developer', label: 'Lead Developer',  icon: '🧑‍💻', color: '#38bdf8' },
-  { role: 'developer',      label: 'Developer',       icon: '⚡', color: '#22c55e' },
-  { role: 'qa',             label: 'QA Engineer',     icon: '🔍', color: '#f472b6' },
+const AGENT_PRESETS: { role: AgentRole; icon: string; color: string }[] = [
+  { role: 'manager', icon: '👔', color: '#f59e0b' },
+  { role: 'pm', icon: '📋', color: '#a78bfa' },
+  { role: 'lead_developer', icon: '🧑‍💻', color: '#38bdf8' },
+  { role: 'developer', icon: '⚡', color: '#22c55e' },
+  { role: 'qa', icon: '🔍', color: '#f472b6' },
 ];
 
-const NODE_TYPE_PRESETS: { type: NodeType; label: string; icon: string; color: string }[] = [
-  { type: 'trigger',      label: 'Trigger',       icon: '⚡', color: '#f59e0b' },
-  { type: 'http',         label: 'HTTP Request',  icon: '🌐', color: '#38bdf8' },
-  { type: 'azure_update', label: 'Azure Update',  icon: '☁️', color: '#0078d4' },
-  { type: 'github',       label: 'GitHub',        icon: '🐙', color: '#6e40c9' },
-  { type: 'notify',       label: 'Notify',        icon: '🔔', color: '#fb923c' },
-  { type: 'condition',    label: 'Condition',     icon: '🔀', color: '#22c55e' },
+const NODE_TYPE_PRESETS: { type: NodeType; icon: string; color: string }[] = [
+  { type: 'trigger', icon: '⚡', color: '#f59e0b' },
+  { type: 'http', icon: '🌐', color: '#38bdf8' },
+  { type: 'azure_update', icon: '☁️', color: '#0078d4' },
+  { type: 'github', icon: '🐙', color: '#6e40c9' },
+  { type: 'notify', icon: '🔔', color: '#fb923c' },
+  { type: 'condition', icon: '🔀', color: '#22c55e' },
 ];
 
-const PRESET_FLOWS: Flow[] = [
+function agentRoleLabel(role: AgentRole, t: ReturnType<typeof useLocale>['t']) {
+  if (role === 'manager') return t('agents.role.manager.label');
+  if (role === 'pm') return t('agents.role.pm.label');
+  if (role === 'lead_developer') return t('agents.role.leadDeveloper.label');
+  if (role === 'developer') return t('agents.role.developer.label');
+  if (role === 'qa') return t('agents.role.qa.label');
+  return role;
+}
+
+function nodeTypeLabel(type: NodeType, t: ReturnType<typeof useLocale>['t']) {
+  if (type === 'trigger') return t('flows.nodeTypeTrigger');
+  if (type === 'http') return t('flows.nodeTypeHttp');
+  if (type === 'azure_update') return t('flows.nodeTypeAzureUpdate');
+  if (type === 'github') return t('flows.nodeTypeGithub');
+  if (type === 'notify') return t('flows.nodeTypeNotify');
+  if (type === 'condition') return t('flows.nodeTypeCondition');
+  return type;
+}
+
+function presetFlows(t: ReturnType<typeof useLocale>['t']): Flow[] {
+  return [
   {
     id: 'pr-review-loop',
-    name: 'Task to PR Review Loop',
+    name: t('flows.preset.prReviewLoop.name'),
     createdAt: new Date().toISOString(),
     nodes: [
-      { id: 'p1', type: 'trigger', role: 'trigger', label: 'Task Intake', icon: '🧾', color: '#f59e0b', action: 'Receive task from board', waitForApproval: false, x: 60, y: 160 },
-      { id: 'p2', type: 'agent', role: 'developer', label: 'Developer Build', icon: '⚡', color: '#22c55e', action: 'Implement task and prepare changes', execute_task_pipeline: true, create_pr: true, waitForApproval: false, x: 280, y: 160 },
-      { id: 'p3', type: 'github', role: 'github', label: 'Open PR', icon: '🐙', color: '#6e40c9', action: 'Create pull request', github_action: 'create_pr', pr_title: 'AI: {{title}}', waitForApproval: false, x: 500, y: 160 },
-      { id: 'p4', type: 'agent', role: 'lead_developer', label: 'PR Review', icon: '🧑‍💻', color: '#38bdf8', action: 'Review PR and approve or request changes', review_only: true, auto_fix_from_comments: true, waitForApproval: true, x: 720, y: 160 },
+      { id: 'p1', type: 'trigger', role: 'trigger', label: t('flows.preset.prReviewLoop.p1.label'), icon: '🧾', color: '#f59e0b', action: t('flows.preset.prReviewLoop.p1.action'), waitForApproval: false, x: 60, y: 160 },
+      { id: 'p2', type: 'agent', role: 'developer', label: t('flows.preset.prReviewLoop.p2.label'), icon: '⚡', color: '#22c55e', action: t('flows.preset.prReviewLoop.p2.action'), execute_task_pipeline: true, create_pr: true, waitForApproval: false, x: 280, y: 160 },
+      { id: 'p3', type: 'github', role: 'github', label: t('flows.preset.prReviewLoop.p3.label'), icon: '🐙', color: '#6e40c9', action: t('flows.preset.prReviewLoop.p3.action'), github_action: 'create_pr', pr_title: 'AI: {{title}}', waitForApproval: false, x: 500, y: 160 },
+      { id: 'p4', type: 'agent', role: 'lead_developer', label: t('flows.preset.prReviewLoop.p4.label'), icon: '🧑‍💻', color: '#38bdf8', action: t('flows.preset.prReviewLoop.p4.action'), review_only: true, auto_fix_from_comments: true, waitForApproval: true, x: 720, y: 160 },
     ],
     edges: [{ from: 'p1', to: 'p2' }, { from: 'p2', to: 'p3' }, { from: 'p3', to: 'p4' }],
   },
   {
     id: 'full-cycle',
-    name: 'Full Dev Cycle',
+    name: t('flows.preset.fullCycle.name'),
     createdAt: new Date().toISOString(),
     nodes: [
-      { id: 'n1', type: 'agent', role: 'pm',             label: 'PM Analiz',      icon: '📋', color: '#a78bfa', action: 'Acceptance criteria yaz', waitForApproval: false, x: 60,  y: 160 },
-      { id: 'n2', type: 'agent', role: 'lead_developer', label: 'Teknik Plan',    icon: '🧑‍💻', color: '#38bdf8', action: 'Implementasyon planı',   waitForApproval: true,  x: 280, y: 160 },
-      { id: 'n3', type: 'agent', role: 'developer',      label: 'Geliştirme',     icon: '⚡', color: '#22c55e', action: 'Kodu yaz, PR aç',         waitForApproval: false, x: 500, y: 160 },
-      { id: 'n4', type: 'agent', role: 'qa',             label: 'QA Test',        icon: '🔍', color: '#f472b6', action: 'Test senaryoları çalıştır', waitForApproval: false, x: 720, y: 160 },
+      { id: 'n1', type: 'agent', role: 'pm', label: t('flows.preset.fullCycle.n1.label'), icon: '📋', color: '#a78bfa', action: t('flows.preset.fullCycle.n1.action'), waitForApproval: false, x: 60,  y: 160 },
+      { id: 'n2', type: 'agent', role: 'lead_developer', label: t('flows.preset.fullCycle.n2.label'), icon: '🧑‍💻', color: '#38bdf8', action: t('flows.preset.fullCycle.n2.action'), waitForApproval: true,  x: 280, y: 160 },
+      { id: 'n3', type: 'agent', role: 'developer', label: t('flows.preset.fullCycle.n3.label'), icon: '⚡', color: '#22c55e', action: t('flows.preset.fullCycle.n3.action'), waitForApproval: false, x: 500, y: 160 },
+      { id: 'n4', type: 'agent', role: 'qa', label: t('flows.preset.fullCycle.n4.label'), icon: '🔍', color: '#f472b6', action: t('flows.preset.fullCycle.n4.action'), waitForApproval: false, x: 720, y: 160 },
     ],
     edges: [{ from: 'n1', to: 'n2' }, { from: 'n2', to: 'n3' }, { from: 'n3', to: 'n4' }],
   },
   {
     id: 'quick-fix',
-    name: 'Quick Fix',
+    name: t('flows.preset.quickFix.name'),
     createdAt: new Date().toISOString(),
     nodes: [
-      { id: 'n1', type: 'agent', role: 'lead_developer', label: 'Root Cause', icon: '🧑‍💻', color: '#38bdf8', action: "Bug'ı analiz et", waitForApproval: false, x: 60,  y: 160 },
-      { id: 'n2', type: 'agent', role: 'developer',      label: 'Fix',        icon: '⚡', color: '#22c55e', action: 'Fix uygula, PR aç',  waitForApproval: false, x: 280, y: 160 },
-      { id: 'n3', type: 'agent', role: 'qa',             label: 'Verify',     icon: '🔍', color: '#f472b6', action: 'Regression test',   waitForApproval: false, x: 500, y: 160 },
+      { id: 'n1', type: 'agent', role: 'lead_developer', label: t('flows.preset.quickFix.n1.label'), icon: '🧑‍💻', color: '#38bdf8', action: t('flows.preset.quickFix.n1.action'), waitForApproval: false, x: 60,  y: 160 },
+      { id: 'n2', type: 'agent', role: 'developer', label: t('flows.preset.quickFix.n2.label'), icon: '⚡', color: '#22c55e', action: t('flows.preset.quickFix.n2.action'), waitForApproval: false, x: 280, y: 160 },
+      { id: 'n3', type: 'agent', role: 'qa', label: t('flows.preset.quickFix.n3.label'), icon: '🔍', color: '#f472b6', action: t('flows.preset.quickFix.n3.action'), waitForApproval: false, x: 500, y: 160 },
     ],
     edges: [{ from: 'n1', to: 'n2' }, { from: 'n2', to: 'n3' }],
   },
-];
+  ];
+}
 
 const LS_FLOWS = 'tiqr_flows';
 
-function loadFlows(): Flow[] {
-  if (typeof window === 'undefined') return PRESET_FLOWS;
+function localizePresetFlow(flow: Flow, t: ReturnType<typeof useLocale>['t']): Flow {
+  const preset = presetFlows(t).find((p) => p.id === flow.id);
+  if (!preset) return flow;
+  const presetNodeById = Object.fromEntries(preset.nodes.map((n) => [n.id, n]));
+  return {
+    ...flow,
+    name: preset.name,
+    nodes: flow.nodes.map((n) => {
+      const pn = presetNodeById[n.id];
+      if (!pn) return n;
+      return { ...n, label: pn.label, action: pn.action };
+    }),
+  };
+}
+
+function loadFlows(defaults: Flow[], t: ReturnType<typeof useLocale>['t']): Flow[] {
+  if (typeof window === 'undefined') return defaults;
   try {
     const s = localStorage.getItem(LS_FLOWS);
-    if (!s) return PRESET_FLOWS;
+    if (!s) return defaults;
     const parsed = JSON.parse(s) as Flow[];
-    return parsed.map((f) => ({ ...f, nodes: f.nodes ?? [], edges: f.edges ?? [] }));
+    return parsed.map((f) => localizePresetFlow({ ...f, nodes: f.nodes ?? [], edges: f.edges ?? [] }, t));
   }
-  catch { return PRESET_FLOWS; }
+  catch { return defaults; }
 }
 function saveFlowsLS(flows: Flow[]) { localStorage.setItem(LS_FLOWS, JSON.stringify(flows)); }
 
@@ -150,7 +186,7 @@ function sortNodesForRun(nodes: FlowNode[]): FlowNode[] {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function FlowsPage() {
   const { t } = useLocale();
-  const [flows, setFlows] = useState<Flow[]>(PRESET_FLOWS);
+  const [flows, setFlows] = useState<Flow[]>([]);
   const [activeFlow, setActiveFlow] = useState<string>('full-cycle');
   const [creating, setCreating] = useState(false);
   const [newFlowName, setNewFlowName] = useState('');
@@ -168,7 +204,8 @@ export default function FlowsPage() {
   const [deleteCandidate, setDeleteCandidate] = useState<Flow | null>(null);
 
   useEffect(() => {
-    const local = loadFlows();
+    const defaults = presetFlows(t);
+    const local = loadFlows(defaults, t);
     setFlows(local);
     if (local.length) setActiveFlow(local[0].id);
     loadPrefs().then((p) => {
@@ -179,11 +216,12 @@ export default function FlowsPage() {
           nodes: f.nodes ?? [],
           edges: f.edges ?? [],
         }));
-        setFlows(db); saveFlowsLS(db);
+        const localized = db.map((f) => localizePresetFlow(f, t));
+        setFlows(localized); saveFlowsLS(localized);
         setActiveFlow(db[0].id);
       }
     }).catch(() => {});
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     if (!activeFlow) return;
@@ -415,7 +453,7 @@ export default function FlowsPage() {
                 setGateApprovals((prev) => ({ ...prev, [n.id]: nextApproved }));
                 void createNotificationEvent({
                   event_type: nextApproved ? 'approval_decision' : 'approval_required',
-                  title: nextApproved ? 'Approval gate approved' : 'Approval gate pending',
+                  title: nextApproved ? t('flows.approvalApprovedTitle') : t('flows.approvalPendingTitle'),
                   message: `${current.name} / ${n.label}`,
                   severity: nextApproved ? 'success' : 'warning',
                 });
@@ -440,7 +478,11 @@ export default function FlowsPage() {
               <div key={s.id} style={{ borderRadius: 9, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', padding: '8px 10px', fontSize: 12, color: 'var(--ink-78)', display: 'flex', justifyContent: 'space-between' }}>
                 <span>{s.label}</span>
                 <span style={{ color: s.status === 'done' ? '#22c55e' : s.status === 'waiting' ? '#f59e0b' : 'var(--ink-35)' }}>
-                  {s.status === 'done' ? `${s.durationMs}ms` : s.status}
+                  {s.status === 'done'
+                    ? `${s.durationMs}ms`
+                    : s.status === 'waiting'
+                      ? t('flows.stepStatus.waiting')
+                      : t('flows.stepStatus.skipped')}
                 </span>
               </div>
             ))}
@@ -662,7 +704,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
     const id = 'n' + Date.now();
     const pos = getNextNodePosition();
     const node: FlowNode = {
-      id, type: 'agent', role: preset.role, label: preset.label, icon: preset.icon,
+      id, type: 'agent', role: preset.role, label: agentRoleLabel(preset.role, t), icon: preset.icon,
       color: preset.color, action: '', waitForApproval: false,
       x: pos.x, y: pos.y,
     };
@@ -674,7 +716,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
     const id = 'n' + Date.now();
     const pos = getNextNodePosition();
     const node: FlowNode = {
-      id, type: preset.type, role: preset.type, label: preset.label, icon: preset.icon,
+      id, type: preset.type, role: preset.type, label: nodeTypeLabel(preset.type, t), icon: preset.icon,
       color: preset.color, action: '', waitForApproval: false,
       x: pos.x, y: pos.y,
     };
@@ -687,7 +729,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
     const id = 'n' + Date.now();
     const pos = getNextNodePosition();
     const node: FlowNode = {
-      id, type: 'agent', role: 'custom', label: 'Yeni Agent', icon: '🤖', color: '#5eead4',
+      id, type: 'agent', role: 'custom', label: t('flows.customAgent'), icon: '🤖', color: '#5eead4',
       action: '', waitForApproval: false,
       x: pos.x, y: pos.y,
     };
@@ -870,7 +912,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
               <button key={p.role} onClick={() => addNode(p)}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, border: '1px solid ' + p.color + '30', background: p.color + '0a', cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ fontSize: 16 }}>{p.icon}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-78)' }}>{p.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-78)' }}>{agentRoleLabel(p.role, t)}</span>
               </button>
             ))}
             <button onClick={addCustomNode}
@@ -885,7 +927,7 @@ function FlowCanvas({ flow, onChange }: { flow: Flow; onChange: (f: Flow) => voi
               <button key={p.type} onClick={() => addTypeNode(p)}
                 style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderRadius: 10, border: '1px solid ' + p.color + '30', background: p.color + '0a', cursor: 'pointer', textAlign: 'left' }}>
                 <span style={{ fontSize: 16 }}>{p.icon}</span>
-                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-78)' }}>{p.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-78)' }}>{nodeTypeLabel(p.type, t)}</span>
               </button>
             ))}
           </div>
@@ -917,7 +959,9 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
   onConnectorMouseDown: (e: React.MouseEvent) => void;
   onEdit: () => void; onDelete: () => void;
 }) {
+  const { t } = useLocale();
   const [hovered, setHovered] = useState(false);
+  const roleText = node.type === 'agent' ? agentRoleLabel(node.role, t) : nodeTypeLabel(node.type, t);
 
   const borderColor = isDropTarget ? '#5eead4'
     : selected ? node.color
@@ -956,20 +1000,20 @@ function FlowNodeCard({ node, index, selected, connecting, isDropTarget, onMouse
           <span style={{ fontSize: 18 }}>{node.icon}</span>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', letterSpacing: '-0.01em', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{node.label}</div>
-            <div style={{ fontSize: 10, color: 'var(--ink-45)', fontWeight: 500, marginTop: 2 }}>{node.role}</div>
+            <div style={{ fontSize: 10, color: 'var(--ink-45)', fontWeight: 500, marginTop: 2 }}>{roleText}</div>
           </div>
         </div>
         {node.action && (
           <div style={{ fontSize: 10, color: 'var(--ink-45)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', marginTop: 4 }}>{node.action}</div>
         )}
         {node.waitForApproval && (
-          <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginTop: 2 }}>⏸ Onay bekler</div>
+          <div style={{ fontSize: 9, fontWeight: 700, color: '#f59e0b', marginTop: 2 }}>⏸ {t('flows.nodeAwaitingApproval')}</div>
         )}
       </div>
 
       {/* Right connector dot — sürükle → bağla */}
       <div
-        title="Sürükle → bağla"
+        title={t('flows.dragConnect')}
         onMouseDown={onConnectorMouseDown}
         style={{
           position: 'absolute', right: -8, top: '50%', transform: 'translateY(-50%)',
@@ -1016,39 +1060,40 @@ const COLOR_OPTIONS = ['#38bdf8','#22c55e','#a78bfa','#f59e0b','#f472b6','#fb923
 function NodeEditPanel({ node, onChange, onClose }: {
   node: FlowNode; onChange: (p: Partial<FlowNode>) => void; onClose: () => void;
 }) {
+  const { t } = useLocale();
   return (
     <div style={{ position: 'absolute', right: 0, top: 0, bottom: 0, width: 300, borderLeft: '1px solid var(--border)', background: 'var(--surface)', display: 'flex', flexDirection: 'column', zIndex: 50 }}>
       <div style={{ height: 2, background: 'linear-gradient(90deg, ' + node.color + ', #7c3aed)' }} />
       <div style={{ padding: '16px 18px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>Node Düzenle</span>
+        <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{t('flows.nodeEditTitle')}</span>
         <button onClick={onClose} style={{ width: 26, height: 26, borderRadius: '50%', border: '1px solid var(--panel-border-3)', background: 'var(--panel-alt)', color: 'var(--ink-50)', cursor: 'pointer', fontSize: 14 }}>×</button>
       </div>
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 14 }}>
 
         {/* Node Type */}
         <div>
-          <label style={pLbl}>Tip</label>
+          <label style={pLbl}>{t('flows.nodeType')}</label>
           <select value={node.type ?? 'agent'} onChange={(e) => onChange({ type: e.target.value as NodeType })}
             style={{ ...pInp, cursor: 'pointer' }}>
-            <option value="agent">Agent</option>
-            <option value="trigger">Trigger</option>
-            <option value="http">HTTP Request</option>
-            <option value="azure_update">Azure Update</option>
-            <option value="github">GitHub</option>
-            <option value="notify">Notify</option>
-            <option value="condition">Condition</option>
+            <option value="agent">{t('flows.nodeTypeAgent')}</option>
+            <option value="trigger">{t('flows.nodeTypeTrigger')}</option>
+            <option value="http">{t('flows.nodeTypeHttp')}</option>
+            <option value="azure_update">{t('flows.nodeTypeAzureUpdate')}</option>
+            <option value="github">{t('flows.nodeTypeGithub')}</option>
+            <option value="notify">{t('flows.nodeTypeNotify')}</option>
+            <option value="condition">{t('flows.nodeTypeCondition')}</option>
           </select>
         </div>
 
         {/* Label */}
         <div>
-          <label style={pLbl}>İsim</label>
+          <label style={pLbl}>{t('flows.nodeName')}</label>
           <input value={node.label} onChange={(e) => onChange({ label: e.target.value })} style={pInp} />
         </div>
 
         {/* Icon */}
         <div>
-          <label style={pLbl}>İkon</label>
+          <label style={pLbl}>{t('flows.nodeIcon')}</label>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {ICON_OPTIONS.map((ic) => (
               <button key={ic} onClick={() => onChange({ icon: ic })}
@@ -1061,7 +1106,7 @@ function NodeEditPanel({ node, onChange, onClose }: {
 
         {/* Color */}
         <div>
-          <label style={pLbl}>Renk</label>
+          <label style={pLbl}>{t('flows.nodeColor')}</label>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {COLOR_OPTIONS.map((c) => (
               <button key={c} onClick={() => onChange({ color: c })}
@@ -1075,14 +1120,14 @@ function NodeEditPanel({ node, onChange, onClose }: {
         {/* AGENT */}
         {(!node.type || node.type === 'agent') && (<>
           <div>
-            <label style={pLbl}>Rol</label>
+            <label style={pLbl}>{t('flows.nodeRole')}</label>
             <input value={node.role} onChange={(e) => onChange({ role: e.target.value })}
-              placeholder="developer, pm, custom..." style={pInp} />
+              placeholder={t('flows.nodeRolePlaceholder')} style={pInp} />
           </div>
           <div>
-            <label style={pLbl}>Görev</label>
+            <label style={pLbl}>{t('flows.nodeTask')}</label>
             <textarea value={node.action} onChange={(e) => onChange({ action: e.target.value })}
-              placeholder="Bu agent ne yapacak?" rows={3}
+              placeholder={t('flows.nodeTaskPlaceholder')} rows={3}
               style={{ ...pInp, resize: 'vertical', lineHeight: 1.5 }} />
           </div>
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
@@ -1090,7 +1135,7 @@ function NodeEditPanel({ node, onChange, onClose }: {
               style={{ width: 36, height: 20, borderRadius: 999, background: node.waitForApproval ? '#f59e0b' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 2, left: node.waitForApproval ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
             </div>
-            <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>Onay bekle</span>
+            <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>{t('flows.nodeWaitApproval')}</span>
           </label>
           {String(node.role || '').trim().toLowerCase() === 'lead_developer' && (
             <>
@@ -1099,14 +1144,14 @@ function NodeEditPanel({ node, onChange, onClose }: {
                   style={{ width: 36, height: 20, borderRadius: 999, background: node.review_only ? '#38bdf8' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
                   <div style={{ position: 'absolute', top: 2, left: node.review_only ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
                 </div>
-                <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>Review only</span>
+                <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>{t('flows.nodeReviewOnly')}</span>
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }}>
                 <div onClick={() => onChange({ auto_fix_from_comments: !node.auto_fix_from_comments })}
                   style={{ width: 36, height: 20, borderRadius: 999, background: node.auto_fix_from_comments !== false ? '#22c55e' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0 }}>
                   <div style={{ position: 'absolute', top: 2, left: node.auto_fix_from_comments !== false ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s' }} />
                 </div>
-                <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>Auto-fix from PR comments</span>
+                <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>{t('flows.nodeAutoFixPrComments')}</span>
               </label>
             </>
           )}
@@ -1115,36 +1160,36 @@ function NodeEditPanel({ node, onChange, onClose }: {
         {/* TRIGGER */}
         {node.type === 'trigger' && (
           <div>
-            <label style={pLbl}>Açıklama</label>
+            <label style={pLbl}>{t('flows.nodeDescription')}</label>
             <input value={node.action} onChange={(e) => onChange({ action: e.target.value })}
-              placeholder="Flow tetikleyici açıklaması" style={pInp} />
+              placeholder={t('flows.nodeTriggerPlaceholder')} style={pInp} />
           </div>
         )}
 
         {/* HTTP */}
         {node.type === 'http' && (<>
           <div>
-            <label style={pLbl}>Method</label>
+            <label style={pLbl}>{t('flows.nodeMethod')}</label>
             <select value={node.method ?? 'GET'} onChange={(e) => onChange({ method: e.target.value })}
               style={{ ...pInp, cursor: 'pointer' }}>
               {['GET','POST','PUT','PATCH','DELETE'].map((m) => <option key={m}>{m}</option>)}
             </select>
           </div>
           <div>
-            <label style={pLbl}>URL</label>
+            <label style={pLbl}>{t('flows.nodeUrl')}</label>
             <input value={node.url ?? ''} onChange={(e) => onChange({ url: e.target.value })}
-              placeholder="https://api.example.com/endpoint" style={pInp} />
+              placeholder={t('flows.nodeUrlPlaceholder')} style={pInp} />
           </div>
           <div>
-            <label style={pLbl}>Headers (JSON)</label>
+            <label style={pLbl}>{t('flows.nodeHeaders')}</label>
             <textarea value={node.headers ?? ''} onChange={(e) => onChange({ headers: e.target.value })}
-              placeholder={'{"Authorization": "Bearer {{token}}"}'} rows={2}
+              placeholder={t('flows.nodeHeadersPlaceholder')} rows={2}
               style={{ ...pInp, resize: 'vertical', lineHeight: 1.5, fontFamily: 'monospace', fontSize: 11 }} />
           </div>
           <div>
-            <label style={pLbl}>Body (JSON / Template)</label>
+            <label style={pLbl}>{t('flows.nodeBody')}</label>
             <textarea value={node.body ?? ''} onChange={(e) => onChange({ body: e.target.value })}
-              placeholder={'{"title": "{{title}}", "state": "{{state}}"}'} rows={3}
+              placeholder={t('flows.nodeBodyPlaceholder')} rows={3}
               style={{ ...pInp, resize: 'vertical', lineHeight: 1.5, fontFamily: 'monospace', fontSize: 11 }} />
           </div>
         </>)}
@@ -1152,17 +1197,17 @@ function NodeEditPanel({ node, onChange, onClose }: {
         {/* AZURE UPDATE */}
         {node.type === 'azure_update' && (<>
           <div>
-            <label style={pLbl}>Yeni Durum</label>
+            <label style={pLbl}>{t('flows.nodeNewState')}</label>
             <select value={node.new_state ?? ''} onChange={(e) => onChange({ new_state: e.target.value })}
               style={{ ...pInp, cursor: 'pointer' }}>
-              <option value="">Seç...</option>
+              <option value="">{t('flows.select')}</option>
               {['Active','In Progress','Code Review','QA To Do','Done','Closed','Resolved'].map((s) => <option key={s}>{s}</option>)}
             </select>
           </div>
           <div>
-            <label style={pLbl}>Yorum (opsiyonel)</label>
+            <label style={pLbl}>{t('flows.nodeComment')}</label>
             <textarea value={node.comment ?? ''} onChange={(e) => onChange({ comment: e.target.value })}
-              placeholder="Work item'a eklenecek yorum..." rows={2}
+              placeholder={t('flows.nodeCommentPlaceholder')} rows={2}
               style={{ ...pInp, resize: 'vertical', lineHeight: 1.5 }} />
           </div>
         </>)}
@@ -1170,29 +1215,29 @@ function NodeEditPanel({ node, onChange, onClose }: {
         {/* GITHUB */}
         {node.type === 'github' && (<>
           <div>
-            <label style={pLbl}>İşlem</label>
+            <label style={pLbl}>{t('flows.nodeAction')}</label>
             <select value={node.github_action ?? 'create_branch'} onChange={(e) => onChange({ github_action: e.target.value })}
               style={{ ...pInp, cursor: 'pointer' }}>
-              <option value="create_branch">Branch Oluştur</option>
-              <option value="create_pr">PR Aç</option>
-              <option value="merge_pr">PR Merge</option>
+              <option value="create_branch">{t('flows.nodeGithubCreateBranch')}</option>
+              <option value="create_pr">{t('flows.nodeGithubCreatePr')}</option>
+              <option value="merge_pr">{t('flows.nodeGithubMergePr')}</option>
             </select>
           </div>
           <div>
-            <label style={pLbl}>Repo</label>
+            <label style={pLbl}>{t('flows.nodeRepo')}</label>
             <input value={node.repo ?? ''} onChange={(e) => onChange({ repo: e.target.value })}
-              placeholder="owner/repo-name" style={pInp} />
+              placeholder={t('flows.nodeRepoPlaceholder')} style={pInp} />
           </div>
           <div>
-            <label style={pLbl}>Branch</label>
+            <label style={pLbl}>{t('flows.nodeBranch')}</label>
             <input value={node.branch ?? ''} onChange={(e) => onChange({ branch: e.target.value })}
-              placeholder="feature/{{id}}-{{title}}" style={pInp} />
+              placeholder={t('flows.nodeBranchPlaceholder')} style={pInp} />
           </div>
           {(node.github_action === 'create_pr' || !node.github_action) && (
             <div>
-              <label style={pLbl}>PR Başlığı</label>
+              <label style={pLbl}>{t('flows.nodePrTitle')}</label>
               <input value={node.pr_title ?? ''} onChange={(e) => onChange({ pr_title: e.target.value })}
-                placeholder="{{title}}" style={pInp} />
+                placeholder={t('flows.nodePrTitlePlaceholder')} style={pInp} />
             </div>
           )}
         </>)}
@@ -1200,14 +1245,14 @@ function NodeEditPanel({ node, onChange, onClose }: {
         {/* NOTIFY */}
         {node.type === 'notify' && (<>
           <div>
-            <label style={pLbl}>Webhook URL</label>
+            <label style={pLbl}>{t('flows.nodeWebhookUrl')}</label>
             <input value={node.webhook_url ?? ''} onChange={(e) => onChange({ webhook_url: e.target.value })}
-              placeholder="https://hooks.slack.com/..." style={pInp} />
+              placeholder={t('flows.nodeWebhookUrlPlaceholder')} style={pInp} />
           </div>
           <div>
-            <label style={pLbl}>Mesaj</label>
+            <label style={pLbl}>{t('flows.nodeMessage')}</label>
             <textarea value={node.notify_message ?? ''} onChange={(e) => onChange({ notify_message: e.target.value })}
-              placeholder="{{title}} tamamlandı." rows={2}
+              placeholder={t('flows.nodeMessagePlaceholder')} rows={2}
               style={{ ...pInp, resize: 'vertical', lineHeight: 1.5 }} />
           </div>
         </>)}
@@ -1215,23 +1260,23 @@ function NodeEditPanel({ node, onChange, onClose }: {
         {/* CONDITION */}
         {node.type === 'condition' && (<>
           <div>
-            <label style={pLbl}>Alan</label>
+            <label style={pLbl}>{t('flows.nodeField')}</label>
             <input value={node.condition_field ?? ''} onChange={(e) => onChange({ condition_field: e.target.value })}
-              placeholder="state, title, assigned_to..." style={pInp} />
+              placeholder={t('flows.nodeFieldPlaceholder')} style={pInp} />
           </div>
           <div>
-            <label style={pLbl}>Operatör</label>
+            <label style={pLbl}>{t('flows.nodeOperator')}</label>
             <select value={node.condition_op ?? 'eq'} onChange={(e) => onChange({ condition_op: e.target.value })}
               style={{ ...pInp, cursor: 'pointer' }}>
-              <option value="eq">Eşit (eq)</option>
-              <option value="neq">Eşit Değil (neq)</option>
-              <option value="contains">İçerir (contains)</option>
+              <option value="eq">{t('flows.nodeOperatorEq')}</option>
+              <option value="neq">{t('flows.nodeOperatorNeq')}</option>
+              <option value="contains">{t('flows.nodeOperatorContains')}</option>
             </select>
           </div>
           <div>
-            <label style={pLbl}>Değer</label>
+            <label style={pLbl}>{t('flows.nodeValue')}</label>
             <input value={node.condition_value ?? ''} onChange={(e) => onChange({ condition_value: e.target.value })}
-              placeholder="In Progress" style={pInp} />
+              placeholder={t('flows.nodeValuePlaceholder')} style={pInp} />
           </div>
         </>)}
 
@@ -1287,8 +1332,8 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
 
   function fmt(iso: string) {
     const d = new Date(iso);
-    return d.toLocaleDateString('tr-TR', { day: '2-digit', month: '2-digit' }) + ' ' +
-      d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString(undefined, { day: '2-digit', month: '2-digit' }) + ' ' +
+      d.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
   }
 
   return (
@@ -1296,7 +1341,7 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
       <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
         <span style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink-78)' }}>{t('flows.runHistory')}</span>
         <div style={{ display: 'flex', gap: 6 }}>
-          <button onClick={onRefresh} title="Yenile"
+          <button onClick={onRefresh} title={t('flows.refresh')}
             style={{ width: 26, height: 26, borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-50)', cursor: 'pointer', fontSize: 12 }}>↻</button>
           <button onClick={onClose}
             style={{ width: 26, height: 26, borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-50)', cursor: 'pointer', fontSize: 14 }}>×</button>
@@ -1307,21 +1352,21 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
         <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10 }}>
           <button onClick={() => onSelect(null as unknown as FlowRunResult)}
             style={{ alignSelf: 'flex-start', padding: '4px 10px', borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'transparent', color: 'var(--ink-35)', fontSize: 11, cursor: 'pointer' }}>
-            ← Geri
+            {t('flows.back')}
           </button>
           <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>{selected.flow_name}</div>
-          {selected.task_title && <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>Görev: {selected.task_title}</div>}
+          {selected.task_title && <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>{t('flows.task')}: {selected.task_title}</div>}
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <span style={{ fontSize: 11, fontWeight: 700, color: STATUS_COLOR[selected.status] ?? '#fff', padding: '2px 8px', borderRadius: 999, background: (STATUS_COLOR[selected.status] ?? '#fff') + '18', border: '1px solid ' + (STATUS_COLOR[selected.status] ?? '#fff') + '40' }}>{selected.status}</span>
             <span style={{ fontSize: 10, color: 'var(--ink-30)' }}>{fmt(selected.started_at)}</span>
             {getFeedbackFlags(selected).found && (
               <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', padding: '2px 8px', borderRadius: 999, background: 'rgba(251,191,36,0.14)', border: '1px solid rgba(251,191,36,0.35)' }}>
-                PR feedback bulundu
+                {t('flows.prFeedbackFound')}
               </span>
             )}
             {getFeedbackFlags(selected).rerun && (
               <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', padding: '2px 8px', borderRadius: 999, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.35)' }}>
-                Developer rerun tetiklendi
+                {t('flows.developerRerunTriggered')}
               </span>
             )}
           </div>
@@ -1345,9 +1390,9 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-          {loading && <div style={{ padding: '20px', textAlign: 'center', color: 'var(--ink-30)', fontSize: 12 }}>Yükleniyor...</div>}
+          {loading && <div style={{ padding: '20px', textAlign: 'center', color: 'var(--ink-30)', fontSize: 12 }}>{t('flows.loading')}</div>}
           {!loading && runs.length === 0 && (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--ink-25)', fontSize: 12 }}>Henüz run yok</div>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--ink-25)', fontSize: 12 }}>{t('flows.noRuns')}</div>
           )}
           {runs.map((run) => (
             <button key={run.id} onClick={() => onSelect(run)}
@@ -1360,16 +1405,16 @@ function RunHistoryPanel({ runs, loading, selected, onSelect, onRefresh, onClose
               {getFeedbackFlags(run).found && (
                 <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                   <span style={{ fontSize: 10, fontWeight: 700, color: '#fbbf24', padding: '2px 7px', borderRadius: 999, background: 'rgba(251,191,36,0.14)', border: '1px solid rgba(251,191,36,0.35)' }}>
-                    PR feedback bulundu
+                    {t('flows.prFeedbackFound')}
                   </span>
                   {getFeedbackFlags(run).rerun && (
                     <span style={{ fontSize: 10, fontWeight: 700, color: '#22c55e', padding: '2px 7px', borderRadius: 999, background: 'rgba(34,197,94,0.14)', border: '1px solid rgba(34,197,94,0.35)' }}>
-                      Developer rerun tetiklendi
+                      {t('flows.developerRerunTriggered')}
                     </span>
                   )}
                 </div>
               )}
-              <div style={{ fontSize: 10, color: 'var(--ink-25)' }}>{fmt(run.started_at)} · {run.steps.length} adım</div>
+              <div style={{ fontSize: 10, color: 'var(--ink-25)' }}>{fmt(run.started_at)} · {run.steps.length} {t('flows.steps')}</div>
             </button>
           ))}
         </div>

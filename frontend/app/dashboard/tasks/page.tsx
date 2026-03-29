@@ -26,6 +26,13 @@ function statusLabel(s: string, t: (key: TranslationKey, vars?: Record<string, s
   return t(`tasks.status.${s}` as TranslationKey);
 }
 
+function sourceLabel(s: string, t: (key: TranslationKey, vars?: Record<string, string | number>) => string): string {
+  const normalized = (s || '').toLowerCase();
+  const key = `tasks.source.${normalized}` as TranslationKey;
+  const translated = t(key);
+  return translated === key ? s : translated;
+}
+
 export default function DashboardTasksPage() {
   const { t } = useLocale();
   const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -437,7 +444,7 @@ export default function DashboardTasksPage() {
                   {q.title}
                 </div>
                 <div style={{ fontSize: 11, color: 'var(--ink-45)' }}>
-                  {t('tasks.taskWithId', { id: q.task_id })} • {q.source}
+                  {t('tasks.taskWithId', { id: q.task_id })} • {sourceLabel(q.source, t)}
                 </div>
               </div>
               <Link href={`/tasks/${q.task_id}`} className='button button-outline' style={{ padding: '5px 9px', fontSize: 12, whiteSpace: 'nowrap' }}>
@@ -489,7 +496,7 @@ export default function DashboardTasksPage() {
                 padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 600,
                 background: 'var(--glass)', color: 'var(--ink-50)',
                 textTransform: 'capitalize', width: 'fit-content',
-              }}>{task.source}</span>
+              }}>{sourceLabel(task.source, t)}</span>
               <span style={{
                 display: 'inline-flex', alignItems: 'center', gap: 6,
                 padding: '4px 10px', borderRadius: 999, fontSize: 11, fontWeight: 700,
@@ -584,13 +591,13 @@ export default function DashboardTasksPage() {
         <div onClick={() => setAiPopupTaskId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', minWidth: 340, maxWidth: 440 }}>
             <h3 style={{ marginTop: 0, marginBottom: 6, fontSize: 16, color: 'var(--ink)' }}>{t('tasks.selectAgent')}</h3>
-            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 0, marginBottom: 14 }}>Developer direkt kodu yazar, PM analizi olmadan.</p>
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 0, marginBottom: 14 }}>{t('tasks.aiAssignHint')}</p>
             <div style={{ display: 'grid', gap: 8 }}>
               {agentConfigs.map((agent) => (
                 <button key={agent.role} onClick={() => void doAssignAI(aiPopupTaskId, agent)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, border: '1px solid var(--panel-border-3)', background: 'var(--panel)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                   <div>
                     <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', textTransform: 'capitalize' }}>{agent.role}</div>
-                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{agent.model || 'default'} {agent.provider ? `• ${agent.provider}` : ''}</div>
+                    <div style={{ fontSize: 11, color: 'var(--muted)', marginTop: 2 }}>{agent.model || t('tasks.defaultModel')} {agent.provider ? `• ${agent.provider}` : ''}</div>
                   </div>
                   <span style={{ fontSize: 18, color: 'var(--muted)' }}>→</span>
                 </button>
@@ -605,10 +612,10 @@ export default function DashboardTasksPage() {
         <div onClick={() => setFlowPopupTaskId(null)} style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 9999 }}>
           <div onClick={(e) => e.stopPropagation()} style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, padding: '20px 24px', minWidth: 340, maxWidth: 440 }}>
             <h3 style={{ marginTop: 0, marginBottom: 6, fontSize: 16, color: 'var(--ink)' }}>{t('tasks.assignFlow')}</h3>
-            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 0, marginBottom: 14 }}>PM analiz eder, Developer kodu yazar, PR acar.</p>
+            <p style={{ fontSize: 12, color: 'var(--muted)', marginTop: 0, marginBottom: 14 }}>{t('tasks.flowAssignHint')}</p>
             <div style={{ display: 'grid', gap: 8 }}>
               {savedFlows.length === 0 ? (
-                <div style={{ fontSize: 12, color: 'var(--muted)', padding: 10 }}>Kayitli flow yok. Flows sayfasindan olusturun.</div>
+                <div style={{ fontSize: 12, color: 'var(--muted)', padding: 10 }}>{t('tasks.noSavedFlows')}</div>
               ) : savedFlows.map((flow) => (
                 <button key={flow.id} onClick={() => void doAssignFlow(flowPopupTaskId, flow.id, flow.name)} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, padding: '12px 14px', borderRadius: 12, border: '1px solid rgba(124,58,237,0.3)', background: 'rgba(124,58,237,0.08)', cursor: 'pointer', textAlign: 'left', width: '100%' }}>
                   <div>
@@ -636,7 +643,7 @@ export default function DashboardTasksPage() {
               {' '}{t('tasks.deleteDesc')}
             </div>
             <div style={{ padding: '12px 14px', borderRadius: 12, background: 'var(--panel)', border: '1px solid var(--panel-border)', marginBottom: 20, fontSize: 12, color: 'var(--ink-50)' }}>
-              #{deleteConfirmTask.id} · {deleteConfirmTask.status}
+              #{deleteConfirmTask.id} · {statusLabel(deleteConfirmTask.status, t)}
             </div>
             <div style={{ display: 'flex', gap: 10 }}>
               <button onClick={() => setDeleteConfirmTask(null)}

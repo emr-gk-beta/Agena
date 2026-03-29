@@ -257,8 +257,8 @@ export default function ProfilePage() {
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 3 }}>{user.full_name || '—'}</div>
             <div style={{ fontSize: 13, color: 'var(--ink-35)' }}>{user.email}</div>
             <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: 'rgba(13,148,136,0.15)', border: '1px solid rgba(13,148,136,0.3)', color: '#5eead4' }}>Pro Plan</span>
-              <span style={{ fontSize: 11, color: 'var(--ink-25)', padding: '3px 10px' }}>Org #{user.organization_id}</span>
+              <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: 'rgba(13,148,136,0.15)', border: '1px solid rgba(13,148,136,0.3)', color: '#5eead4' }}>{t('profile.proPlan')}</span>
+              <span style={{ fontSize: 11, color: 'var(--ink-25)', padding: '3px 10px' }}>{t('profile.org')} #{user.organization_id}</span>
             </div>
           </div>
           <button onClick={logout} style={{ padding: '8px 14px', borderRadius: 10, border: '1px solid rgba(248,113,113,0.2)', background: 'rgba(248,113,113,0.06)', color: '#f87171', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0 }}>
@@ -332,34 +332,34 @@ export default function ProfilePage() {
 
         <div style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: 18, display: 'grid', gap: 10 }}>
           <div>
-            <div style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 14 }}>Workspace Preferences</div>
-            <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 2 }}>DB-backed defaults used during AI assignment.</div>
+            <div style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 14 }}>{t('profile.workspacePreferences')}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 2 }}>{t('profile.workspacePreferencesDesc')}</div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <ToggleRow label='Email notifications' checked={profileSettings.email_notifications} onChange={(v) => { setProfileSettings((p) => ({ ...p, email_notifications: v })); setSaved(false); }} />
-            <ToggleRow label='Web push notifications' checked={profileSettings.web_push_notifications} onChange={(v) => { setProfileSettings((p) => ({ ...p, web_push_notifications: v })); setSaved(false); }} />
-            <ToggleRow label='Daily summary email' checked={profileSettings.daily_summary} onChange={(v) => { setProfileSettings((p) => ({ ...p, daily_summary: v })); setSaved(false); }} />
-            <ToggleRow label='Auto-assign new tasks' checked={profileSettings.auto_assign_new_tasks} onChange={(v) => { setProfileSettings((p) => ({ ...p, auto_assign_new_tasks: v })); setSaved(false); }} />
-            <ToggleRow label='Create PR by default' checked={profileSettings.default_create_pr} onChange={(v) => { setProfileSettings((p) => ({ ...p, default_create_pr: v })); setSaved(false); }} />
+            <ToggleRow label={t('profile.emailNotifications')} checked={profileSettings.email_notifications} onChange={(v) => { setProfileSettings((p) => ({ ...p, email_notifications: v })); setSaved(false); }} />
+            <ToggleRow label={t('profile.webPushNotifications')} checked={profileSettings.web_push_notifications} onChange={(v) => { setProfileSettings((p) => ({ ...p, web_push_notifications: v })); setSaved(false); }} />
+            <ToggleRow label={t('profile.dailySummaryEmail')} checked={profileSettings.daily_summary} onChange={(v) => { setProfileSettings((p) => ({ ...p, daily_summary: v })); setSaved(false); }} />
+            <ToggleRow label={t('profile.autoAssignNewTasks')} checked={profileSettings.auto_assign_new_tasks} onChange={(v) => { setProfileSettings((p) => ({ ...p, auto_assign_new_tasks: v })); setSaved(false); }} />
+            <ToggleRow label={t('profile.createPrByDefault')} checked={profileSettings.default_create_pr} onChange={(v) => { setProfileSettings((p) => ({ ...p, default_create_pr: v })); setSaved(false); }} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <ProfileInput
-              label='Preferred provider'
+              label={t('profile.preferredProvider')}
               value={profileSettings.preferred_provider}
               onChange={(v) => { setProfileSettings((p) => ({ ...p, preferred_provider: v })); setSaved(false); }}
-              placeholder='openai | gemini | codex_cli'
+              placeholder={t('profile.preferredProviderPlaceholder')}
             />
             <ProfileInput
-              label='Preferred model'
+              label={t('profile.preferredModel')}
               value={profileSettings.preferred_model}
               onChange={(v) => { setProfileSettings((p) => ({ ...p, preferred_model: v })); setSaved(false); }}
-              placeholder='gpt-5'
+              placeholder={t('profile.preferredModelPlaceholder')}
             />
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-50)', marginBottom: 6 }}>Branch Pattern</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-50)', marginBottom: 6 }}>{t('profile.branchPattern')}</div>
             {/* Preset buttons */}
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
               {[
@@ -386,12 +386,12 @@ export default function ProfilePage() {
             <input
               value={profileSettings.branch_prefix}
               onChange={(e) => { setProfileSettings((p) => ({ ...p, branch_prefix: e.target.value })); setSaved(false); }}
-              placeholder='feature/{ext_id}-{title_slug}'
+              placeholder={t('profile.branchPatternPlaceholder')}
               style={{ width: '100%', padding: '9px 11px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-90)', fontSize: 12, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
             />
             {/* Preview */}
             <div style={{ fontSize: 10, color: 'var(--ink-25)', marginTop: 6, fontFamily: 'monospace' }}>
-              Preview: {(profileSettings.branch_prefix || 'feature/AB#{ext_id}-{title_slug}')
+              {t('profile.preview')}: {(profileSettings.branch_prefix || 'feature/AB#{ext_id}-{title_slug}')
                 .replace('{ext_id}', '61717')
                 .replace('{title_slug}', 'merchant-status')
                 .replace('{id}', '47')
@@ -399,25 +399,25 @@ export default function ProfilePage() {
             </div>
           </div>
           <ProfileInput
-            label='Queue warning threshold'
+            label={t('profile.queueWarningThreshold')}
             value={String(profileSettings.queue_warn_threshold)}
             onChange={(v) => {
               const n = Number(v);
               setProfileSettings((p) => ({ ...p, queue_warn_threshold: Number.isFinite(n) ? Math.max(1, Math.floor(n)) : p.queue_warn_threshold }));
               setSaved(false);
             }}
-            placeholder='5'
+            placeholder={t('profile.queueWarningThresholdPlaceholder')}
           />
           <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: 10, background: 'var(--panel)' }}>
-            <div style={{ fontSize: 12, color: 'var(--ink-78)', fontWeight: 700, marginBottom: 8 }}>Event Notification Matrix</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-78)', fontWeight: 700, marginBottom: 8 }}>{t('profile.eventNotificationMatrix')}</div>
             <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.6fr 0.7fr', gap: 8, fontSize: 11, color: 'var(--ink-35)', marginBottom: 6 }}>
-              <div>Event</div><div>In-App</div><div>Email</div><div>Web Push</div>
+              <div>{t('profile.event')}</div><div>{t('profile.inApp')}</div><div>{t('profile.email')}</div><div>{t('profile.webPush')}</div>
             </div>
             {Object.keys(EVENT_PREF_DEFAULTS).map((eventKey) => {
               const channels = profileSettings.notification_preferences[eventKey] || EVENT_PREF_DEFAULTS[eventKey];
               return (
                 <div key={eventKey} style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.6fr 0.7fr', gap: 8, alignItems: 'center', padding: '6px 0', borderTop: '1px solid var(--panel-alt)' }}>
-                  <div style={{ fontSize: 11, color: 'var(--ink-78)' }}>{eventKey.replace(/_/g, ' ')}</div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-78)' }}>{t(`profile.event.${eventKey}` as Parameters<typeof t>[0])}</div>
                   <MiniToggle checked={channels.in_app} onChange={(v) => { setProfileSettings((p) => ({ ...p, notification_preferences: { ...p.notification_preferences, [eventKey]: { ...channels, in_app: v } } })); setSaved(false); }} />
                   <MiniToggle checked={channels.email} onChange={(v) => { setProfileSettings((p) => ({ ...p, notification_preferences: { ...p.notification_preferences, [eventKey]: { ...channels, email: v } } })); setSaved(false); }} />
                   <MiniToggle checked={channels.web_push} onChange={(v) => { setProfileSettings((p) => ({ ...p, notification_preferences: { ...p.notification_preferences, [eventKey]: { ...channels, web_push: v } } })); setSaved(false); }} />
@@ -494,10 +494,11 @@ function ProfileSel({ label, value, onChange, options, placeholder, loading, dis
   label: string; value: string; onChange: (v: string) => void;
   options: Opt[]; placeholder: string; loading: boolean; disabled: boolean;
 }) {
+  const { t } = useLocale();
   return (
     <div>
       <label style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', display: 'block', marginBottom: 6 }}>
-        {label} {loading ? <span style={{ color: 'var(--ink-25)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>loading…</span> : null}
+        {label} {loading ? <span style={{ color: 'var(--ink-25)', fontWeight: 400, textTransform: 'none', letterSpacing: 0 }}>{t('profile.loading')}</span> : null}
       </label>
       <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled || loading}
         style={{ width: '100%', padding: '10px 12px', borderRadius: 10, border: '1px solid ' + (value ? 'rgba(139,92,246,0.4)' : 'var(--panel-border-3)'), background: value ? 'rgba(139,92,246,0.08)' : 'var(--glass)', color: value ? 'var(--ink-90)' : 'var(--ink-35)', fontSize: 13, outline: 'none', appearance: 'none', cursor: disabled ? 'not-allowed' : 'pointer', opacity: disabled ? 0.4 : 1 }}>

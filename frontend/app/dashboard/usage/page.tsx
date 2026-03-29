@@ -42,7 +42,7 @@ export default function UsagePage() {
       setData(res);
       setPage(res.page);
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed');
+      setError(e instanceof Error ? e.message : t('usage.errorDefault'));
     } finally {
       setLoading(false);
     }
@@ -69,20 +69,20 @@ export default function UsagePage() {
       <div style={{ ...box, padding: 12, display: 'grid', gridTemplateColumns: 'repeat(7, minmax(120px, 1fr))', gap: 8 }}>
         <select value={operationType} onChange={(e) => setOperationType(e.target.value)} style={field}>
           <option value='all'>{t('usage.all')}</option>
-          <option value='task_orchestration_run'>task_orchestration_run</option>
-          <option value='repo_profile_scan'>repo_profile_scan</option>
+          <option value='task_orchestration_run'>{t('usage.operation.taskOrchestrationRun')}</option>
+          <option value='repo_profile_scan'>{t('usage.operation.repoProfileScan')}</option>
         </select>
         <select value={provider} onChange={(e) => setProvider(e.target.value)} style={field}>
           <option value='all'>{t('usage.all')}</option>
-          <option value='openai'>openai</option>
-          <option value='gemini'>gemini</option>
-          <option value='local'>local</option>
-          <option value='codex-cli'>codex-cli</option>
+          <option value='openai'>{t('usage.provider.openai')}</option>
+          <option value='gemini'>{t('usage.provider.gemini')}</option>
+          <option value='local'>{t('usage.provider.local')}</option>
+          <option value='codex-cli'>{t('usage.provider.codexCli')}</option>
         </select>
         <select value={status} onChange={(e) => setStatus(e.target.value)} style={field}>
           <option value='all'>{t('usage.all')}</option>
-          <option value='completed'>completed</option>
-          <option value='failed'>failed</option>
+          <option value='completed'>{t('usage.status.completed')}</option>
+          <option value='failed'>{t('usage.status.failed')}</option>
         </select>
         <input value={taskId} onChange={(e) => setTaskId(e.target.value)} placeholder={t('usage.taskId')} style={field} />
         <input value={createdFrom} onChange={(e) => setCreatedFrom(e.target.value)} type='date' style={field} />
@@ -113,7 +113,7 @@ export default function UsagePage() {
           <span>{t('usage.colDetails')}</span>
         </div>
         {loading ? (
-          <div style={{ padding: 14, color: 'var(--ink-50)' }}>Loading...</div>
+          <div style={{ padding: 14, color: 'var(--ink-50)' }}>{t('usage.loading')}</div>
         ) : error ? (
           <div style={{ padding: 14, color: '#f87171' }}>{error}</div>
         ) : !data || data.items.length === 0 ? (
@@ -165,4 +165,3 @@ const field: React.CSSProperties = {
   fontSize: 12,
   outline: 'none',
 };
-

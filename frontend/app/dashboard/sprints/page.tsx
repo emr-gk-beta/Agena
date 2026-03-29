@@ -712,7 +712,7 @@ export default function SprintsPage() {
               cursor: 'pointer',
             }}
           >
-            Azure
+            {t('tasks.source.azure')}
           </button>
         )}
         {(hasJira || !hasAzure) && (
@@ -729,7 +729,7 @@ export default function SprintsPage() {
               cursor: 'pointer',
             }}
           >
-            Jira
+            {t('tasks.source.jira')}
           </button>
         )}
       </div>
@@ -888,6 +888,7 @@ function BoardCard({ item, stateColor, selected, onClick, onImport, isImported }
   item: WorkItem; stateColor: string; selected: boolean; onClick: () => void;
   onImport?: () => void; isImported?: boolean;
 }) {
+  const { t } = useLocale();
   const [hovered, setHovered] = useState(false);
   const active = selected || hovered;
 
@@ -941,7 +942,7 @@ function BoardCard({ item, stateColor, selected, onClick, onImport, isImported }
           {onImport && !isImported && (
             <button onClick={(e) => { e.stopPropagation(); onImport(); }}
               style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 999, background: 'rgba(13,148,136,0.12)', border: '1px solid rgba(13,148,136,0.3)', color: '#5eead4', cursor: 'pointer' }}
-              title="Import to Tiqr">
+              title={t('sprints.importToTiqr')}>
               ↓
             </button>
           )}
@@ -968,6 +969,15 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
   onRunFlow: (flowId: string, options?: FlowRunOptions) => void;
 }) {
   const { t, lang } = useLocale();
+  const dateLocaleByLang: Record<typeof lang, string> = {
+    tr: 'tr-TR',
+    en: 'en-US',
+    es: 'es-ES',
+    zh: 'zh-CN',
+    it: 'it-IT',
+    de: 'de-DE',
+    ja: 'ja-JP',
+  };
   const stateInfo = STATE_COLORS[item.state ?? ''] ?? { color: '#5eead4', bg: 'rgba(94,234,212,0.07)', border: 'rgba(94,234,212,0.2)' };
   const openDuration  = elapsed(item.created_date);
   const toActiveDuration = item.activated_date ? elapsed(item.created_date, item.activated_date) : null;
@@ -1053,7 +1063,7 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
 
         {item.created_date && (
           <DetailRow icon="📅" label={t('sprints.opened')}>
-            {new Date(item.created_date).toLocaleDateString(lang === 'tr' ? 'tr-TR' : 'en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+            {new Date(item.created_date).toLocaleDateString(dateLocaleByLang[lang], { day: 'numeric', month: 'short', year: 'numeric' })}
             {openDuration && <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--ink-30)', background: 'var(--panel-alt)', padding: '1px 6px', borderRadius: 999 }}>{openDuration} {t('sprints.ago')}</span>}
           </DetailRow>
         )}
