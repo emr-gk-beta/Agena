@@ -325,64 +325,71 @@ class CrewAIAgentRunner:
         crewai_model = self._normalize_crewai_model(selected_model)
         materialized_images = self._materialize_image_inputs(image_inputs)
 
-        try:
-            llm = self._build_crewai_llm(crewai_model, max_output_tokens, complexity_hint)
-            agent_kwargs: dict[str, Any] = {
-                'role': role,
-                'goal': goal,
-                'backstory': (
-                    backstory.strip()
-                    if backstory and backstory.strip()
-                    else (
-                        f'You are {role} inside AGENA. '
-                        'Follow the provided system instructions exactly and return only the requested output.'
-                    )
-                ),
-                'llm': llm,
-                'verbose': False,
-                'allow_delegation': False,
-                'respect_context_window': True,
-            }
-            if multimodal and materialized_images:
-                agent_kwargs['multimodal'] = True
-            if reasoning and 'codex' not in crewai_model.lower():
-                agent_kwargs['reasoning'] = True
-                agent_kwargs['max_reasoning_attempts'] = 2
-            agent = Agent(**agent_kwargs)
+        # Codex models are incompatible with CrewAI's internal tool-call mechanism
+        # (structured output, reasoning, etc.) — go straight to direct LLM.
+        use_direct_llm = 'codex' in crewai_model.lower()
 
-            task_kwargs: dict[str, Any] = {
-                'description': self._compose_task_description(system_prompt, user_prompt, materialized_images),
-                'expected_output': expected_output,
-                'agent': agent,
-                'markdown': False,
-            }
-            if structured_output is not None:
-                task_kwargs['output_json'] = structured_output
-            task = Task(**task_kwargs)
+        if not use_direct_llm:
+            try:
+                llm = self._build_crewai_llm(crewai_model, max_output_tokens, complexity_hint)
+                agent_kwargs: dict[str, Any] = {
+                    'role': role,
+                    'goal': goal,
+                    'backstory': (
+                        backstory.strip()
+                        if backstory and backstory.strip()
+                        else (
+                            f'You are {role} inside AGENA. '
+                            'Follow the provided system instructions exactly and return only the requested output.'
+                        )
+                    ),
+                    'llm': llm,
+                    'verbose': False,
+                    'allow_delegation': False,
+                    'respect_context_window': True,
+                }
+                if multimodal and materialized_images:
+                    agent_kwargs['multimodal'] = True
+                if reasoning:
+                    agent_kwargs['reasoning'] = True
+                    agent_kwargs['max_reasoning_attempts'] = 2
+                agent = Agent(**agent_kwargs)
 
-            crew = Crew(
-                agents=[agent],
-                tasks=[task],
-                process=Process.sequential,
-                planning=False,
-                verbose=False,
-            )
-            result = await crew.kickoff_async()
-            content = self._extract_raw_output(result)
-            usage = self._extract_usage(result)
-            structured = self._extract_structured_output(result)
-            return content, usage, selected_model, structured
-        except Exception as exc:
-            logger.warning('CrewAI runtime failed for %s, falling back to direct LLM: %s', role, exc)
-            content, usage, model, _ = await self.llm.generate(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                complexity_hint=complexity_hint,
-                max_output_tokens=max_output_tokens,
-                skip_cache=skip_cache,
-                image_inputs=image_inputs,
-            )
-            return content, usage, model, None
+                task_kwargs: dict[str, Any] = {
+                    'description': self._compose_task_description(system_prompt, user_prompt, materialized_images),
+                    'expected_output': expected_output,
+                    'agent': agent,
+                    'markdown': False,
+                }
+                if structured_output is not None:
+                    task_kwargs['output_json'] = structured_output
+                task = Task(**task_kwargs)
+
+                crew = Crew(
+                    agents=[agent],
+                    tasks=[task],
+                    process=Process.sequential,
+                    planning=False,
+                    verbose=False,
+                )
+                result = await crew.kickoff_async()
+                content = self._extract_raw_output(result)
+                usage = self._extract_usage(result)
+                structured = self._extract_structured_output(result)
+                return content, usage, selected_model, structured
+            except Exception as exc:
+                logger.warning('CrewAI runtime failed for %s, falling back to direct LLM: %s', role, exc)
+
+        # Direct LLM path (codex models or CrewAI fallback)
+        content, usage, model, _ = await self.llm.generate(
+            system_prompt=system_prompt,
+            user_prompt=user_prompt,
+            complexity_hint=complexity_hint,
+            max_output_tokens=max_output_tokens,
+            skip_cache=skip_cache,
+            image_inputs=image_inputs,
+        )
+        return content, usage, model, None
 
     def _select_model(self, complexity_hint: str) -> str:
         if complexity_hint in {'simple', 'low'}:
