@@ -344,7 +344,7 @@ export default function DashboardOverview() {
 
       {/* Quota Usage Bars */}
       {quota && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 14 }} className="dash-grid-responsive">
           {/* Tasks quota */}
           <div style={{
             borderRadius: 16, border: '1px solid var(--panel-border)',
@@ -396,7 +396,7 @@ export default function DashboardOverview() {
       )}
 
       {/* KPI Grid */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }} className="dash-grid-responsive">
         {kpis.map((k) => (
           <div key={k.label} style={{
             borderRadius: 18,
@@ -424,7 +424,7 @@ export default function DashboardOverview() {
       </div>
 
       {/* Operations Radar + Pipeline */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.6fr', gap: 20 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 0.6fr', gap: 20 }} className="dash-grid-responsive">
         {/* Operations Radar */}
         <div style={{
           borderRadius: 20, border: '1px solid var(--panel-border)',
@@ -558,7 +558,7 @@ export default function DashboardOverview() {
 
         {/* Summary numbers */}
         {analyticsSummary && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, marginBottom: 20 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
             {[
               { label: t('dashboard.analytics.totalCost'), value: `$${analyticsSummary.cost_usd.toFixed(2)}`, color: '#5eead4' },
               { label: t('dashboard.analytics.totalTokens'), value: analyticsSummary.total_tokens.toLocaleString(), color: '#a78bfa' },
@@ -579,7 +579,7 @@ export default function DashboardOverview() {
         )}
 
         {/* Charts row */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+        <div className="dash-grid-responsive" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
           {/* Cost trend line chart */}
           <div style={{
             borderRadius: 16,
@@ -670,7 +670,7 @@ export default function DashboardOverview() {
       </div>
 
       {/* Quick links */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 14 }} className="dash-grid-responsive">
         {[
           { href: '/dashboard/tasks', label: t('dashboard.quick.manageTasks'), desc: t('dashboard.quick.manageTasksDesc'), icon: '◈' },
           { href: '/dashboard/sprints', label: t('dashboard.quick.sprintBoard'), desc: t('dashboard.quick.sprintBoardDesc'), icon: '◎' },
