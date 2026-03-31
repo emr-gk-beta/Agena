@@ -1260,7 +1260,7 @@ function RunConfigModal({ task, onRun, onClose }: {
   }
 
   const providers = [
-    { value: 'openai', label: 'OpenAI', models: ['o3', 'o4-mini', 'gpt-5', 'gpt-5-codex', 'gpt-5.2-codex', 'gpt-4.1'] },
+    { value: 'openai', label: 'OpenAI', models: ['o3', 'o4-mini', 'gpt-5', 'gpt-5-codex', 'gpt-5.1-codex-mini', 'gpt-5.2-codex', 'gpt-4.1'] },
     { value: 'gemini', label: 'Gemini', models: ['gemini-2.5-pro', 'gemini-2.5-flash'] },
     { value: 'codex_cli', label: 'Codex CLI', models: ['codex'] },
     { value: 'claude_cli', label: 'Claude CLI', models: ['claude-sonnet-4-6'] },
