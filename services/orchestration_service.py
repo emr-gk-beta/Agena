@@ -239,20 +239,35 @@ class OrchestrationService:
                 if mode == 'ai':
                     task_image_inputs = await self._build_task_image_inputs(task_description_for_ai, organization_id)
                 # Build repo context into task description before flow starts
-                _repo_ctx = await self._build_repo_context(
-                    local_repo_path=routing.local_repo_path,
-                    organization_id=organization_id,
-                    user_id=task.created_by_user_id,
-                    task_title=task.title or '',
-                    task_description=task.description or '',
-                    remote_repo=routing.remote_repo,
-                )
-                await task_service.add_log(task.id, organization_id, 'agent',
-                    f'Repo context built: {len(_repo_ctx or "")} chars, '
-                    f'has_agents_md: {"agents.md" in (_repo_ctx or "").lower()}, '
-                    f'repo_path: {routing.local_repo_path}\n'
-                    f'task_images: {len(task_image_inputs)}'
-                )
+                # Check for remote agents.md first — if it exists, skip expensive
+                # full repo context build (saves ~128K chars / ~32K tokens)
+                _remote_agents_md: str | None = None
+                if not routing.local_repo_path and routing.remote_repo:
+                    _remote_agents_md = await self._fetch_remote_agents_md(routing.remote_repo, organization_id)
+
+                if _remote_agents_md:
+                    # agents.md found — no need for full repo context scan
+                    _repo_ctx = None
+                    await task_service.add_log(task.id, organization_id, 'agent',
+                        f'Repo context: using agents.md ({len(_remote_agents_md)} chars), skipped full repo scan\n'
+                        f'repo_path: {routing.local_repo_path}\n'
+                        f'task_images: {len(task_image_inputs)}'
+                    )
+                else:
+                    _repo_ctx = await self._build_repo_context(
+                        local_repo_path=routing.local_repo_path,
+                        organization_id=organization_id,
+                        user_id=task.created_by_user_id,
+                        task_title=task.title or '',
+                        task_description=task.description or '',
+                        remote_repo=routing.remote_repo,
+                    )
+                    await task_service.add_log(task.id, organization_id, 'agent',
+                        f'Repo context built: {len(_repo_ctx or "")} chars, '
+                        f'has_agents_md: {"agents.md" in (_repo_ctx or "").lower()}, '
+                        f'repo_path: {routing.local_repo_path}\n'
+                        f'task_images: {len(task_image_inputs)}'
+                    )
                 enriched_desc = self._build_effective_description(
                     task.description,
                     routing.execution_prompt,
@@ -370,12 +385,10 @@ class OrchestrationService:
                         repo_root = _rp if _rp.is_dir() else None
                     agents_md_content, agents_md_source, agents_pkg_dir = self._resolve_repo_guide(repo_root)
 
-                    # Remote mode: try fetching agents.md from remote repo
-                    if not agents_md_content and not repo_root and routing.remote_repo:
-                        remote_agents_md = await self._fetch_remote_agents_md(routing.remote_repo, organization_id)
-                        if remote_agents_md:
-                            agents_md_content = remote_agents_md
-                            agents_md_source = 'remote:agents.md'
+                    # Remote mode: use pre-fetched agents.md if available
+                    if not agents_md_content and _remote_agents_md:
+                        agents_md_content = _remote_agents_md
+                        agents_md_source = 'remote:agents.md'
 
                     if not self._repo_guide_is_sufficient(agents_md_content, agents_pkg_dir):
                         if repo_root:
@@ -402,22 +415,16 @@ class OrchestrationService:
                             agents_md_content = flow_state.get('context_summary', '')
                             agents_md_source = 'fallback:flow_context'
 
-                    # Remote mode: combine agents.md with file tree (paths only)
-                    # so planner knows actual file paths without sending full source
-                    # contents (saves ~120K tokens)
-                    if not repo_root and _repo_ctx and agents_md_content and agents_md_source == 'remote:agents.md':
-                        # Extract just the file tree section from repo context
-                        file_tree_only = _repo_ctx
+                    # Remote mode: if agents.md exists, trust it for file paths.
+                    # Only append file tree when agents.md is missing (fallback mode).
+                    if not repo_root and _repo_ctx and agents_md_source and 'remote_repo_context' in agents_md_source:
+                        # No agents.md — append file tree so planner knows actual paths
                         tree_start = _repo_ctx.find('=== FILE TREE ===')
                         tree_end = _repo_ctx.find('=== END FILE TREE ===')
                         if tree_start >= 0 and tree_end >= 0:
-                            file_tree_only = _repo_ctx[:tree_end + len('=== END FILE TREE ===')]
-                        agents_md_content = (
-                            agents_md_content
-                            + '\n\n=== ACTUAL REPOSITORY FILE TREE ===\n'
-                            + file_tree_only
-                        )
-                        agents_md_source = 'remote:agents.md+file_tree'
+                            file_tree_only = _repo_ctx[tree_start:tree_end + len('=== END FILE TREE ===')]
+                            agents_md_content = agents_md_content + '\n\n' + file_tree_only
+                            agents_md_source = agents_md_source + '+file_tree'
 
                     # Build planner input: index + relevant package signatures
                     planner_md = agents_md_content
