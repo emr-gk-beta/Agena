@@ -1072,9 +1072,9 @@ export default function OfficePage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 104px)', gap: 0 }}>
       {/* ── Header bar ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 14px', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', margin: 0 }}>{t('office.title')}</h1>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '0 0 6px', flexShrink: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <h1 style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink-90)', margin: 0 }}>{t('office.title')}</h1>
           {/* Live status pills */}
           <div style={{ display: 'flex', gap: 6 }}>
             {running.length > 0 && (
