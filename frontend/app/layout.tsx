@@ -2,6 +2,8 @@ import './globals.css';
 import type { Metadata, Viewport } from 'next';
 import Navbar from '@/components/Navbar';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
+import MicrosoftClarity from '@/components/MicrosoftClarity';
+import WebVitals from '@/components/WebVitals';
 
 const SITE_URL = 'https://agena.dev';
 
@@ -224,6 +226,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <GoogleAnalytics />
+        <MicrosoftClarity />
+        <WebVitals />
         <Navbar />
         <main>
           {children}

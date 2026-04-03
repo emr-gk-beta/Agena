@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import NewsletterForm from '@/components/NewsletterForm';
 
 export const metadata: Metadata = {
   title: 'Blog – AGENA Agentic AI Platform',
@@ -191,6 +192,26 @@ export default function BlogPage() {
               </article>
             </Link>
           ))}
+        </div>
+
+        {/* Newsletter signup */}
+        <div
+          style={{
+            marginTop: 64,
+            padding: '40px 32px',
+            borderRadius: 16,
+            background: 'linear-gradient(135deg, rgba(13,148,136,0.08) 0%, rgba(139,92,246,0.06) 100%)',
+            border: '1px solid rgba(13,148,136,0.15)',
+            textAlign: 'center',
+          }}
+        >
+          <h3 style={{ fontSize: 22, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 8 }}>
+            Stay updated on Agentic AI
+          </h3>
+          <p style={{ color: 'var(--ink-45)', fontSize: 14, marginBottom: 24, maxWidth: 440, margin: '0 auto 24px' }}>
+            Get the latest insights on autonomous code generation, AI agents, and pixel agent technology. No spam.
+          </p>
+          <NewsletterForm />
         </div>
       </div>
     </>
