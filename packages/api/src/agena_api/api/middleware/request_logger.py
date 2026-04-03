@@ -47,8 +47,10 @@ class RequestLoggerMiddleware(BaseHTTPMiddleware):
         finally:
             duration_ms = round((time.perf_counter() - start) * 1000)
             status_code = response.status_code if response else 500
+            request_id = getattr(request.state, 'request_id', None)
             log_entry = {
                 'timestamp': datetime.now(timezone.utc).isoformat(),
+                'request_id': request_id,
                 'org_id': org_id,
                 'user_id': user_id,
                 'method': request.method,
