@@ -172,8 +172,12 @@ export default function ProfilePage() {
     setSaved(false);
     if (!v || !project) return;
     setLsp(true);
-    apiFetch<Opt[]>('/tasks/azure/sprints?project=' + encodeURIComponent(project) + '&team=' + encodeURIComponent(v))
-      .then(setSprints)
+    apiFetch<(Opt & { is_current?: boolean })[]>('/tasks/azure/sprints?project=' + encodeURIComponent(project) + '&team=' + encodeURIComponent(v))
+      .then((sps) => {
+        setSprints(sps);
+        const current = sps.find((s) => s.is_current);
+        if (current) setSprint(current.path ?? current.name);
+      })
       .catch(() => {})
       .finally(() => setLsp(false));
   }, [project]);
@@ -205,8 +209,12 @@ export default function ProfilePage() {
     setSaved(false);
     if (!v) return;
     setJls(true);
-    apiFetch<Opt[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(v))
-      .then(setJiraSprints)
+    apiFetch<(Opt & { is_current?: boolean })[]>('/tasks/jira/sprints?board_id=' + encodeURIComponent(v))
+      .then((jsps) => {
+        setJiraSprints(jsps);
+        const current = jsps.find((s) => s.is_current);
+        if (current) setJiraSprint(current.path ?? current.name);
+      })
       .catch(() => {})
       .finally(() => setJls(false));
   }, []);
