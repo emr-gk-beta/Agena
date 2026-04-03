@@ -3,12 +3,16 @@ import logging
 import agena_core.http  # noqa: F401 – apply SSL patch before any httpx clients are created
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from redis.asyncio import Redis
+from sqlalchemy import text
 
+from agena_api.api.middleware.auth_rate_limit import AuthRateLimitMiddleware
 from agena_api.api.middleware.rate_limit import RateLimitMiddleware
+from agena_api.api.middleware.request_id import RequestIDMiddleware
 from agena_api.api.middleware.request_logger import RequestLoggerMiddleware
 from agena_api.api.middleware.tenant import TenantMiddleware
 from agena_api.api.routes import admin, agents, analytics, auth, billing, chatops, flows, github, integrations, memory, notifications, org, preferences, public, refinement, saas_tasks, tasks, usage_events, webhooks, ws
-from agena_core.database import engine
+from agena_core.database import engine, SessionLocal
 from agena_core.logging import configure_logging
 from agena_core.settings import get_settings
 import agena_models.models  # noqa: F401 -- register all ORM models
@@ -20,15 +24,19 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.app_name)
 
+# Middleware stack (outermost first in execution order).
 app.add_middleware(TenantMiddleware)
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(AuthRateLimitMiddleware)
 app.add_middleware(RequestLoggerMiddleware)
+app.add_middleware(RequestIDMiddleware)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=['*'],
-    allow_credentials=False,
+    allow_origins=settings.cors_origins,
+    allow_credentials=True,
     allow_methods=['*'],
     allow_headers=['*'],
+    expose_headers=['X-Request-ID'],
 )
 
 app.include_router(analytics.router)
@@ -63,3 +71,42 @@ async def startup_event() -> None:
 @app.get('/health')
 async def health() -> dict[str, str]:
     return {'status': 'ok'}
+
+
+@app.get('/health/deep')
+async def health_deep() -> dict:
+    """Deep health check — verifies database, Redis, and Qdrant connectivity."""
+    checks: dict[str, dict] = {}
+
+    # Database
+    try:
+        async with SessionLocal() as session:
+            await session.execute(text('SELECT 1'))
+        checks['database'] = {'status': 'ok'}
+    except Exception as e:
+        checks['database'] = {'status': 'error', 'detail': str(e)}
+
+    # Redis
+    try:
+        redis = Redis.from_url(settings.redis_url, decode_responses=True)
+        await redis.ping()
+        await redis.aclose()
+        checks['redis'] = {'status': 'ok'}
+    except Exception as e:
+        checks['redis'] = {'status': 'error', 'detail': str(e)}
+
+    # Qdrant (optional)
+    if settings.qdrant_enabled:
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=5) as client:
+                resp = await client.get(f'{settings.qdrant_url}/healthz')
+                if resp.status_code == 200:
+                    checks['qdrant'] = {'status': 'ok'}
+                else:
+                    checks['qdrant'] = {'status': 'error', 'detail': f'HTTP {resp.status_code}'}
+        except Exception as e:
+            checks['qdrant'] = {'status': 'error', 'detail': str(e)}
+
+    overall = 'ok' if all(c['status'] == 'ok' for c in checks.values()) else 'degraded'
+    return {'status': overall, 'checks': checks}

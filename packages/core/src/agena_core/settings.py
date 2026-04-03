@@ -88,6 +88,16 @@ class Settings(BaseSettings):
     # Telegram & Teams bot credentials are stored per-org in IntegrationConfig (DB).
     # No env vars needed — each org manages their own bot via Dashboard → Integrations.
 
+    cors_allowed_origins: str = Field(
+        default='https://agena.dev,https://*.agena.dev,http://localhost:3010,http://localhost:3011,http://localhost:3012',
+        alias='CORS_ALLOWED_ORIGINS',
+    )
+
+    @property
+    def cors_origins(self) -> list[str]:
+        """Parse comma-separated CORS_ALLOWED_ORIGINS into a list."""
+        return [o.strip() for o in self.cors_allowed_origins.split(',') if o.strip()]
+
     @property
     def sqlalchemy_database_uri(self) -> str:
         return (
