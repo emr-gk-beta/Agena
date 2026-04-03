@@ -911,13 +911,11 @@ export function generateMetadata({ params }: { params: { slug: string } }): Meta
       publishedTime: post.date,
       authors: ['AGENA'],
       url: `https://agena.dev/blog/${params.slug}`,
-      images: [{ url: '/og-image.png', width: 1200, height: 630, alt: post.title }],
     },
     twitter: {
       card: 'summary_large_image',
       title: post.title,
       description: post.description,
-      images: ['/og-image.png'],
     },
   };
 }

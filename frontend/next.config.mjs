@@ -8,6 +8,17 @@ const nextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  async redirects() {
+    return [
+      { source: '/login', destination: '/signin', permanent: true },
+      { source: '/register', destination: '/signup', permanent: true },
+      { source: '/sign-up', destination: '/signup', permanent: true },
+      { source: '/sign-in', destination: '/signin', permanent: true },
+      { source: '/features', destination: '/use-cases', permanent: true },
+      { source: '/about', destination: '/', permanent: false },
+      { source: '/documentation', destination: '/docs', permanent: true },
+    ];
+  },
   async headers() {
     return [
       {
