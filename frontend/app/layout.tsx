@@ -1,6 +1,8 @@
 import './globals.css';
 import type { Metadata, Viewport } from 'next';
+import { headers } from 'next/headers';
 import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
 import MicrosoftClarity from '@/components/MicrosoftClarity';
 import WebVitals from '@/components/WebVitals';
@@ -202,9 +204,18 @@ const jsonLd = {
   ],
 };
 
+const LANG_MAP: Record<string, string> = {
+  tr: 'tr', en: 'en', de: 'de', es: 'es', ja: 'ja', zh: 'zh', it: 'it',
+};
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  const headerList = headers();
+  const acceptLang = headerList.get('accept-language') || '';
+  const preferred = acceptLang.split(',')[0]?.split('-')[0]?.toLowerCase() || 'en';
+  const lang = LANG_MAP[preferred] || 'en';
+
   return (
-    <html lang='en'>
+    <html lang={lang}>
       <head>
         <link
           rel='preconnect'
@@ -232,6 +243,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <main>
           {children}
         </main>
+        <Footer />
       </body>
     </html>
   );
