@@ -232,7 +232,13 @@ function DashboardInner({ children }: { children: ReactNode }) {
       apiFetch<{ full_name?: string; email: string; org_slug?: string; org_name?: string; is_platform_admin?: boolean }>('/auth/me').then((u) => {
         if (!active) return;
         setUserName(u.full_name || u.email);
-        if (u.is_platform_admin) setIsPlatformAdmin(true);
+        if (u.is_platform_admin) {
+          setIsPlatformAdmin(true);
+          // Redirect platform admin to admin panel if on generic dashboard pages
+          if (pathname === '/dashboard' || pathname === '/dashboard/onboarding') {
+            router.replace('/dashboard/admin');
+          }
+        }
         // Store org slug/name from the /me response
         if (u.org_slug) { setOrgSlugState(u.org_slug); setOrgSlug(u.org_slug); }
         if (u.org_name) { setOrgNameDisplay(u.org_name); setOrgName(u.org_name); }
