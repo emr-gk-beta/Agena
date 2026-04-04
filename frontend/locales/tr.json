@@ -2139,5 +2139,10 @@
   "docs.integrationsApi": "Entegrasyonlar API",
   "docs.title": "Dokümantasyon",
   "docs.prevPage": "Önceki",
-  "docs.nextPage": "Sonraki"
+  "docs.nextPage": "Sonraki",
+  "nav.useCases": "Kullanım Alanları",
+  "nav.docs": "Dokümanlar",
+  "nav.blog": "Blog",
+  "nav.contact": "İletişim",
+  "nav.changelog": "Değişiklikler"
 }

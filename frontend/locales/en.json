@@ -2139,5 +2139,10 @@
   "docs.integrationsApi": "Integrations API",
   "docs.title": "Documentation",
   "docs.prevPage": "Previous",
-  "docs.nextPage": "Next"
+  "docs.nextPage": "Next",
+  "nav.useCases": "Use Cases",
+  "nav.docs": "Docs",
+  "nav.blog": "Blog",
+  "nav.contact": "Contact",
+  "nav.changelog": "Changelog"
 }
