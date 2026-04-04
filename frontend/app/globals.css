@@ -171,10 +171,10 @@ body::before {
 }
 
 .navbar-wordmark {
-  width: clamp(112px, 11vw, 148px);
+  width: clamp(120px, 11vw, 148px);
   height: auto;
   display: block;
-  filter: drop-shadow(0 4px 16px rgba(45, 212, 191, 0.2));
+  filter: drop-shadow(0 4px 16px rgba(45, 212, 191, 0.25)) brightness(1.15);
 }
 
 @keyframes pulse-brand {
@@ -218,6 +218,7 @@ body::before {
 }
 
 @media (max-width: 768px) {
+  .navbar-shell { background: rgba(3, 7, 18, 0.92); }
   .navbar-desktop { display: none !important; }
   .navbar-mobile-controls { display: flex; }
   .navbar-mobile-menu { display: flex; }
