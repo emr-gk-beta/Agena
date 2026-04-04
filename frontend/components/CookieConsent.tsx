@@ -36,11 +36,11 @@ export default function CookieConsent() {
         zIndex: 9999,
         padding: '20px 24px',
         borderRadius: 16,
-        background: 'rgba(3,7,18,0.95)',
-        border: '1px solid rgba(13,148,136,0.2)',
+        background: 'var(--cookie-bg, rgba(3,7,18,0.95))',
+        border: '1px solid var(--cookie-border, rgba(13,148,136,0.2))',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        boxShadow: '0 8px 32px rgba(0,0,0,0.4)',
+        boxShadow: 'var(--cookie-shadow, 0 8px 32px rgba(0,0,0,0.4))',
         animation: 'slideUp 0.4s ease',
       }}
     >
