@@ -62,9 +62,9 @@ export default function ContactForm() {
         <input type='email' value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('contact.form.email')} required style={inputStyle} />
       </div>
       <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder={t('contact.form.message')} required rows={5} style={{ ...inputStyle, resize: 'vertical' }} />
-      <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--ink-45)' }}>
-        <input type='checkbox' checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} style={{ accentColor: '#0d9488' }} />
-        {t('contact.form.newsletter')}
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 13, color: 'var(--ink-45)', lineHeight: 1.5 }}>
+        <input type='checkbox' checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} style={{ accentColor: '#0d9488', marginTop: 3, flexShrink: 0 }} />
+        <span>{t('contact.form.newsletter')}</span>
       </label>
       <button type='submit' className='button button-primary' disabled={status === 'sending'} style={{ padding: '13px 28px', fontSize: 15, alignSelf: 'flex-start' }}>
         {status === 'sending' ? t('contact.form.sending') : t('contact.form.send')}
