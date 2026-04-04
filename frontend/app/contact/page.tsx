@@ -68,8 +68,8 @@ export default function ContactPage() {
                 <Link href='/docs' style={{ color: 'var(--accent)', fontSize: 14, textDecoration: 'none' }}>
                   Documentation
                 </Link>
-                <Link href='/pricing' style={{ color: 'var(--accent)', fontSize: 14, textDecoration: 'none' }}>
-                  Pricing Plans
+                <Link href='/changelog' style={{ color: 'var(--accent)', fontSize: 14, textDecoration: 'none' }}>
+                  Changelog
                 </Link>
                 <Link href='/blog' style={{ color: 'var(--accent)', fontSize: 14, textDecoration: 'none' }}>
                   Blog
@@ -117,6 +117,42 @@ export default function ContactPage() {
             </div>
           </div>
         </div>
+        {/* FAQ Section */}
+        <div style={{ marginTop: 64 }}>
+          <h2 style={{ fontSize: 24, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 24 }}>
+            Frequently Asked Questions
+          </h2>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[
+              { q: 'How do I get started with AGENA?', a: 'Sign up for a free account, connect your GitHub or Azure DevOps repository, and create your first task. AGENA\'s AI agents will analyze, generate code, and open a pull request automatically.' },
+              { q: 'Is AGENA open source?', a: 'Yes! AGENA is fully open source under the MIT license. You can self-host it or use the managed platform. The source code is available on GitHub.' },
+              { q: 'Which integrations does AGENA support?', a: 'AGENA integrates with GitHub, Azure DevOps, Jira, Slack, and Microsoft Teams. We support OpenAI and Google Gemini as LLM providers.' },
+              { q: 'Can I use my own LLM API keys?', a: 'Absolutely. AGENA supports bring-your-own-key for OpenAI and Google Gemini. Configure your API keys in the dashboard settings.' },
+              { q: 'How does the free tier work?', a: 'The free tier includes 5 AI tasks per month with full feature access. No credit card required. Upgrade to Pro for unlimited tasks and priority processing.' },
+              { q: 'Is my code secure?', a: 'AGENA never stores your source code. All repository access is scoped via OAuth tokens and code is processed in isolated sessions. Self-hosting gives you full control.' },
+            ].map((faq) => (
+              <details
+                key={faq.q}
+                style={{
+                  padding: '18px 24px',
+                  borderRadius: 14,
+                  border: '1px solid var(--panel-border-2)',
+                  background: 'var(--panel)',
+                  cursor: 'pointer',
+                }}
+              >
+                <summary style={{ color: 'var(--ink-90)', fontWeight: 600, fontSize: 15, lineHeight: 1.5, listStyle: 'none', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  {faq.q}
+                  <span style={{ color: 'var(--ink-35)', fontSize: 18, marginLeft: 12, flexShrink: 0 }}>+</span>
+                </summary>
+                <p style={{ color: 'var(--ink-50)', fontSize: 14, lineHeight: 1.75, marginTop: 12 }}>
+                  {faq.a}
+                </p>
+              </details>
+            ))}
+          </div>
+        </div>
+
       </div>
     </>
   );

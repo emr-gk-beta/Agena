@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import NewsletterForm from '@/components/NewsletterForm';
+import BlogList from '@/components/BlogList';
 
 export const metadata: Metadata = {
   title: 'Blog – AGENA Agentic AI Platform',
@@ -163,46 +164,7 @@ export default function BlogPage() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-          {posts.map((post) => (
-            <Link
-              key={post.slug}
-              href={`/blog/${post.slug}`}
-              style={{ textDecoration: 'none' }}
-            >
-              <article className='blog-card'>
-                <div style={{ display: 'flex', gap: 12, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
-                  <time style={{ color: 'var(--ink-35)', fontSize: 13 }}>{post.date}</time>
-                  <span style={{ color: 'var(--ink-25)' }}>·</span>
-                  <span style={{ color: 'var(--ink-35)', fontSize: 13 }}>{post.readTime}</span>
-                </div>
-                <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 10, lineHeight: 1.4 }}>
-                  {post.title}
-                </h2>
-                <p style={{ color: 'var(--ink-50)', fontSize: 14, lineHeight: 1.7, marginBottom: 14 }}>
-                  {post.description}
-                </p>
-                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {post.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      style={{
-                        padding: '4px 10px',
-                        borderRadius: 6,
-                        background: 'rgba(13,148,136,0.1)',
-                        color: 'var(--accent)',
-                        fontSize: 12,
-                        fontWeight: 600,
-                      }}
-                    >
-                      {tag}
-                    </span>
-                  ))}
-                </div>
-              </article>
-            </Link>
-          ))}
-        </div>
+        <BlogList posts={posts} />
 
         {/* Newsletter signup */}
         <div

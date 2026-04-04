@@ -6,6 +6,8 @@ import Footer from '@/components/Footer';
 import GoogleAnalytics from '@/components/GoogleAnalytics';
 import MicrosoftClarity from '@/components/MicrosoftClarity';
 import WebVitals from '@/components/WebVitals';
+import CookieConsent from '@/components/CookieConsent';
+import BackToTop from '@/components/BackToTop';
 
 const SITE_URL = 'https://agena.dev';
 
@@ -151,12 +153,7 @@ const jsonLd = {
       name: 'Use Cases',
       url: `${SITE_URL}/use-cases`,
     },
-    {
-      '@type': 'SiteNavigationElement',
-      name: 'Pricing',
-      url: `${SITE_URL}/pricing`,
-    },
-    {
+{
       '@type': 'SiteNavigationElement',
       name: 'Changelog',
       url: `${SITE_URL}/changelog`,
@@ -291,6 +288,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           {children}
         </main>
         <Footer />
+        <CookieConsent />
+        <BackToTop />
       </body>
     </html>
   );
