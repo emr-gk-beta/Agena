@@ -33,10 +33,10 @@ export default function Navbar() {
         <nav className='navbar-desktop' style={{ display: 'flex', gap: 0, alignItems: 'center' }}>
           {/* Page links */}
           <div style={{ display: 'flex', gap: 2, alignItems: 'center', marginRight: 12 }}>
-            <Link href='/use-cases' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>Use Cases</Link>
-            <Link href='/docs' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>Docs</Link>
-            <Link href='/blog' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>Blog</Link>
-            <Link href='/contact' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>Contact</Link>
+            <Link href='/use-cases' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>{t('nav.useCases')}</Link>
+            <Link href='/docs' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>{t('nav.docs')}</Link>
+            <Link href='/blog' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>{t('nav.blog')}</Link>
+            <Link href='/contact' style={{ color: 'var(--muted)', fontSize: 13, padding: '6px 10px', borderRadius: 8, textDecoration: 'none', fontWeight: 500 }}>{t('nav.contact')}</Link>
           </div>
 
           {/* Divider */}
@@ -114,11 +114,11 @@ export default function Navbar() {
       {/* Mobile menu dropdown */}
       {menuOpen && (
         <div className='navbar-mobile-menu'>
-          <Link href='/use-cases' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>Use Cases</Link>
-          <Link href='/docs' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>Docs</Link>
-          <Link href='/blog' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>Blog</Link>
-          <Link href='/changelog' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>Changelog</Link>
-          <Link href='/contact' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>Contact</Link>
+          <Link href='/use-cases' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>{t('nav.useCases')}</Link>
+          <Link href='/docs' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>{t('nav.docs')}</Link>
+          <Link href='/blog' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>{t('nav.blog')}</Link>
+          <Link href='/changelog' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>{t('nav.changelog')}</Link>
+          <Link href='/contact' style={{ color: 'var(--muted)', fontSize: 14, padding: '10px 16px', borderRadius: 8, textDecoration: 'none', textAlign: 'center' }}>{t('nav.contact')}</Link>
           <div style={{ display: 'flex', justifyContent: 'center', gap: 12, padding: '6px 16px' }}>
             <a
               href='https://github.com/aozyildirim/Agena'

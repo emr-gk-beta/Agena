@@ -2139,5 +2139,10 @@
   "docs.integrationsApi": "集成API",
   "docs.title": "文档",
   "docs.prevPage": "上一页",
-  "docs.nextPage": "下一页"
+  "docs.nextPage": "下一页",
+  "nav.useCases": "使用场景",
+  "nav.docs": "文档",
+  "nav.blog": "博客",
+  "nav.contact": "联系我们",
+  "nav.changelog": "更新日志"
 }

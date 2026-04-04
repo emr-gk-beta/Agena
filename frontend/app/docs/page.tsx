@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useLocale } from '@/lib/i18n';
+import enDocs from '@/locales/docs/en.json';
 
 const SITE = 'https://agena.dev';
 
@@ -69,6 +70,22 @@ const sectionsDef = [
   },
 ];
 
+// EN content imported statically; other langs loaded dynamically
+const contentEN: Record<string, string> = enDocs as Record<string, string>;
+const _contentCache: Record<string, Record<string, string>> = { en: contentEN };
+
+async function loadDocsLang(lang: string): Promise<Record<string, string>> {
+  if (_contentCache[lang]) return _contentCache[lang];
+  try {
+    const mod = await import(`@/locales/docs/${lang}.json`);
+    _contentCache[lang] = mod.default as Record<string, string>;
+    return _contentCache[lang];
+  } catch {
+    return contentEN;
+  }
+}
+
+// Legacy inline content kept as fallback
 const content: Record<string, string> = {
   overview: `
 AGENA is an **agentic AI platform** that autonomously generates code, creates pull requests, and manages your software development workflow. It is designed for development teams who want to accelerate delivery without sacrificing code quality.
@@ -945,6 +962,11 @@ export default function DocsPage() {
   })), [t]);
 
   const [activeId, setActiveId] = useState('overview');
+  const [docsContent, setDocsContent] = useState<Record<string, string>>(contentEN);
+
+  useEffect(() => {
+    loadDocsLang(lang).then(setDocsContent);
+  }, [lang]);
 
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -952,7 +974,7 @@ export default function DocsPage() {
     if (!searchQuery.trim()) return null;
     const q = searchQuery.toLowerCase();
     const results: { id: string; title: string; snippet: string }[] = [];
-    for (const [id, text] of Object.entries(content)) {
+    for (const [id, text] of Object.entries(docsContent)) {
       const child = sections.flatMap(s => s.children).find(c => c.id === id);
       if (!child) continue;
       if (child.title.toLowerCase().includes(q) || text.toLowerCase().includes(q)) {
@@ -962,9 +984,9 @@ export default function DocsPage() {
       }
     }
     return results;
-  }, [searchQuery, sections]);
+  }, [searchQuery, sections, docsContent]);
 
-  const activeContent = content[activeId] || '';
+  const activeContent = docsContent[activeId] || content[activeId] || '';
   const activeSection = sections.flatMap(s => s.children).find(c => c.id === activeId);
   const parentSection = sections.find(s => s.children.some(c => c.id === activeId));
 

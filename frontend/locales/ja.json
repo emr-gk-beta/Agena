@@ -2139,5 +2139,10 @@
   "docs.integrationsApi": "インテグレーションAPI",
   "docs.title": "ドキュメント",
   "docs.prevPage": "前へ",
-  "docs.nextPage": "次へ"
+  "docs.nextPage": "次へ",
+  "nav.useCases": "ユースケース",
+  "nav.docs": "ドキュメント",
+  "nav.blog": "ブログ",
+  "nav.contact": "お問い合わせ",
+  "nav.changelog": "変更履歴"
 }
