@@ -25,10 +25,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
       priority: 1.0,
     },
     {
-      url: `${baseUrl}/pricing`,
-      lastModified: new Date('2026-03-15'),
-      changeFrequency: 'monthly',
-      priority: 0.8,
+      url: `${baseUrl}/status`,
+      lastModified: new Date('2026-04-04'),
+      changeFrequency: 'daily',
+      priority: 0.5,
     },
     {
       url: `${baseUrl}/blog`,
