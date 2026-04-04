@@ -2109,6 +2109,10 @@ input:focus, textarea:focus {
   .docs-sidebar-mobile { display: flex !important; }
   .docs-content { padding: 24px 0 48px 0 !important; }
 
+  /* ── Blog post layout ── */
+  .blog-post-layout { flex-direction: column !important; padding: 48px 16px !important; }
+  .blog-toc-sidebar { display: none !important; }
+
   /* ── Blog / Changelog container ── */
   .blog-container { padding: 48px 16px !important; }
   .changelog-container { padding: 48px 16px !important; }
