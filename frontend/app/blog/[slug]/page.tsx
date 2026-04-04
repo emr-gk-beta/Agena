@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import ReadingProgress from '@/components/ReadingProgress';
+import BlogTableOfContents from '@/components/BlogTableOfContents';
+import ShareButtons from '@/components/ShareButtons';
 
 const posts: Record<string, { title: string; description: string; date: string; readTime: string; content: string }> = {
   'what-is-agentic-ai': {
@@ -956,44 +959,59 @@ export default function BlogPostPage({ params }: { params: { slug: string } }) {
       <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <script type='application/ld+json' dangerouslySetInnerHTML={{ __html: JSON.stringify(breadcrumbLd) }} />
 
-      <article className='container blog-container' style={{ maxWidth: 760, padding: '80px 24px' }}>
-        {/* Breadcrumb */}
-        <nav style={{ marginBottom: 32, fontSize: 13, color: 'var(--ink-35)' }}>
-          <Link href='/' style={{ color: 'var(--ink-35)', textDecoration: 'none' }}>Home</Link>
-          <span style={{ margin: '0 8px' }}>/</span>
-          <Link href='/blog' style={{ color: 'var(--ink-35)', textDecoration: 'none' }}>Blog</Link>
-          <span style={{ margin: '0 8px' }}>/</span>
-          <span style={{ color: 'var(--ink-50)' }}>{post.title.slice(0, 40)}...</span>
-        </nav>
+      <ReadingProgress />
 
-        <header style={{ marginBottom: 40 }}>
-          <h1 style={{ fontSize: 'clamp(28px, 3.5vw, 42px)', fontWeight: 800, color: 'var(--ink-90)', lineHeight: 1.2, marginBottom: 16 }}>
-            {post.title}
-          </h1>
-          <div style={{ display: 'flex', gap: 16, color: 'var(--ink-35)', fontSize: 14 }}>
-            <time>{post.date}</time>
-            <span>{post.readTime}</span>
+      <div className='blog-post-layout' style={{ maxWidth: 1060, margin: '0 auto', padding: '80px 24px', display: 'flex', gap: 48 }}>
+        <article style={{ flex: 1, minWidth: 0 }}>
+          {/* Breadcrumb */}
+          <nav style={{ marginBottom: 32, fontSize: 13, color: 'var(--ink-35)' }}>
+            <Link href='/' style={{ color: 'var(--ink-35)', textDecoration: 'none' }}>Home</Link>
+            <span style={{ margin: '0 8px' }}>/</span>
+            <Link href='/blog' style={{ color: 'var(--ink-35)', textDecoration: 'none' }}>Blog</Link>
+            <span style={{ margin: '0 8px' }}>/</span>
+            <span style={{ color: 'var(--ink-50)' }}>{post.title.slice(0, 40)}...</span>
+          </nav>
+
+          <header style={{ marginBottom: 40 }}>
+            <h1 style={{ fontSize: 'clamp(28px, 3.5vw, 42px)', fontWeight: 800, color: 'var(--ink-90)', lineHeight: 1.2, marginBottom: 16 }}>
+              {post.title}
+            </h1>
+            <div style={{ display: 'flex', gap: 16, alignItems: 'center', color: 'var(--ink-35)', fontSize: 14, flexWrap: 'wrap' }}>
+              <time>{post.date}</time>
+              <span>{post.readTime}</span>
+              <ShareButtons title={post.title} slug={params.slug} />
+            </div>
+          </header>
+
+          <div
+            className='blog-content'
+            style={{ color: 'var(--ink-72)', fontSize: 16, lineHeight: 1.8 }}
+            dangerouslySetInnerHTML={{ __html: markdownToHtml(post.content) }}
+          />
+
+          {/* Share again at bottom */}
+          <div style={{ marginTop: 40, paddingTop: 24, borderTop: '1px solid var(--panel-border-2)' }}>
+            <ShareButtons title={post.title} slug={params.slug} />
           </div>
-        </header>
 
-        <div
-          className='blog-content'
-          style={{ color: 'var(--ink-72)', fontSize: 16, lineHeight: 1.8 }}
-          dangerouslySetInnerHTML={{ __html: markdownToHtml(post.content) }}
-        />
+          <div style={{ marginTop: 40, padding: '32px', borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', textAlign: 'center' }}>
+            <h3 style={{ color: 'var(--ink-90)', fontSize: 22, fontWeight: 700, marginBottom: 12 }}>
+              Ready to try agentic AI?
+            </h3>
+            <p style={{ color: 'var(--ink-45)', marginBottom: 20, fontSize: 15 }}>
+              Start free and let AGENA&apos;s pixel agents handle your development workflow.
+            </p>
+            <Link href='/signup' className='button button-primary' style={{ fontSize: 15, padding: '12px 28px' }}>
+              Start Free →
+            </Link>
+          </div>
+        </article>
 
-        <div style={{ marginTop: 64, padding: '32px', borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', textAlign: 'center' }}>
-          <h3 style={{ color: 'var(--ink-90)', fontSize: 22, fontWeight: 700, marginBottom: 12 }}>
-            Ready to try agentic AI?
-          </h3>
-          <p style={{ color: 'var(--ink-45)', marginBottom: 20, fontSize: 15 }}>
-            Start free and let AGENA&apos;s pixel agents handle your development workflow.
-          </p>
-          <Link href='/signup' className='button button-primary' style={{ fontSize: 15, padding: '12px 28px' }}>
-            Start Free →
-          </Link>
-        </div>
-      </article>
+        {/* Table of Contents sidebar */}
+        <aside className='blog-toc-sidebar' style={{ width: 200, flexShrink: 0 }}>
+          <BlogTableOfContents />
+        </aside>
+      </div>
     </>
   );
 }
