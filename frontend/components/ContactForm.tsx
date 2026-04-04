@@ -57,9 +57,9 @@ export default function ContactForm() {
         <input type='email' value={email} onChange={(e) => setEmail(e.target.value)} placeholder={t('contact.form.email')} required style={{ ...inputStyle, flex: '1 1 180px' }} />
       </div>
       <textarea value={message} onChange={(e) => setMessage(e.target.value)} placeholder={t('contact.form.message')} required rows={4} style={{ ...inputStyle, resize: 'vertical' }} />
-      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--ink-45)', lineHeight: 1.5 }}>
-        <input type='checkbox' checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} style={{ accentColor: '#0d9488', flexShrink: 0, marginTop: 2 }} />
-        <span style={{ overflow: 'hidden', overflowWrap: 'anywhere' }}>{t('contact.form.newsletter')}</span>
+      <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer', fontSize: 12, color: 'var(--ink-45)', lineHeight: 1.5, width: '100%', boxSizing: 'border-box' }}>
+        <input type='checkbox' checked={newsletter} onChange={(e) => setNewsletter(e.target.checked)} style={{ accentColor: '#0d9488', flexShrink: 0, marginTop: 2, width: 16, height: 16 }} />
+        <span style={{ flex: 1, minWidth: 0, wordBreak: 'break-word' }}>{t('contact.form.newsletter')}</span>
       </label>
       <button type='submit' className='button button-primary' disabled={status === 'sending'} style={{ padding: '11px 24px', fontSize: 14, alignSelf: 'flex-start' }}>
         {status === 'sending' ? t('contact.form.sending') : t('contact.form.send')}
