@@ -18,6 +18,7 @@ export default function ThemeToggle({ style }: { style?: React.CSSProperties }) 
   function toggle() {
     const next = !light;
     setLight(next);
+    document.documentElement.classList.add('theme-transition');
     if (next) {
       document.documentElement.classList.add('light');
       localStorage.setItem('agena_theme', 'light');
@@ -25,6 +26,7 @@ export default function ThemeToggle({ style }: { style?: React.CSSProperties }) 
       document.documentElement.classList.remove('light');
       localStorage.setItem('agena_theme', 'dark');
     }
+    setTimeout(() => document.documentElement.classList.remove('theme-transition'), 500);
   }
 
   return (

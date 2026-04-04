@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useLocale } from '@/lib/i18n';
+import NewsletterForm from '@/components/NewsletterForm';
 
 export default function Footer() {
   const pathname = usePathname();
@@ -20,7 +21,7 @@ export default function Footer() {
             <h4 style={{ color: 'var(--ink-65)', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Product</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
               <Link href='/use-cases' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>Use Cases</Link>
-              <Link href='/pricing' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>Pricing</Link>
+              <Link href='/contact' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>Contact</Link>
               <Link href='/changelog' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>Changelog</Link>
               <Link href='/docs' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>Documentation</Link>
             </div>
@@ -44,6 +45,13 @@ export default function Footer() {
             </div>
           </div>
         </div>
+        {/* Newsletter */}
+        <div style={{ paddingTop: 24, borderTop: '1px solid var(--panel-border)', textAlign: 'center', marginBottom: 24 }}>
+          <h4 style={{ color: 'var(--ink-65)', fontSize: 14, fontWeight: 700, marginBottom: 8 }}>Stay in the loop</h4>
+          <p style={{ color: 'var(--ink-35)', fontSize: 13, marginBottom: 16 }}>Get agentic AI updates. No spam.</p>
+          <NewsletterForm />
+        </div>
+
         <div style={{ textAlign: 'center', paddingTop: 24, borderTop: '1px solid var(--panel-border)' }}>
           <p style={{ color: 'var(--ink-25)', fontSize: 11 }}>
             &copy; {new Date().getFullYear()} AGENA. Agentic AI Platform &amp; Pixel Agent Technology.

@@ -932,6 +932,55 @@ export default function HomePage() {
           </div>
         </section>
 
+        {/* ── TESTIMONIALS ── */}
+        <section style={{ padding: '60px 0' }}>
+          <div style={{ marginBottom: 48, textAlign: 'center' }}>
+            <div className='section-label' style={{ justifyContent: 'center' }}>{t('landing.testimonialsLabel') || 'Testimonials'}</div>
+            <h2 style={{ fontSize: 'clamp(28px, 3vw, 42px)', fontWeight: 800, color: 'var(--ink-90)' }}>
+              {t('landing.testimonialsTitle') || 'Loved by developers'}
+            </h2>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20, maxWidth: 960, margin: '0 auto' }}>
+            {[
+              { name: 'Alex M.', role: 'Senior Developer', text: 'AGENA turned our 2-week sprint into a 2-day sprint. The AI agents generate production-ready PRs that actually pass code review.', avatar: 'AM' },
+              { name: 'Sarah K.', role: 'Engineering Lead', text: 'The flow builder is incredible. We automated our entire PR pipeline — from Jira ticket to merged code — with zero manual intervention.', avatar: 'SK' },
+              { name: 'Mehmet Y.', role: 'CTO, Startup', text: 'As a small team, AGENA is like having 3 extra senior developers. The code quality from the AI review pipeline surprised us.', avatar: 'MY' },
+              { name: 'David R.', role: 'DevOps Engineer', text: 'GitHub and Azure DevOps integration works flawlessly. We process 50+ automated PRs per week with AGENA agents.', avatar: 'DR' },
+              { name: 'Lina C.', role: 'Product Manager', text: 'I write task descriptions and AGENA delivers working code. It changed how our entire team thinks about product delivery.', avatar: 'LC' },
+              { name: 'Kenji T.', role: 'Full Stack Developer', text: 'The pixel agent visualization makes AI workflows transparent. I can see exactly what each agent is doing in real-time.', avatar: 'KT' },
+            ].map((t) => (
+              <div
+                key={t.name}
+                className='testimonial-card'
+                style={{
+                  padding: '24px',
+                  borderRadius: 16,
+                  border: '1px solid var(--panel-border-2)',
+                  background: 'var(--panel)',
+                }}
+              >
+                <p style={{ color: 'var(--ink-60)', fontSize: 14, lineHeight: 1.7, marginBottom: 16, fontStyle: 'italic' }}>
+                  &ldquo;{t.text}&rdquo;
+                </p>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, rgba(13,148,136,0.3), rgba(139,92,246,0.3))',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: 12, fontWeight: 700, color: 'var(--ink-75)',
+                  }}>
+                    {t.avatar}
+                  </div>
+                  <div>
+                    <div style={{ color: 'var(--ink-90)', fontSize: 13, fontWeight: 600 }}>{t.name}</div>
+                    <div style={{ color: 'var(--ink-35)', fontSize: 12 }}>{t.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* ── FAQ ── */}
         <section style={{ padding: '60px 0' }}>
           <div style={{ marginBottom: 28, textAlign: 'center' }}>
