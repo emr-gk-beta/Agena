@@ -1003,7 +1003,7 @@ function renderMarkdown(md: string): string {
 }
 
 export default function DocsPage() {
-  const { t } = useLocale();
+  const { t, lang } = useLocale();
 
   // Resolve i18n titles from sectionsDef
   const sections = useMemo(() => sectionsDef.map(s => ({
