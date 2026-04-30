@@ -499,7 +499,11 @@ export default function SentryPage() {
         @media (max-width: 640px) {
           .sentry-issue-card { flex-direction: column; align-items: stretch !important; }
           .sentry-issue-right { flex-direction: row !important; align-items: center !important; justify-content: space-between !important; flex-wrap: wrap; gap: 8px !important; padding-top: 6px; border-top: 1px dashed var(--panel-border); }
+          .sentry-row-card { grid-template-columns: auto 1fr !important; }
+          .sentry-row-actions { grid-column: 1 / -1; padding-top: 8px; border-top: 1px dashed var(--panel-border); margin-top: 4px; justify-content: flex-start !important; }
+          .sentry-row-actions select { flex: 1; min-width: 0; }
         }
+        .sentry-icon-btn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 0 !important; font-size: 13px !important; }
       `}</style>
       {/* Hero header */}
       <div style={{
@@ -588,7 +592,7 @@ export default function SentryPage() {
               const mapping = mappings.find((m) => m.project_slug === p.slug);
               const isSelected = selectedProject === p.slug;
               return (
-                <div key={p.slug} className='int-row' style={{
+                <div key={p.slug} className='int-row sentry-row-card' style={{
                   display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', gap: 10,
                   padding: '10px 12px', borderRadius: 10,
                   background: isSelected ? 'rgba(75,46,131,0.10)' : 'var(--glass)',
@@ -618,10 +622,12 @@ export default function SentryPage() {
                       )}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                    <button onClick={() => void fetchIssues(p.slug)} style={btnSmall}>{t('integrations.sentry.issuesBtn')}</button>
+                  <div className='sentry-row-actions' style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-end' }}>
+                    <button onClick={() => void fetchIssues(p.slug)} title={t('integrations.sentry.issuesBtn')}
+                      className='sentry-icon-btn' style={{ ...btnSmall }}>📋</button>
                     {!mapping ? (
-                      <button onClick={() => void addMapping(p)} style={{ ...btnSmall, color: '#1CE783', borderColor: 'rgba(28,231,131,0.4)' }}>
+                      <button onClick={() => void addMapping(p)}
+                        style={{ ...btnSmall, color: '#1CE783', borderColor: 'rgba(28,231,131,0.4)', height: 30, padding: '0 12px' }}>
                         + {t('integrations.common.map')}
                       </button>
                     ) : (
@@ -629,15 +635,17 @@ export default function SentryPage() {
                         <select
                           value={mapping.repo_mapping_id ?? ''}
                           onChange={(ev) => void updateMapping(mapping.id, { repo_mapping_id: ev.target.value ? parseInt(ev.target.value) : null })}
-                          style={{ ...inputStyle, width: 140, fontSize: 11, padding: '4px 8px', height: 28 }}
+                          style={{ ...inputStyle, width: 140, fontSize: 11, padding: '4px 8px', height: 30 }}
                         >
                           <option value="">{t('integrations.common.selectRepo')}</option>
                           {repos.map((r) => (
                             <option key={r.id} value={r.id}>{r.owner}/{r.repo_name}</option>
                           ))}
                         </select>
-                        <button onClick={() => void importIssues(mapping.project_slug)} style={btnSmall}>{t('integrations.common.import')}</button>
-                        <button onClick={() => void deleteMapping(mapping.id)} title={t('integrations.common.unmap') || 'Unmap'} style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)', padding: '4px 8px' }}>×</button>
+                        <button onClick={() => void importIssues(mapping.project_slug)} title={t('integrations.common.import')}
+                          className='sentry-icon-btn' style={{ ...btnSmall }}>⬇</button>
+                        <button onClick={() => void deleteMapping(mapping.id)} title={t('integrations.common.unmap') || 'Unmap'}
+                          className='sentry-icon-btn' style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)' }}>×</button>
                       </>
                     )}
                   </div>
@@ -920,8 +928,17 @@ export default function SentryPage() {
                 const days = Math.floor(hrs / 24);
                 return `${days}d ago`;
               })() : null;
+              const nextRunRel = m.auto_import && lastImport ? (() => {
+                const nextDue = lastImport.getTime() + m.import_interval_minutes * 60000;
+                const diffMs = nextDue - Date.now();
+                if (diffMs <= 0) return t('integrations.sentry.dueNow') || 'due now';
+                const mins = Math.ceil(diffMs / 60000);
+                if (mins < 60) return (t('integrations.sentry.nextInM') || 'next in {n}m').replace('{n}', String(mins));
+                const hrs = Math.ceil(mins / 60);
+                return (t('integrations.sentry.nextInH') || 'next in {n}h').replace('{n}', String(hrs));
+              })() : null;
               return (
-                <div key={m.id} className='int-row' style={{
+                <div key={m.id} className='int-row sentry-row-card' style={{
                   display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12,
                   alignItems: 'center',
                   padding: '12px 14px', borderRadius: 12,
@@ -950,10 +967,11 @@ export default function SentryPage() {
                     <div style={{ fontSize: 10, color: 'var(--ink-35)', marginTop: 3, fontFamily: 'monospace' }}>
                       {m.project_slug}
                       {lastImportRel && <span style={{ color: 'var(--ink-50)', fontFamily: 'inherit', marginLeft: 8 }}>· {(t('integrations.sentry.lastImport') || 'Last import')}: {lastImportRel}</span>}
+                      {nextRunRel && <span style={{ color: '#1CE783', fontFamily: 'inherit', marginLeft: 8 }}>· {nextRunRel}</span>}
                       {!lastImportRel && m.import_interval_minutes && m.auto_import && <span style={{ color: 'var(--ink-50)', fontFamily: 'inherit', marginLeft: 8 }}>· {(t('integrations.sentry.everyN') || 'every {n}min').replace('{n}', String(m.import_interval_minutes))}</span>}
                     </div>
                   </div>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <div className='sentry-row-actions' style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
                     <select
                       value={m.repo_mapping_id ?? ''}
                       onChange={(e) => void updateMapping(m.id, { repo_mapping_id: e.target.value ? parseInt(e.target.value) : null })}
@@ -975,11 +993,13 @@ export default function SentryPage() {
                       <input type='checkbox' checked={m.auto_import} onChange={(e) => void updateMapping(m.id, { auto_import: e.target.checked })} style={{ margin: 0 }} />
                       {t('integrations.common.auto').toUpperCase()}
                     </label>
-                    <button onClick={() => void importIssues(m.project_slug)} style={btnSmall}>{t('integrations.common.import')}</button>
-                    <button onClick={() => void openRequestModal(m)} style={btnSmall}>
+                    <button onClick={() => void importIssues(m.project_slug)} title={t('integrations.sentry.runNow') || 'Run now'}
+                      className='sentry-icon-btn' style={{ ...btnSmall, color: '#1CE783', borderColor: 'rgba(28,231,131,0.3)' }}>▶</button>
+                    <button onClick={() => void openRequestModal(m)} style={{ ...btnSmall, height: 30 }}>
                       {t('integrations.newrelic.request') || 'Request'}
                     </button>
-                    <button onClick={() => void deleteMapping(m.id)} style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)', padding: '4px 8px' }}>×</button>
+                    <button onClick={() => void deleteMapping(m.id)} title={t('integrations.common.unmap') || 'Unmap'}
+                      className='sentry-icon-btn' style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)' }}>×</button>
                   </div>
                 </div>
               );

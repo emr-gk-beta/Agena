@@ -3121,5 +3121,9 @@
   "integrations.sentry.everyN": "{n}分ごと",
   "integrations.sentry.noRepoLinked": "リポジトリ未連携",
   "integrations.sentry.noMappingsTitle": "まだプロジェクトマッピングがありません",
-  "integrations.common.unmap": "マッピング解除"
+  "integrations.common.unmap": "マッピング解除",
+  "integrations.sentry.runNow": "今すぐ実行",
+  "integrations.sentry.dueNow": "実行予定",
+  "integrations.sentry.nextInM": "{n}分後",
+  "integrations.sentry.nextInH": "{n}時間後"
 }

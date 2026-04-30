@@ -3121,5 +3121,9 @@
   "integrations.sentry.everyN": "alle {n}min",
   "integrations.sentry.noRepoLinked": "kein Repo verknüpft",
   "integrations.sentry.noMappingsTitle": "Noch keine Projektzuordnung",
-  "integrations.common.unmap": "Zuordnung entfernen"
+  "integrations.common.unmap": "Zuordnung entfernen",
+  "integrations.sentry.runNow": "Jetzt ausführen",
+  "integrations.sentry.dueNow": "jetzt fällig",
+  "integrations.sentry.nextInM": "nächste in {n}min",
+  "integrations.sentry.nextInH": "nächste in {n}h"
 }

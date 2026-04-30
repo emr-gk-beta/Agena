@@ -3121,5 +3121,9 @@
   "integrations.sentry.everyN": "ogni {n}min",
   "integrations.sentry.noRepoLinked": "nessun repo collegato",
   "integrations.sentry.noMappingsTitle": "Nessuna mappatura progetto",
-  "integrations.common.unmap": "Rimuovi mappatura"
+  "integrations.common.unmap": "Rimuovi mappatura",
+  "integrations.sentry.runNow": "Esegui ora",
+  "integrations.sentry.dueNow": "in scadenza",
+  "integrations.sentry.nextInM": "prossimo tra {n}min",
+  "integrations.sentry.nextInH": "prossimo tra {n}h"
 }

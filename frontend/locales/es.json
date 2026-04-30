@@ -3121,5 +3121,9 @@
   "integrations.sentry.everyN": "cada {n}min",
   "integrations.sentry.noRepoLinked": "sin repo vinculado",
   "integrations.sentry.noMappingsTitle": "Sin mapeos de proyecto",
-  "integrations.common.unmap": "Desvincular"
+  "integrations.common.unmap": "Desvincular",
+  "integrations.sentry.runNow": "Ejecutar ahora",
+  "integrations.sentry.dueNow": "pendiente",
+  "integrations.sentry.nextInM": "próximo en {n}m",
+  "integrations.sentry.nextInH": "próximo en {n}h"
 }

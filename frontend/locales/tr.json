@@ -3121,5 +3121,9 @@
   "integrations.sentry.everyN": "{n}dk'da bir",
   "integrations.sentry.noRepoLinked": "repo bağlı değil",
   "integrations.sentry.noMappingsTitle": "Henüz proje eşlemesi yok",
-  "integrations.common.unmap": "Eşlemeyi kaldır"
+  "integrations.common.unmap": "Eşlemeyi kaldır",
+  "integrations.sentry.runNow": "Şimdi çalıştır",
+  "integrations.sentry.dueNow": "şimdi sırada",
+  "integrations.sentry.nextInM": "sonraki {n}dk",
+  "integrations.sentry.nextInH": "sonraki {n}sa"
 }

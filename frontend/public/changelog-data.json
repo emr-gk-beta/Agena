@@ -1,5 +1,13 @@
 [
   {
+    "hash": "ae305d1",
+    "short": "ae305d1",
+    "message": "Sentry: project + mapping list redesign, polished empty state, mobile-responsive issue cards",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "03b1566",
     "short": "03b1566",
     "message": "Sentry: premium landing UX — hero header with status, stat tiles, auto-load projects",

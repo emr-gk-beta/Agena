@@ -3121,5 +3121,9 @@
   "integrations.sentry.everyN": "每 {n} 分钟",
   "integrations.sentry.noRepoLinked": "未关联仓库",
   "integrations.sentry.noMappingsTitle": "尚无项目映射",
-  "integrations.common.unmap": "取消映射"
+  "integrations.common.unmap": "取消映射",
+  "integrations.sentry.runNow": "立即运行",
+  "integrations.sentry.dueNow": "已到期",
+  "integrations.sentry.nextInM": "{n} 分钟后",
+  "integrations.sentry.nextInH": "{n} 小时后"
 }
