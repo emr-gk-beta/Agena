@@ -3130,5 +3130,17 @@
   "integrations.sentry.importedSomeSkipped": "+{i} importados, {s} omitidos",
   "integrations.sentry.importedN": "+{n} importados",
   "integrations.sentry.noNewIssues": "Sin novedades",
-  "integrations.sentry.toastImporting": "Importando de {p}…"
+  "integrations.sentry.toastImporting": "Importando de {p}…",
+  "integrations.newrelic.heroSubtitle": "Auto-importa errores APM de tus entidades de New Relic, encamínalos al repo correcto, IA arregla y envía el parche.",
+  "integrations.newrelic.findEntityLabel": "Buscar entidad para mapear",
+  "integrations.newrelic.noMappingsTitle": "Sin mapeos de entidad",
+  "integrations.datadog.heroSubtitle": "Trae issues de Error Tracking directo de Datadog, IA los arregla por tu repo.",
+  "integrations.datadog.queryLabel": "Filtrar issues de Datadog",
+  "integrations.datadog.issuesCount": "{n} Issues",
+  "integrations.datadog.healthOpen": "Abiertos",
+  "integrations.datadog.emptyTitle": "Sin issues",
+  "integrations.datadog.emptyHint": "Ajusta la query o elige un rango más amplio y pulsa Fetch.",
+  "integrations.appdynamics.heroSubtitle": "Trae errores APM de AppDynamics a Agena, IA los arregla por tu repo.",
+  "integrations.appdynamics.lastImportFromBatch": "Último lote",
+  "integrations.appdynamics.viewImportedTasks": "Ver tareas importadas ↗"
 }

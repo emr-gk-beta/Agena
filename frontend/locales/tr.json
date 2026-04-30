@@ -3130,5 +3130,17 @@
   "integrations.sentry.importedSomeSkipped": "+{i} alındı, {s} atlandı",
   "integrations.sentry.importedN": "+{n} alındı",
   "integrations.sentry.noNewIssues": "Yeni hata yok",
-  "integrations.sentry.toastImporting": "{p} içe aktarılıyor…"
+  "integrations.sentry.toastImporting": "{p} içe aktarılıyor…",
+  "integrations.newrelic.heroSubtitle": "New Relic entity'lerinden APM hatalarını otomatik içe aktar, doğru repo'ya yönlendir, AI düzeltsin ve patch gönder.",
+  "integrations.newrelic.findEntityLabel": "Eşlenecek entity bul",
+  "integrations.newrelic.noMappingsTitle": "Henüz entity eşlemesi yok",
+  "integrations.datadog.heroSubtitle": "Datadog Error Tracking issue'larını çek, AI repo üzerinden düzeltsin.",
+  "integrations.datadog.queryLabel": "Datadog issue filtresi",
+  "integrations.datadog.issuesCount": "{n} Issue",
+  "integrations.datadog.healthOpen": "Açık",
+  "integrations.datadog.emptyTitle": "Henüz issue yok",
+  "integrations.datadog.emptyHint": "Sorguyu değiştir veya daha geniş zaman aralığı seç, sonra Fetch'e bas.",
+  "integrations.appdynamics.heroSubtitle": "AppDynamics APM hatalarını Agena'ya çek, AI repo üzerinden düzeltsin.",
+  "integrations.appdynamics.lastImportFromBatch": "Son parti",
+  "integrations.appdynamics.viewImportedTasks": "İçeri alınan görevleri gör ↗"
 }

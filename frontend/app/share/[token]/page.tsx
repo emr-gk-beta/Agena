@@ -155,7 +155,9 @@ export default function SharedTaskPage() {
               alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap',
             }}>
               <div style={{ fontSize: 13, color: 'var(--ink-78, #d1d5db)' }}>
-                Import this task into your organization to run it.
+                {getToken()
+                  ? 'Import this task into your organization to run it.'
+                  : 'Sign in to import this task into your organization.'}
               </div>
               <button
                 onClick={async () => {
@@ -170,7 +172,13 @@ export default function SharedTaskPage() {
                     const r = await apiFetch<ImportedTask>(`/tasks/share/${token}/import`, { method: 'POST' });
                     router.push(`/dashboard/tasks/${r.id}`);
                   } catch (e) {
-                    setImportError(e instanceof Error ? e.message : 'Import failed');
+                    const msg = e instanceof Error ? e.message : 'Import failed';
+                    // If session expired, the JWT is rejected as 401/403; nudge to login.
+                    if (/401|403|unauthor|forbid/i.test(msg)) {
+                      router.push(`/auth/login?next=${encodeURIComponent(`/share/${token}`)}`);
+                      return;
+                    }
+                    setImportError(msg);
                   } finally {
                     setImporting(false);
                   }
@@ -182,7 +190,7 @@ export default function SharedTaskPage() {
                   color: '#5eead4', cursor: importing ? 'wait' : 'pointer',
                 }}
               >
-                {importing ? 'Importing…' : 'Import to my org'}
+                {importing ? 'Importing…' : getToken() ? 'Import to my org' : 'Sign in to import'}
               </button>
             </div>
             {importError && (

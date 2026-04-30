@@ -1,5 +1,13 @@
 [
   {
+    "hash": "89bca91",
+    "short": "89bca91",
+    "message": "Share: fix 500 — RepoMapping has no .name attribute, derive display name from owner/repo_name",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "fix"
+  },
+  {
     "hash": "f4fe7aa",
     "short": "f4fe7aa",
     "message": "Tasks: surface Sentry Resolve / Share / priority / resolved marker on mobile too",

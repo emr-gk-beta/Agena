@@ -1,8 +1,21 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
+
+function Pill({ children, color = '#94a3b8', bg }: { children: React.ReactNode; color?: string; bg?: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+      padding: '2px 7px', borderRadius: 4,
+      color, background: bg ?? `${color}1f`,
+      whiteSpace: 'nowrap',
+    }}>{children}</span>
+  );
+}
 
 interface DatadogIssue {
   id: string;
@@ -48,6 +61,10 @@ export default function DatadogPage() {
 
   useEffect(() => {
     void loadRepos();
+    void fetchIssues();
+  }, []);
+
+  useEffect(() => {
     if (!msg) return;
     const timer = setTimeout(() => setMsg(''), 3000);
     return () => clearTimeout(timer);
@@ -101,42 +118,113 @@ export default function DatadogPage() {
     }
   }
 
+  const totalIssues = issues.length;
+  const openIssues = issues.filter((i) => (i.attributes?.status || '').toLowerCase() === 'open').length;
+  const totalEvents = issues.reduce((s, i) => s + (i.attributes?.occurrences || 0), 0);
+  const totalUsers = issues.reduce((s, i) => s + (i.attributes?.impacted_users || 0), 0);
+
   return (
-    <div className='integrations-page' style={{ display: 'grid', gap: 16, maxWidth: 900 }}>
-      {/* Header */}
-      <div>
-        <h1 style={{ fontSize: 18, fontWeight: 800, color: 'var(--ink-90)', margin: 0 }}>
-          <span style={{ marginRight: 8 }}>🐶</span>{t('integrations.datadog.title')}
-        </h1>
-        <p style={{ fontSize: 12, color: 'var(--ink-40)', marginTop: 4 }}>
-          {t('integrations.datadog.subtitle')}
-        </p>
+    <div className='integrations-page' style={{ display: 'grid', gap: 16, maxWidth: 980, margin: '0 auto' }}>
+      <style>{`@keyframes dd-spin { to { transform: rotate(360deg); } }`}</style>
+
+      {/* Hero header — Datadog purple */}
+      <div style={{
+        position: 'relative', overflow: 'hidden',
+        borderRadius: 16,
+        border: '1px solid var(--panel-border)',
+        background: 'linear-gradient(135deg, rgba(99,44,166,0.20), rgba(168,85,247,0.10) 60%, rgba(56,189,248,0.06))',
+        padding: '20px 22px',
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #632ca6, #a855f7, #38bdf8)' }} />
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(99,44,166,0.18)', border: '1px solid rgba(99,44,166,0.4)',
+            fontSize: 22,
+          }}>🐶</div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', letterSpacing: -0.3 }}>
+              {t('integrations.datadog.title')}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-58)', marginTop: 3, lineHeight: 1.5 }}>
+              {t('integrations.datadog.heroSubtitle') || 'Pull Error Tracking issues straight from Datadog, AI fixes them through your repo.'}
+            </div>
+          </div>
+        </div>
+        {totalIssues > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+            {[
+              { label: t('integrations.sentry.healthIssues') || 'Issues', value: totalIssues, color: 'var(--ink)' },
+              { label: t('integrations.sentry.healthEvents') || 'Events', value: totalEvents.toLocaleString(), color: '#f87171' },
+              { label: t('integrations.sentry.healthUsers') || 'Users', value: totalUsers.toLocaleString(), color: '#fbbf24' },
+              { label: t('integrations.datadog.healthOpen') || 'Open', value: openIssues, color: '#ef4444' },
+            ].map((tile) => (
+              <div key={tile.label} style={{
+                flex: 1, minWidth: 130,
+                padding: '10px 14px', borderRadius: 10,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid var(--panel-border)',
+              }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>{tile.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: tile.color, marginTop: 4 }}>{tile.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
-      {/* Toast */}
-      {(msg || error) && (
+      {/* Floating toast */}
+      {(importing || msg || error) && typeof document !== 'undefined' && createPortal(
         <div style={{
-          padding: '8px 12px', borderRadius: 8, fontSize: 11, fontWeight: 700,
-          color: error ? '#fecaca' : '#86efac',
-          background: error ? 'rgba(127,29,29,0.9)' : 'rgba(20,83,45,0.9)',
-          border: error ? '1px solid rgba(248,113,113,0.35)' : '1px solid rgba(34,197,94,0.35)',
+          position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)',
+          zIndex: 9999, maxWidth: 'min(94vw, 460px)',
+          padding: '12px 18px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 10,
+          fontSize: 13, fontWeight: 700,
+          color: error ? '#fecaca' : importing ? '#fde68a' : '#bbf7d0',
+          background: error ? 'rgba(127,29,29,0.95)' : importing ? 'rgba(120,53,15,0.95)' : 'rgba(20,83,45,0.95)',
+          border: `1px solid ${error ? 'rgba(248,113,113,0.4)' : importing ? 'rgba(251,191,36,0.4)' : 'rgba(34,197,94,0.4)'}`,
+          boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(8px)',
         }}>
-          {error || msg}
-        </div>
+          {importing ? (
+            <>
+              <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(251,191,36,0.4)', borderTopColor: '#fbbf24', borderRadius: '50%', animation: 'dd-spin 0.7s linear infinite' }} />
+              <span>{t('integrations.datadog.importing') || 'Importing…'}</span>
+            </>
+          ) : error ? (
+            <>
+              <span>✗</span>
+              <span style={{ flex: 1 }}>{error}</span>
+              <button onClick={() => setError('')} style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
+            </>
+          ) : (
+            <>
+              <span>✓</span>
+              <span style={{ flex: 1 }}>{msg}</span>
+              <button onClick={() => setMsg('')} style={{ background: 'transparent', border: 'none', color: '#86efac', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
+            </>
+          )}
+        </div>,
+        document.body
       )}
 
       {/* Query + Fetch */}
-      <div className='int-row' style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+      <div style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 12, padding: 16 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 8 }}>
+          {t('integrations.datadog.queryLabel') || 'Filter Datadog issues'}
+        </div>
+        <div className='int-row' style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder={t('integrations.datadog.queryPlaceholder')}
-          style={{ flex: 1, padding: '8px 12px', borderRadius: 8, fontSize: 12, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)', outline: 'none' }}
+          style={{ flex: 1, minWidth: 200, padding: '10px 12px', borderRadius: 8, fontSize: 12, border: '1px solid var(--panel-border)', background: 'var(--glass)', color: 'var(--ink)', outline: 'none', height: 38 }}
         />
         <select
           value={timeFrom}
           onChange={(e) => setTimeFrom(e.target.value)}
-          style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, border: '1px solid var(--panel-border)', background: 'var(--panel)', color: 'var(--ink)', outline: 'none' }}
+          style={{ padding: '8px 12px', borderRadius: 8, fontSize: 12, border: '1px solid var(--panel-border)', background: 'var(--glass)', color: 'var(--ink)', outline: 'none', height: 38 }}
         >
           <option value='-30m'>{t('integrations.newrelic.range30m') || 'Last 30 min'}</option>
           <option value='-1h'>{t('integrations.newrelic.range1h') || 'Last 1 hour'}</option>
@@ -145,8 +233,8 @@ export default function DatadogPage() {
           <option value='-7d'>{t('integrations.newrelic.range7d') || 'Last 7 days'}</option>
         </select>
         <button onClick={fetchIssues} disabled={issuesLoading}
-          style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', background: '#632ca6', color: '#fff', cursor: 'pointer' }}>
-          {issuesLoading ? t('integrations.common.loading') : t('integrations.datadog.fetchIssues')}
+          style={{ padding: '10px 18px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: 'none', background: '#632ca6', color: '#fff', cursor: 'pointer' }}>
+          {issuesLoading ? '…' : t('integrations.datadog.fetchIssues')}
         </button>
         <button onClick={async () => {
           if (mirrorTarget === 'none') {
@@ -171,8 +259,9 @@ export default function DatadogPage() {
           } catch { /* ignore */ }
         }} disabled={importing}
           style={{ padding: '8px 16px', borderRadius: 8, fontSize: 12, fontWeight: 700, border: '1px solid #632ca6', background: 'transparent', color: '#632ca6', cursor: 'pointer' }}>
-          {importing ? t('integrations.datadog.importing') : t('integrations.common.importAll')}
+          {importing ? '…' : t('integrations.common.importAll')}
         </button>
+        </div>
       </div>
 
       {confirmOpen && (
@@ -227,72 +316,61 @@ export default function DatadogPage() {
         </div>
       )}
 
-      {/* Import result */}
-      {importResult && (
-        <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(99,44,166,0.08)', border: '1px solid rgba(99,44,166,0.2)', fontSize: 12 }}>
-          {t('integrations.datadog.importedSkipped')
-            .replace('{imported}', String(importResult.imported))
-            .replace('{skipped}', String(importResult.skipped))}
-        </div>
-      )}
-
-      {/* Issues list */}
+      {/* Issues list — premium cards */}
       {issues.length > 0 && (
-        <div style={{ borderRadius: 12, border: '1px solid var(--panel-border)', overflow: 'hidden' }}>
-          <div className='int-table-header' style={{ padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', background: 'var(--panel)', display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 100px', gap: 8, fontSize: 10, fontWeight: 700, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.5 }}>
-            <span>{t('integrations.common.error')}</span>
-            <span>{t('integrations.common.serviceColon')}</span>
-            <span>{t('integrations.common.statusColon')}</span>
-            <span>{t('integrations.common.countColon')}</span>
-            <span>{t('integrations.datadog.colLastSeen')}</span>
+        <div style={{ background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 12, padding: 16 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 10 }}>
+            {(t('integrations.datadog.issuesCount') || '{n} Issues').replace('{n}', String(issues.length))}
           </div>
-          {issues.map((issue) => {
-            const a = issue.attributes || {};
-            const isImported = Boolean(issue.imported_task_id);
-            return (
-              <div key={issue.id} className='int-table-row' style={{ padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', display: 'grid', gridTemplateColumns: '1fr 100px 80px 80px 100px', gap: 8, alignItems: 'center', fontSize: 12, opacity: isImported ? 0.55 : 1 }}>
-                <div style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: 'var(--ink-78)', fontWeight: 600 }}>
-                  {a.title || issue.id}
-                  {isImported && (
-                    <a
-                      href={`/tasks/${issue.imported_task_id}`}
-                      style={{ marginLeft: 8, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.18)', color: '#60a5fa', textDecoration: 'none' }}
-                    >
-                      #{issue.imported_task_id}
-                    </a>
-                  )}
-                  {isImported && issue.imported_work_item_url && (
-                    <a
-                      href={issue.imported_work_item_url}
-                      target='_blank'
-                      rel='noreferrer'
-                      style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(168,85,247,0.18)', color: '#a855f7', textDecoration: 'none' }}
-                    >
-                      WI ↗
-                    </a>
-                  )}
+          <div style={{ display: 'grid', gap: 6 }}>
+            {issues.map((issue) => {
+              const a = issue.attributes || {};
+              const isImported = Boolean(issue.imported_task_id);
+              const isOpen = (a.status || '').toLowerCase() === 'open';
+              return (
+                <div key={issue.id} style={{
+                  padding: '10px 12px', borderRadius: 10,
+                  background: 'var(--glass)', border: '1px solid var(--panel-border)',
+                  opacity: isImported ? 0.6 : 1,
+                }}>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                    <Pill color={isOpen ? '#ef4444' : '#22c55e'}>{(a.status || '?').toUpperCase()}</Pill>
+                    {a.service && <Pill color='#60a5fa'>{a.service}</Pill>}
+                    {a.env && <Pill color='#94a3b8'>{a.env}</Pill>}
+                    {a.type && <Pill color='#64748b'>{a.type}</Pill>}
+                    {isImported && (
+                      <a href={`/tasks/${issue.imported_task_id}`} style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.18)', color: '#60a5fa', textDecoration: 'none' }}>
+                        TASK #{issue.imported_task_id}
+                      </a>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {a.title || issue.id}
+                  </div>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 6, fontSize: 10, color: 'var(--ink-45)', flexWrap: 'wrap' }}>
+                    {(a.occurrences ?? 0) > 0 && <span><strong style={{ color: '#f87171' }}>{a.occurrences!.toLocaleString()}</strong> {(t('integrations.sentry.healthEvents') || 'events').toLowerCase()}</span>}
+                    {(a.impacted_users ?? 0) > 0 && <span><strong style={{ color: '#fbbf24' }}>{a.impacted_users!.toLocaleString()}</strong> {(t('integrations.sentry.usersAffected') || 'users')}</span>}
+                    {a.last_seen && <span>{(t('integrations.common.lastSeen') || 'Last seen')}: {new Date(a.last_seen).toLocaleString()}</span>}
+                  </div>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-50)' }}>{a.service || '—'}</div>
-                <div>
-                  <span style={{
-                    fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 999,
-                    background: a.status === 'open' ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
-                    color: a.status === 'open' ? '#ef4444' : '#22c55e',
-                  }}>{a.status || '?'}</span>
-                </div>
-                <div style={{ fontSize: 11, color: 'var(--ink-50)' }}>{a.occurrences ?? '—'}</div>
-                <div style={{ fontSize: 10, color: 'var(--ink-35)' }}>
-                  {a.last_seen ? new Date(a.last_seen).toLocaleDateString() : '—'}
-                </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
       )}
 
       {issues.length === 0 && !issuesLoading && (
-        <div style={{ textAlign: 'center', padding: 30, color: 'var(--ink-25)', fontSize: 13 }}>
-          {t('integrations.datadog.fetchIssues')}
+        <div style={{
+          padding: '32px 18px', textAlign: 'center', borderRadius: 12,
+          background: 'var(--glass)', border: '1px dashed var(--panel-border)',
+        }}>
+          <div style={{ fontSize: 32, marginBottom: 8 }}>🐶</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
+            {t('integrations.datadog.emptyTitle') || 'No issues yet'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 4 }}>
+            {t('integrations.datadog.emptyHint') || 'Adjust the query or pick a wider time range and hit Fetch.'}
+          </div>
         </div>
       )}
 

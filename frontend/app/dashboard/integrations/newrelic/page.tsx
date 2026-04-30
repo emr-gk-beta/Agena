@@ -46,6 +46,18 @@ interface RepoMapping {
   repo_name: string;
 }
 
+function Pill({ children, color = '#94a3b8', bg }: { children: React.ReactNode; color?: string; bg?: string }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 4,
+      fontSize: 10, fontWeight: 700, letterSpacing: 0.3,
+      padding: '2px 7px', borderRadius: 4,
+      color, background: bg ?? `${color}1f`,
+      whiteSpace: 'nowrap',
+    }}>{children}</span>
+  );
+}
+
 export default function NewRelicPage() {
   const { t } = useLocale();
   const [query, setQuery] = useState('');
@@ -75,9 +87,14 @@ export default function NewRelicPage() {
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [sprintOptions, setSprintOptions] = useState<Array<{ path: string; name: string; is_current?: boolean }>>([]);
 
+  const [runningGuid, setRunningGuid] = useState<string | null>(null);
+  const [rowResult, setRowResult] = useState<Record<string, { kind: 'ok' | 'err'; text: string; ts: number }>>({});
+
   useEffect(() => {
     void loadMappings();
     void loadRepos();
+    // Auto-load entities so landing isn't an empty form.
+    void searchEntities();
   }, []);
 
   useEffect(() => {
@@ -170,6 +187,8 @@ export default function NewRelicPage() {
   async function importErrors(entityGuid?: string) {
     setError('');
     setMsg('');
+    const rowKey = entityGuid || '__all__';
+    setRunningGuid(rowKey);
     try {
       const body: Record<string, unknown> = {};
       if (entityGuid) body.entity_guid = entityGuid;
@@ -180,17 +199,33 @@ export default function NewRelicPage() {
       (res.manual_azure_urls || []).forEach((url) => {
         if (typeof window !== 'undefined') window.open(url, '_blank', 'noopener');
       });
+      let summary = '';
       if (res.imported === 0 && res.skipped > 0) {
-        setMsg(`No new errors to import — ${res.skipped} already imported before`);
+        summary = (t('integrations.sentry.allAlreadyImported') || 'All {n} already imported').replace('{n}', String(res.skipped));
       } else if (res.imported > 0 && res.skipped > 0) {
-        setMsg(`${res.imported} new error(s) imported as tasks, ${res.skipped} skipped (already exists)`);
+        summary = (t('integrations.sentry.importedSomeSkipped') || '+{i} imported, {s} skipped').replace('{i}', String(res.imported)).replace('{s}', String(res.skipped));
       } else if (res.imported > 0) {
-        setMsg(`${res.imported} error(s) imported as tasks`);
+        summary = (t('integrations.sentry.importedN') || '+{n} imported').replace('{n}', String(res.imported));
       } else {
-        setMsg('No errors found to import');
+        summary = t('integrations.sentry.noNewIssues') || 'No new issues';
       }
+      setMsg(summary);
+      setRowResult((prev) => ({ ...prev, [rowKey]: { kind: 'ok', text: summary, ts: Date.now() } }));
+      void loadMappings();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Import failed');
+      const errText = e instanceof Error ? e.message : 'Import failed';
+      setError(errText);
+      setRowResult((prev) => ({ ...prev, [rowKey]: { kind: 'err', text: errText, ts: Date.now() } }));
+    } finally {
+      setRunningGuid(null);
+      setTimeout(() => {
+        setRowResult((prev) => {
+          if (!prev[rowKey] || Date.now() - prev[rowKey].ts < 5800) return prev;
+          const next = { ...prev };
+          delete next[rowKey];
+          return next;
+        });
+      }, 6000);
     }
   }
 
@@ -286,21 +321,120 @@ export default function NewRelicPage() {
     background: 'transparent', color: 'var(--ink-58)', fontSize: 11, cursor: 'pointer',
   };
 
-  return (
-    <div className='integrations-page' style={{ display: 'grid', gap: 16, maxWidth: 900, margin: '0 auto' }}>
-      <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--ink)' }}>
-        {t('integrations.providerNewrelic')} — {t('integrations.newrelic.entityBrowser')}
-      </h2>
+  const totalMappings = mappings.length;
+  const autoMappings = mappings.filter((m) => m.auto_import).length;
+  const repoMappingsCount = mappings.filter((m) => m.repo_mapping_id != null).length;
 
-      {msg && <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(34,197,94,0.1)', color: '#22c55e', fontSize: 12, fontWeight: 600 }}>{msg}</div>}
-      {error && <div style={{ padding: '8px 12px', borderRadius: 8, background: 'rgba(248,113,113,0.1)', color: '#f87171', fontSize: 12, fontWeight: 600 }}>{error}</div>}
+  return (
+    <div className='integrations-page' style={{ display: 'grid', gap: 16, maxWidth: 980, margin: '0 auto' }}>
+      <style>{`
+        .nr-row-card {
+          display: flex !important;
+          flex-wrap: wrap;
+          gap: 10px;
+          align-items: center;
+        }
+        .nr-row-card > .nr-row-icon { flex: 0 0 auto; }
+        .nr-row-card > .nr-row-title { flex: 1 1 180px; min-width: 0; }
+        .nr-row-card > .nr-row-actions { flex: 0 0 auto; margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+        @media (max-width: 700px) {
+          .nr-row-card > .nr-row-actions { flex: 1 1 100% !important; margin-left: 0 !important; padding-top: 8px; margin-top: 2px; border-top: 1px dashed var(--panel-border); justify-content: flex-start !important; }
+          .nr-row-actions select { flex: 1 1 auto; min-width: 0; max-width: 220px; }
+        }
+        .nr-icon-btn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 0 !important; font-size: 13px !important; }
+        @keyframes nr-spin { to { transform: rotate(360deg); } }
+      `}</style>
+
+      {/* Hero header */}
+      <div style={{
+        position: 'relative', overflow: 'hidden',
+        borderRadius: 16,
+        border: '1px solid var(--panel-border)',
+        background: 'linear-gradient(135deg, rgba(28,231,131,0.18), rgba(0,180,200,0.10) 60%, rgba(56,189,248,0.08))',
+        padding: '20px 22px',
+      }}>
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 3, background: 'linear-gradient(90deg, #1CE783, #00b4c8, #38bdf8)' }} />
+        <div style={{ display: 'flex', alignItems: 'flex-start', gap: 14, flexWrap: 'wrap' }}>
+          <div style={{
+            width: 44, height: 44, borderRadius: 10,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: 'rgba(28,231,131,0.15)', border: '1px solid rgba(28,231,131,0.4)',
+            fontSize: 22,
+          }}>📡</div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 20, fontWeight: 800, color: 'var(--ink)', letterSpacing: -0.3 }}>
+              {t('integrations.providerNewrelic')}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--ink-58)', marginTop: 3, lineHeight: 1.5 }}>
+              {t('integrations.newrelic.heroSubtitle') || 'Auto-import APM errors from your New Relic entities, route them to the right repo, let AI fix and ship the patch.'}
+            </div>
+          </div>
+        </div>
+        {totalMappings > 0 && (
+          <div style={{ display: 'flex', gap: 8, marginTop: 16, flexWrap: 'wrap' }}>
+            {[
+              { label: t('integrations.sentry.statMapped') || 'Mapped projects', value: totalMappings, color: 'var(--ink)' },
+              { label: t('integrations.sentry.statWithRepo') || 'Linked to a repo', value: `${repoMappingsCount}/${totalMappings}`, color: '#60a5fa' },
+              { label: t('integrations.sentry.statAuto') || 'Auto-import on', value: autoMappings, color: '#1CE783' },
+            ].map((tile) => (
+              <div key={tile.label} style={{
+                flex: 1, minWidth: 130,
+                padding: '10px 14px', borderRadius: 10,
+                background: 'rgba(255,255,255,0.04)', border: '1px solid var(--panel-border)',
+              }}>
+                <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>{tile.label}</div>
+                <div style={{ fontSize: 22, fontWeight: 800, color: tile.color, marginTop: 4 }}>{tile.value}</div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Floating toast */}
+      {(runningGuid || msg || error) && typeof document !== 'undefined' && createPortal(
+        <div style={{
+          position: 'fixed', left: '50%', bottom: 28, transform: 'translateX(-50%)',
+          zIndex: 9999, maxWidth: 'min(94vw, 460px)',
+          padding: '12px 18px', borderRadius: 12,
+          display: 'flex', alignItems: 'center', gap: 10,
+          fontSize: 13, fontWeight: 700,
+          color: error ? '#fecaca' : runningGuid ? '#fde68a' : '#bbf7d0',
+          background: error ? 'rgba(127,29,29,0.95)' : runningGuid ? 'rgba(120,53,15,0.95)' : 'rgba(20,83,45,0.95)',
+          border: `1px solid ${error ? 'rgba(248,113,113,0.4)' : runningGuid ? 'rgba(251,191,36,0.4)' : 'rgba(34,197,94,0.4)'}`,
+          boxShadow: '0 12px 32px rgba(0,0,0,0.45)',
+          backdropFilter: 'blur(8px)',
+        }}>
+          {runningGuid ? (
+            <>
+              <span style={{ display: 'inline-block', width: 14, height: 14, border: '2px solid rgba(251,191,36,0.4)', borderTopColor: '#fbbf24', borderRadius: '50%', animation: 'nr-spin 0.7s linear infinite' }} />
+              <span>{t('integrations.sentry.toastImporting') || 'Importing…'}</span>
+            </>
+          ) : error ? (
+            <>
+              <span>✗</span>
+              <span style={{ flex: 1 }}>{error}</span>
+              <button onClick={() => setError('')} style={{ background: 'transparent', border: 'none', color: '#fca5a5', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
+            </>
+          ) : (
+            <>
+              <span>✓</span>
+              <span style={{ flex: 1 }}>{msg}</span>
+              <button onClick={() => setMsg('')} style={{ background: 'transparent', border: 'none', color: '#86efac', cursor: 'pointer', fontSize: 16, padding: 0 }}>×</button>
+            </>
+          )}
+        </div>,
+        document.body
+      )}
 
       {/* Search */}
       <div style={cardStyle}>
+        <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 8 }}>
+          {t('integrations.newrelic.findEntityLabel') || 'Find an entity to map'}
+        </div>
         <div className='int-row' style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={t('integrations.newrelic.entityBrowser')}
-            style={{ ...inputStyle, flex: 1, minWidth: 200 }} onKeyDown={(e) => e.key === 'Enter' && searchEntities()} />
-          <select value={entityType} onChange={(e) => setEntityType(e.target.value)} style={{ ...inputStyle, width: 180 }}>
+            style={{ ...inputStyle, flex: 1, minWidth: 200, height: 38 }} onKeyDown={(e) => e.key === 'Enter' && searchEntities()} />
+          <select value={entityType} onChange={(e) => setEntityType(e.target.value)} style={{ ...inputStyle, width: 180, height: 38 }}>
             <option value="">{t('integrations.common.allTypes')}</option>
             <option value="APPLICATION">{t('integrations.newrelic.typeApm')}</option>
             <option value="BROWSER_APPLICATION">{t('integrations.newrelic.typeBrowser')}</option>
@@ -308,42 +442,85 @@ export default function NewRelicPage() {
             <option value="HOST">{t('integrations.newrelic.typeHost')}</option>
             <option value="MONITOR">{t('integrations.newrelic.typeMonitor')}</option>
           </select>
-          <button onClick={() => void searchEntities()} disabled={loading} style={btnPrimary}>
-            {loading ? '...' : t('integrations.common.search')}
+          <button onClick={() => void searchEntities()} disabled={loading} style={{ ...btnPrimary, padding: '10px 18px' }}>
+            {loading ? '…' : t('integrations.common.search')}
           </button>
         </div>
       </div>
 
-      {/* Entity results */}
+      {/* Entity results — premium cards */}
       {entities.length > 0 && (
         <div style={cardStyle}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, marginBottom: 8, color: 'var(--ink-58)' }}>{t('integrations.newrelic.entitiesCount').replace('{n}', String(entities.length))}</h3>
-          <div style={{ display: 'grid', gap: 4 }}>
+          <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 10 }}>
+            {t('integrations.newrelic.entitiesCount').replace('{n}', String(entities.length))}
+          </div>
+          <div style={{ display: 'grid', gap: 6 }}>
             {entities.map((e) => {
               const mapping = mappings.find((m) => m.entity_guid === e.guid);
+              const isSelected = selectedGuid === e.guid;
               return (
-                <div key={e.guid} className='int-row' style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px', borderRadius: 8, background: selectedGuid === e.guid ? 'var(--glass)' : 'transparent', flexWrap: 'wrap' }}>
-                  <span style={{ fontSize: 12, fontWeight: 600, flex: 1, minWidth: 150, color: 'var(--ink)' }}>{e.name}</span>
-                  <span style={{ fontSize: 10, color: 'var(--ink-35)', fontWeight: 500 }}>{e.entity_type.replace('_ENTITY', '')}</span>
-                  <span style={{ fontSize: 10, color: e.reporting ? '#22c55e' : '#f87171' }}>{e.reporting ? t('integrations.common.active') : t('integrations.common.inactive')}</span>
-                  <button onClick={() => void fetchErrors(e.guid, e.name)} style={btnSmall}>{t('integrations.newrelic.errorsBtn')}</button>
-                  {!mapping && <button onClick={() => void addMapping(e)} style={btnSmall}>{t('integrations.common.map')}</button>}
-                  {mapping && (
-                    <>
-                      <select
-                        value={mapping.repo_mapping_id ?? ''}
-                        onChange={(ev) => void updateMapping(mapping.id, { repo_mapping_id: ev.target.value ? parseInt(ev.target.value) : null })}
-                        style={{ ...inputStyle, width: 160, fontSize: 11, padding: '4px 8px' }}
-                      >
-                        <option value="">{t('integrations.common.selectRepo')}</option>
-                        {repos.map((r) => (
-                          <option key={r.id} value={r.id}>{r.owner}/{r.repo_name}</option>
-                        ))}
-                      </select>
-                      <button onClick={() => void importErrors(mapping.entity_guid)} style={btnSmall}>{t('integrations.common.import')}</button>
-                      <button onClick={() => void deleteMapping(mapping.id)} style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)', fontSize: 10 }}>x</button>
-                    </>
-                  )}
+                <div key={e.guid} className='nr-row-card' style={{
+                  padding: '10px 12px', borderRadius: 10,
+                  background: isSelected ? 'rgba(28,231,131,0.10)' : 'var(--glass)',
+                  border: `1px solid ${isSelected ? 'rgba(28,231,131,0.4)' : 'var(--panel-border)'}`,
+                  transition: 'background 0.15s, border 0.15s',
+                }}>
+                  <div className='nr-row-icon' style={{
+                    width: 30, height: 30, borderRadius: 8,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: mapping ? 'rgba(28,231,131,0.12)' : 'rgba(148,163,184,0.10)',
+                    border: `1px solid ${mapping ? 'rgba(28,231,131,0.30)' : 'var(--panel-border)'}`,
+                    fontSize: 14, color: mapping ? '#1CE783' : 'var(--ink-35)',
+                  }}>
+                    {mapping ? '✓' : '○'}
+                  </div>
+                  <div className='nr-row-title'>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {e.name}
+                    </div>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 2, flexWrap: 'wrap' }}>
+                      <Pill color='#64748b'>{e.entity_type.replace('_ENTITY', '').replace('_APPLICATION', '')}</Pill>
+                      <Pill color={e.reporting ? '#22c55e' : '#f87171'}>{e.reporting ? '● LIVE' : '○ INACTIVE'}</Pill>
+                      {mapping && mapping.repo_display_name && (
+                        <span style={{ fontSize: 10, color: '#60a5fa', fontWeight: 600 }}>→ {mapping.repo_display_name}</span>
+                      )}
+                      {mapping && mapping.auto_import && <Pill color='#1CE783'>AUTO</Pill>}
+                    </div>
+                  </div>
+                  <div className='nr-row-actions'>
+                    <button onClick={() => void fetchErrors(e.guid, e.name)} title={t('integrations.newrelic.errorsBtn')} className='nr-icon-btn' style={btnSmall}>📋</button>
+                    {!mapping ? (
+                      <button onClick={() => void addMapping(e)} style={{ ...btnSmall, color: '#1CE783', borderColor: 'rgba(28,231,131,0.4)', height: 30, padding: '0 12px' }}>
+                        + {t('integrations.common.map')}
+                      </button>
+                    ) : (
+                      <>
+                        <select
+                          value={mapping.repo_mapping_id ?? ''}
+                          onChange={(ev) => void updateMapping(mapping.id, { repo_mapping_id: ev.target.value ? parseInt(ev.target.value) : null })}
+                          style={{ ...inputStyle, width: 140, fontSize: 11, padding: '4px 8px', height: 30 }}
+                        >
+                          <option value="">{t('integrations.common.selectRepo')}</option>
+                          {repos.map((r) => (
+                            <option key={r.id} value={r.id}>{r.owner}/{r.repo_name}</option>
+                          ))}
+                        </select>
+                        <button onClick={() => void importErrors(mapping.entity_guid)} disabled={runningGuid === mapping.entity_guid}
+                          title={t('integrations.common.import')} className='nr-icon-btn' style={{ ...btnSmall, opacity: runningGuid === mapping.entity_guid ? 0.6 : 1 }}>
+                          {runningGuid === mapping.entity_guid ? '…' : '⬇'}
+                        </button>
+                        {rowResult[mapping.entity_guid] && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 4,
+                            color: rowResult[mapping.entity_guid].kind === 'ok' ? '#22c55e' : '#f87171',
+                            background: rowResult[mapping.entity_guid].kind === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(248,113,113,0.12)',
+                            whiteSpace: 'nowrap',
+                          }}>{rowResult[mapping.entity_guid].text}</span>
+                        )}
+                        <button onClick={() => void deleteMapping(mapping.id)} title={t('integrations.common.unmap') || 'Unmap'} className='nr-icon-btn' style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)' }}>×</button>
+                      </>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -354,22 +531,54 @@ export default function NewRelicPage() {
       {/* Error groups */}
       {selectedGuid && (
         <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-            <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-58)' }}>{t('integrations.newrelic.errorsFor').replace('{name}', selectedEntityName)}</h3>
-            <button onClick={() => void importErrors(selectedGuid)} style={btnPrimary}>{t('integrations.common.importAsTasks')}</button>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)' }}>
+                {t('integrations.newrelic.errorsFor').replace('{name}', selectedEntityName)}
+              </div>
+              {!errorsLoading && errors.length > 0 && (
+                <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 3 }}>
+                  {errors.length} {t('integrations.newrelic.errors') || 'error groups'}
+                  {' · '}
+                  <strong style={{ color: '#f87171' }}>{errors.reduce((s, e) => s + (e.occurrences || 0), 0).toLocaleString()}</strong>{' '}
+                  {(t('integrations.sentry.healthEvents') || 'events').toLowerCase()}
+                </div>
+              )}
+            </div>
+            <button onClick={() => void importErrors(selectedGuid)} disabled={runningGuid === selectedGuid} style={{ ...btnPrimary, opacity: runningGuid === selectedGuid ? 0.6 : 1 }}>
+              {runningGuid === selectedGuid ? '…' : t('integrations.common.importAsTasks')}
+            </button>
           </div>
           {errorsLoading ? (
             <div style={{ fontSize: 12, color: 'var(--ink-35)', padding: 12 }}>{t('integrations.common.loading')}</div>
           ) : errors.length === 0 ? (
             <div style={{ fontSize: 12, color: 'var(--ink-35)', padding: 12 }}>{t('integrations.common.noErrors')}</div>
           ) : (
-            <div style={{ display: 'grid', gap: 4 }}>
+            <div style={{ display: 'grid', gap: 6 }}>
               {errors.map((e, i) => (
-                <div key={i} style={{ display: 'flex', gap: 8, padding: '6px 8px', borderRadius: 8, background: 'var(--glass)', fontSize: 12 }}>
-                  <span style={{ fontWeight: 600, color: '#f87171', minWidth: 40, textAlign: 'right' }}>{e.occurrences}x</span>
-                  <span style={{ fontWeight: 600, color: 'var(--ink)' }}>{e.error_class}</span>
-                  <span style={{ color: 'var(--ink-50)', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{e.error_message}</span>
-                  {e.last_seen && <span style={{ color: 'var(--ink-25)', fontSize: 10, flexShrink: 0 }}>{new Date(Number(e.last_seen)).toLocaleString()}</span>}
+                <div key={i} style={{
+                  padding: '10px 12px', borderRadius: 10,
+                  background: 'var(--glass)', border: '1px solid var(--panel-border)',
+                }}>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 4, flexWrap: 'wrap' }}>
+                    <Pill color='#f87171'>{e.occurrences.toLocaleString()}× ERR</Pill>
+                    {e.imported_task_id && (
+                      <a href={`/tasks/${e.imported_task_id}`} style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', borderRadius: 4, background: 'rgba(96,165,250,0.18)', color: '#60a5fa', textDecoration: 'none' }}>
+                        TASK #{e.imported_task_id}
+                      </a>
+                    )}
+                  </div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', fontFamily: 'monospace', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {e.error_class}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {e.error_message}
+                  </div>
+                  {e.last_seen && (
+                    <div style={{ fontSize: 10, color: 'var(--ink-35)', marginTop: 4 }}>
+                      {(t('integrations.common.lastSeen') || 'Last seen')}: {new Date(Number(e.last_seen)).toLocaleString()}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
@@ -377,43 +586,123 @@ export default function NewRelicPage() {
         </div>
       )}
 
-      {/* Mappings */}
+      {/* Mappings — premium cards */}
       <div style={cardStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-          <h3 style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink-58)' }}>{t('integrations.newrelic.entityMappings')}</h3>
-          <button onClick={() => void importErrors()} style={btnPrimary}>{t('integrations.common.importAll')}</button>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+          <h3 style={{ fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', margin: 0 }}>
+            {t('integrations.newrelic.entityMappings')}
+          </h3>
+          {mappings.length > 0 && (
+            <button onClick={() => void importErrors()} disabled={runningGuid === '__all__'} style={{ ...btnPrimary, opacity: runningGuid === '__all__' ? 0.6 : 1 }}>
+              {runningGuid === '__all__' ? '…' : t('integrations.common.importAll')}
+            </button>
+          )}
         </div>
         {mappings.length === 0 ? (
-          <div style={{ fontSize: 12, color: 'var(--ink-35)', padding: 12 }}>{t('integrations.common.noMappingsHint')}</div>
+          <div style={{ padding: '28px 18px', textAlign: 'center', borderRadius: 12, background: 'var(--glass)', border: '1px dashed var(--panel-border)' }}>
+            <div style={{ fontSize: 28, marginBottom: 6 }}>📡</div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)' }}>
+              {t('integrations.newrelic.noMappingsTitle') || 'No entity mappings yet'}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 4, lineHeight: 1.5, maxWidth: 380, margin: '4px auto 0' }}>
+              {t('integrations.common.noMappingsHint')}
+            </div>
+          </div>
         ) : (
-          <div style={{ display: 'grid', gap: 6 }}>
-            {mappings.map((m) => (
-              <div key={m.id} className='int-row' style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 10px', borderRadius: 8, background: 'var(--glass)', flexWrap: 'wrap' }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{m.entity_name}</div>
-                  <div style={{ fontSize: 10, color: 'var(--ink-35)' }}>{m.entity_type} • {m.repo_display_name || t('integrations.common.noRepo')}</div>
+          <div style={{ display: 'grid', gap: 8 }}>
+            {mappings.map((m) => {
+              const lastImport = m.last_import_at ? new Date(m.last_import_at) : null;
+              const lastImportRel = lastImport ? (() => {
+                const diffMs = Date.now() - lastImport.getTime();
+                const mins = Math.floor(diffMs / 60000);
+                if (mins < 1) return t('integrations.sentry.justNow') || 'just now';
+                if (mins < 60) return `${mins}m ago`;
+                const hrs = Math.floor(mins / 60);
+                if (hrs < 24) return `${hrs}h ago`;
+                const days = Math.floor(hrs / 24);
+                return `${days}d ago`;
+              })() : null;
+              const nextRunRel = m.auto_import && lastImport ? (() => {
+                const nextDue = lastImport.getTime() + m.import_interval_minutes * 60000;
+                const diffMs = nextDue - Date.now();
+                if (diffMs <= 0) return t('integrations.sentry.dueNow') || 'due now';
+                const mins = Math.ceil(diffMs / 60000);
+                if (mins < 60) return (t('integrations.sentry.nextInM') || 'next in {n}m').replace('{n}', String(mins));
+                const hrs = Math.ceil(mins / 60);
+                return (t('integrations.sentry.nextInH') || 'next in {n}h').replace('{n}', String(hrs));
+              })() : null;
+              return (
+                <div key={m.id} className='nr-row-card' style={{
+                  padding: '12px 14px', borderRadius: 12,
+                  background: 'var(--glass)', border: '1px solid var(--panel-border)',
+                }}>
+                  <div className='nr-row-icon' style={{
+                    width: 36, height: 36, borderRadius: 10,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    background: m.auto_import ? 'rgba(28,231,131,0.10)' : 'rgba(96,165,250,0.10)',
+                    border: `1px solid ${m.auto_import ? 'rgba(28,231,131,0.35)' : 'rgba(96,165,250,0.35)'}`,
+                    fontSize: 16,
+                  }}>
+                    {m.auto_import ? '⚡' : '🔗'}
+                  </div>
+                  <div className='nr-row-title'>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{m.entity_name}</span>
+                      {m.repo_display_name ? (
+                        <span style={{ fontSize: 11, color: '#60a5fa', fontWeight: 600 }}>→ {m.repo_display_name}</span>
+                      ) : (
+                        <Pill color='#f59e0b'>{(t('integrations.sentry.noRepoLinked') || 'no repo linked').toUpperCase()}</Pill>
+                      )}
+                      {m.auto_import && <Pill color='#1CE783'>AUTO</Pill>}
+                    </div>
+                    <div style={{ fontSize: 10, color: 'var(--ink-35)', marginTop: 3, fontFamily: 'monospace' }}>
+                      {m.entity_type.replace('_ENTITY', '').replace('_APPLICATION', '')}
+                      {lastImportRel && <span style={{ color: 'var(--ink-50)', fontFamily: 'inherit', marginLeft: 8 }}>· {(t('integrations.sentry.lastImport') || 'Last import')}: {lastImportRel}</span>}
+                      {nextRunRel && <span style={{ color: '#1CE783', fontFamily: 'inherit', marginLeft: 8 }}>· {nextRunRel}</span>}
+                    </div>
+                  </div>
+                  <div className='nr-row-actions'>
+                    <select
+                      value={m.repo_mapping_id ?? ''}
+                      onChange={(e) => void updateMapping(m.id, { repo_mapping_id: e.target.value ? parseInt(e.target.value) : null })}
+                      style={{ ...inputStyle, width: 150, fontSize: 11, height: 30 }}
+                    >
+                      <option value="">{t('integrations.common.noRepo') || 'No repo'}</option>
+                      {repos.map((r) => (
+                        <option key={r.id} value={r.id}>{r.owner}/{r.repo_name}</option>
+                      ))}
+                    </select>
+                    <label style={{
+                      display: 'flex', alignItems: 'center', gap: 6, cursor: 'pointer',
+                      fontSize: 10, fontWeight: 700, letterSpacing: 0.5,
+                      color: m.auto_import ? '#1CE783' : 'var(--ink-50)',
+                      padding: '6px 10px', borderRadius: 6,
+                      background: m.auto_import ? 'rgba(28,231,131,0.10)' : 'transparent',
+                      border: `1px solid ${m.auto_import ? 'rgba(28,231,131,0.4)' : 'var(--panel-border)'}`,
+                    }}>
+                      <input type='checkbox' checked={m.auto_import} onChange={(e) => void updateMapping(m.id, { auto_import: e.target.checked })} style={{ margin: 0 }} />
+                      {t('integrations.common.auto').toUpperCase()}
+                    </label>
+                    <button onClick={() => void importErrors(m.entity_guid)} disabled={runningGuid === m.entity_guid}
+                      title={t('integrations.sentry.runNow') || 'Run now'} className='nr-icon-btn' style={{ ...btnSmall, color: '#1CE783', borderColor: 'rgba(28,231,131,0.3)', opacity: runningGuid === m.entity_guid ? 0.6 : 1 }}>
+                      {runningGuid === m.entity_guid ? '…' : '▶'}
+                    </button>
+                    {rowResult[m.entity_guid] && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 4,
+                        color: rowResult[m.entity_guid].kind === 'ok' ? '#22c55e' : '#f87171',
+                        background: rowResult[m.entity_guid].kind === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(248,113,113,0.12)',
+                        whiteSpace: 'nowrap',
+                      }}>{rowResult[m.entity_guid].text}</span>
+                    )}
+                    <button onClick={() => void openRequestModal(m)} style={{ ...btnSmall, height: 30 }}>
+                      {t('integrations.newrelic.request') || 'Request'}
+                    </button>
+                    <button onClick={() => void deleteMapping(m.id)} title={t('integrations.common.unmap') || 'Unmap'} className='nr-icon-btn' style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)' }}>×</button>
+                  </div>
                 </div>
-                <select
-                  value={m.repo_mapping_id ?? ''}
-                  onChange={(e) => void updateMapping(m.id, { repo_mapping_id: e.target.value ? parseInt(e.target.value) : null })}
-                  style={{ ...inputStyle, width: 160, fontSize: 11 }}
-                >
-                  <option value="">No repo</option>
-                  {repos.map((r) => (
-                    <option key={r.id} value={r.id}>{r.owner}/{r.repo_name}</option>
-                  ))}
-                </select>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer', fontSize: 10, color: 'var(--ink-50)' }}>
-                  <input type="checkbox" checked={m.auto_import} onChange={(e) => void updateMapping(m.id, { auto_import: e.target.checked })} />
-                  {t('integrations.common.auto')}
-                </label>
-                <button onClick={() => void importErrors(m.entity_guid)} style={btnSmall}>{t('integrations.common.import')}</button>
-                <button onClick={() => void openRequestModal(m)} style={btnSmall}>
-                  {t('integrations.newrelic.request') || 'Request'}
-                </button>
-                <button onClick={() => void deleteMapping(m.id)} style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)' }}>x</button>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

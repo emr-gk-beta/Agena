@@ -3130,5 +3130,17 @@
   "integrations.sentry.importedSomeSkipped": "+{i} 导入, {s} 跳过",
   "integrations.sentry.importedN": "+{n} 导入",
   "integrations.sentry.noNewIssues": "没有新问题",
-  "integrations.sentry.toastImporting": "正在从 {p} 导入…"
+  "integrations.sentry.toastImporting": "正在从 {p} 导入…",
+  "integrations.newrelic.heroSubtitle": "从 New Relic 实体自动导入 APM 错误,路由到正确仓库,AI 修复并推送补丁。",
+  "integrations.newrelic.findEntityLabel": "查找要映射的实体",
+  "integrations.newrelic.noMappingsTitle": "尚无实体映射",
+  "integrations.datadog.heroSubtitle": "直接从 Datadog 拉取错误跟踪问题,AI 通过仓库修复。",
+  "integrations.datadog.queryLabel": "筛选 Datadog 问题",
+  "integrations.datadog.issuesCount": "{n} 个问题",
+  "integrations.datadog.healthOpen": "未关闭",
+  "integrations.datadog.emptyTitle": "暂无问题",
+  "integrations.datadog.emptyHint": "调整查询或扩大时间范围,然后点击 Fetch。",
+  "integrations.appdynamics.heroSubtitle": "从 AppDynamics 拉取 APM 错误到 Agena,AI 通过仓库修复。",
+  "integrations.appdynamics.lastImportFromBatch": "上次批次",
+  "integrations.appdynamics.viewImportedTasks": "查看导入任务 ↗"
 }

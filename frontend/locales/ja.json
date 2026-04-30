@@ -3130,5 +3130,17 @@
   "integrations.sentry.importedSomeSkipped": "+{i} 取込, {s} スキップ",
   "integrations.sentry.importedN": "+{n} 取込",
   "integrations.sentry.noNewIssues": "新しい問題なし",
-  "integrations.sentry.toastImporting": "{p} から取込中…"
+  "integrations.sentry.toastImporting": "{p} から取込中…",
+  "integrations.newrelic.heroSubtitle": "New Relic エンティティから APM エラーを自動取込、適切なリポジトリにルーティング、AI が修正してパッチを送信。",
+  "integrations.newrelic.findEntityLabel": "マッピングするエンティティを検索",
+  "integrations.newrelic.noMappingsTitle": "エンティティマッピングなし",
+  "integrations.datadog.heroSubtitle": "Datadog の Error Tracking イシューを取得、AI がリポジトリ経由で修正。",
+  "integrations.datadog.queryLabel": "Datadog イシューを絞り込む",
+  "integrations.datadog.issuesCount": "{n} 件のイシュー",
+  "integrations.datadog.healthOpen": "未解決",
+  "integrations.datadog.emptyTitle": "イシューなし",
+  "integrations.datadog.emptyHint": "クエリを変更するか時間範囲を広げて Fetch をクリック。",
+  "integrations.appdynamics.heroSubtitle": "AppDynamics の APM エラーを Agena に取込、AI がリポジトリ経由で修正。",
+  "integrations.appdynamics.lastImportFromBatch": "最終バッチ",
+  "integrations.appdynamics.viewImportedTasks": "取込済みタスクを表示 ↗"
 }
