@@ -1,5 +1,13 @@
 [
   {
+    "hash": "2172cea",
+    "short": "2172cea",
+    "message": "Sentry: inline import feedback so the run-now button doesn't feel silent",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "cbd2b1f",
     "short": "cbd2b1f",
     "message": "Sentry: actually fix mobile row layout (flex-wrap > grid hacks)",

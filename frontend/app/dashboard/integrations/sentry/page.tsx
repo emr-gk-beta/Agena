@@ -622,7 +622,7 @@ export default function SentryPage() {
               const mapping = mappings.find((m) => m.project_slug === p.slug);
               const isSelected = selectedProject === p.slug;
               return (
-                <div key={p.slug} className='int-row sentry-row-card' style={{
+                <div key={p.slug} className='sentry-row-card' style={{
                   padding: '10px 12px', borderRadius: 10,
                   background: isSelected ? 'rgba(75,46,131,0.10)' : 'var(--glass)',
                   border: `1px solid ${isSelected ? 'rgba(75,46,131,0.4)' : 'var(--panel-border)'}`,
@@ -978,7 +978,7 @@ export default function SentryPage() {
                 return (t('integrations.sentry.nextInH') || 'next in {n}h').replace('{n}', String(hrs));
               })() : null;
               return (
-                <div key={m.id} className='int-row sentry-row-card' style={{
+                <div key={m.id} className='sentry-row-card' style={{
                   padding: '12px 14px', borderRadius: 12,
                   background: 'var(--glass)',
                   border: '1px solid var(--panel-border)',
