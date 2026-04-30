@@ -3194,5 +3194,7 @@
   "reviews.count": "{n} revisiones",
   "reviews.emptyTitle": "Sin revisiones aún",
   "reviews.emptyHint": "Pulsa 🔎 Review en cualquier task para ejecutar un agente revisor.",
-  "nav.reviews": "Revisiones de Código"
+  "nav.reviews": "Revisiones de Código",
+  "reviews.viewHistory": "Ver historial",
+  "reviews.lastSeverity": "última"
 }

@@ -3194,5 +3194,7 @@
   "reviews.count": "{n} 件のレビュー",
   "reviews.emptyTitle": "まだレビューはありません",
   "reviews.emptyHint": "任意のタスクで 🔎 Review ボタンを押してレビュアーエージェントを実行してください。",
-  "nav.reviews": "コードレビュー"
+  "nav.reviews": "コードレビュー",
+  "reviews.viewHistory": "履歴を表示",
+  "reviews.lastSeverity": "直近"
 }

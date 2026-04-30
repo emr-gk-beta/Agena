@@ -585,6 +585,7 @@ export default function AgentsPage() {
           agent={editModalAgent || draft}
           isNew={showNewAgent && !editModalAgent}
           promptSlugs={promptSlugs}
+          reviewStat={editModalAgent ? reviewStats[editModalAgent.role] : undefined}
           onClose={() => { setShowNewAgent(false); setEditModalAgent(null); }}
           onSave={(updated) => {
             if (editModalAgent) {
@@ -622,7 +623,7 @@ export default function AgentsPage() {
 }
 
 // ── Agent Edit/Create Modal ───────────────────────────────────────────────────
-function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t, promptSlugs }: {
+function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t, promptSlugs, reviewStat }: {
   agent: AgentConfig;
   isNew: boolean;
   promptSlugs: string[];
@@ -630,6 +631,7 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t, promp
   onSave: (agent: AgentConfig) => { ok: true } | { ok: false; error: string };
   onDelete?: () => void;
   t: ReturnType<typeof useLocale>['t'];
+  reviewStat?: { count: number; lastSeverity: string | null; avgScore: number | null };
 }) {
   const [a, setA] = useState<AgentConfig>({ ...initial });
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -662,6 +664,39 @@ function AgentModal({ agent: initial, isNew, onClose, onSave, onDelete, t, promp
         </div>
 
         <div style={{ padding: '16px 24px 24px', display: 'grid', gap: 14 }}>
+          {/* Review history banner — visible on existing agents that have reviewer activity */}
+          {!isNew && reviewStat && reviewStat.count > 0 && (() => {
+            const sevColors: Record<string, string> = { critical: '#ef4444', high: '#f97316', medium: '#eab308', low: '#60a5fa', clean: '#22c55e' };
+            const sevColor = reviewStat.lastSeverity ? (sevColors[reviewStat.lastSeverity] || 'var(--ink-35)') : 'var(--ink-35)';
+            return (
+              <a href={`/dashboard/reviews?agent_role=${encodeURIComponent(a.role)}`}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 10,
+                  padding: '12px 14px', borderRadius: 12,
+                  background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.25)',
+                  textDecoration: 'none', color: 'var(--ink)',
+                }}>
+                <span style={{ fontSize: 20 }}>🔎</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 700 }}>
+                    {(t('reviews.count') || '{n} reviews').replace('{n}', String(reviewStat.count))}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--ink-50)', marginTop: 2, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                    {reviewStat.lastSeverity && (
+                      <span style={{ fontSize: 9, fontWeight: 700, padding: '1px 6px', borderRadius: 4, background: `${sevColor}1f`, color: sevColor, textTransform: 'uppercase' }}>
+                        {(t('reviews.lastSeverity') || 'last') + ': ' + reviewStat.lastSeverity}
+                      </span>
+                    )}
+                    {reviewStat.avgScore != null && <span>{(t('reviews.statAvgScore') || 'avg score')}: <strong>{reviewStat.avgScore}</strong></span>}
+                  </div>
+                </div>
+                <span style={{ fontSize: 11, fontWeight: 700, color: '#c084fc' }}>
+                  {t('reviews.viewHistory') || 'View history'} →
+                </span>
+              </a>
+            );
+          })()}
+
           {/* Character picker */}
           <div>
             <label style={labelStyle}>{t('office.pickCharacter')}</label>

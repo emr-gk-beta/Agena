@@ -3194,5 +3194,7 @@
   "reviews.count": "{n} review",
   "reviews.emptyTitle": "Nessuna review ancora",
   "reviews.emptyHint": "Clicca 🔎 Review su un task per eseguire un agente reviewer.",
-  "nav.reviews": "Code Review"
+  "nav.reviews": "Code Review",
+  "reviews.viewHistory": "Mostra cronologia",
+  "reviews.lastSeverity": "ultima"
 }

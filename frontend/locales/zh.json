@@ -3194,5 +3194,7 @@
   "reviews.count": "{n} 条审查",
   "reviews.emptyTitle": "暂无审查",
   "reviews.emptyHint": "在任何任务上点击 🔎 Review 按钮即可运行审查 agent。",
-  "nav.reviews": "代码审查"
+  "nav.reviews": "代码审查",
+  "reviews.viewHistory": "查看历史",
+  "reviews.lastSeverity": "最近"
 }

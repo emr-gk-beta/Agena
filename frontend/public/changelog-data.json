@@ -1,5 +1,13 @@
 [
   {
+    "hash": "e5ea640",
+    "short": "e5ea640",
+    "message": "Reviews: route reviewer dynamically from task metadata, drop hardcoded tag heuristic",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "9d7cf6f",
     "short": "9d7cf6f",
     "message": "Reviews: AI code-review history surface, separate from refinement",

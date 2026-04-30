@@ -3194,5 +3194,7 @@
   "reviews.count": "{n} Reviews",
   "reviews.emptyTitle": "Noch keine Reviews",
   "reviews.emptyHint": "Klicke 🔎 Review auf einer Task, um einen Reviewer-Agent zu starten.",
-  "nav.reviews": "Code Reviews"
+  "nav.reviews": "Code Reviews",
+  "reviews.viewHistory": "Verlauf anzeigen",
+  "reviews.lastSeverity": "letzte"
 }

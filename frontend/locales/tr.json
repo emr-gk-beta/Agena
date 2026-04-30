@@ -3194,5 +3194,7 @@
   "reviews.count": "{n} inceleme",
   "reviews.emptyTitle": "Henüz inceleme yok",
   "reviews.emptyHint": "Herhangi bir task'ta 🔎 Review butonuna basarak reviewer agent çalıştır.",
-  "nav.reviews": "Kod İncelemeleri"
+  "nav.reviews": "Kod İncelemeleri",
+  "reviews.viewHistory": "Geçmişi gör",
+  "reviews.lastSeverity": "son"
 }
