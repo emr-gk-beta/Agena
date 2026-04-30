@@ -3125,5 +3125,9 @@
   "integrations.sentry.runNow": "今すぐ実行",
   "integrations.sentry.dueNow": "実行予定",
   "integrations.sentry.nextInM": "{n}分後",
-  "integrations.sentry.nextInH": "{n}時間後"
+  "integrations.sentry.nextInH": "{n}時間後",
+  "integrations.sentry.allAlreadyImported": "{n} 件すでに取込済み",
+  "integrations.sentry.importedSomeSkipped": "+{i} 取込, {s} スキップ",
+  "integrations.sentry.importedN": "+{n} 取込",
+  "integrations.sentry.noNewIssues": "新しい問題なし"
 }

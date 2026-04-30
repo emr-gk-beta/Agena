@@ -3125,5 +3125,9 @@
   "integrations.sentry.runNow": "立即运行",
   "integrations.sentry.dueNow": "已到期",
   "integrations.sentry.nextInM": "{n} 分钟后",
-  "integrations.sentry.nextInH": "{n} 小时后"
+  "integrations.sentry.nextInH": "{n} 小时后",
+  "integrations.sentry.allAlreadyImported": "{n} 个已导入",
+  "integrations.sentry.importedSomeSkipped": "+{i} 导入, {s} 跳过",
+  "integrations.sentry.importedN": "+{n} 导入",
+  "integrations.sentry.noNewIssues": "没有新问题"
 }

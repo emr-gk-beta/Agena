@@ -192,6 +192,9 @@ export default function SentryPage() {
   const [aiFixLoading, setAiFixLoading] = useState(false);
   const [aiFixError, setAiFixError] = useState('');
 
+  const [runningSlug, setRunningSlug] = useState<string | null>(null);
+  const [rowResult, setRowResult] = useState<Record<string, { kind: 'ok' | 'err'; text: string; ts: number }>>({});
+
   useEffect(() => {
     void loadMappings();
     void loadRepos();
@@ -376,6 +379,8 @@ export default function SentryPage() {
   async function importIssues(projectSlug?: string) {
     setError('');
     setMsg('');
+    const rowKey = projectSlug || '__all__';
+    setRunningSlug(rowKey);
     try {
       const body: Record<string, unknown> = {};
       if (projectSlug) body.project_slug = projectSlug;
@@ -383,17 +388,34 @@ export default function SentryPage() {
         method: 'POST',
         body: JSON.stringify(body),
       });
+      let summary = '';
       if (res.imported === 0 && res.skipped > 0) {
-        setMsg(`No new issues to import — ${res.skipped} already imported before`);
+        summary = (t('integrations.sentry.allAlreadyImported') || 'All {n} already imported').replace('{n}', String(res.skipped));
       } else if (res.imported > 0 && res.skipped > 0) {
-        setMsg(`${res.imported} new issue(s) imported as tasks, ${res.skipped} skipped (already exists)`);
+        summary = (t('integrations.sentry.importedSomeSkipped') || '+{i} imported, {s} skipped').replace('{i}', String(res.imported)).replace('{s}', String(res.skipped));
       } else if (res.imported > 0) {
-        setMsg(`${res.imported} issue(s) imported as tasks`);
+        summary = (t('integrations.sentry.importedN') || '+{n} imported').replace('{n}', String(res.imported));
       } else {
-        setMsg('No issues found to import');
+        summary = t('integrations.sentry.noNewIssues') || 'No new issues';
       }
+      setMsg(summary);
+      setRowResult((prev) => ({ ...prev, [rowKey]: { kind: 'ok', text: summary, ts: Date.now() } }));
+      void loadMappings();
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Import failed');
+      const errText = e instanceof Error ? e.message : 'Import failed';
+      setError(errText);
+      setRowResult((prev) => ({ ...prev, [rowKey]: { kind: 'err', text: errText, ts: Date.now() } }));
+    } finally {
+      setRunningSlug(null);
+      // Clear inline result after 6s
+      setTimeout(() => {
+        setRowResult((prev) => {
+          if (!prev[rowKey] || Date.now() - prev[rowKey].ts < 5800) return prev;
+          const next = { ...prev };
+          delete next[rowKey];
+          return next;
+        });
+      }, 6000);
     }
   }
 
@@ -650,7 +672,18 @@ export default function SentryPage() {
                           ))}
                         </select>
                         <button onClick={() => void importIssues(mapping.project_slug)} title={t('integrations.common.import')}
-                          className='sentry-icon-btn' style={{ ...btnSmall }}>⬇</button>
+                          disabled={runningSlug === mapping.project_slug}
+                          className='sentry-icon-btn' style={{ ...btnSmall, opacity: runningSlug === mapping.project_slug ? 0.6 : 1 }}>
+                          {runningSlug === mapping.project_slug ? '…' : '⬇'}
+                        </button>
+                        {rowResult[mapping.project_slug] && (
+                          <span style={{
+                            fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 4,
+                            color: rowResult[mapping.project_slug].kind === 'ok' ? '#22c55e' : '#f87171',
+                            background: rowResult[mapping.project_slug].kind === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(248,113,113,0.12)',
+                            whiteSpace: 'nowrap',
+                          }}>{rowResult[mapping.project_slug].text}</span>
+                        )}
                         <button onClick={() => void deleteMapping(mapping.id)} title={t('integrations.common.unmap') || 'Unmap'}
                           className='sentry-icon-btn' style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.2)' }}>×</button>
                       </>
@@ -999,7 +1032,18 @@ export default function SentryPage() {
                       {t('integrations.common.auto').toUpperCase()}
                     </label>
                     <button onClick={() => void importIssues(m.project_slug)} title={t('integrations.sentry.runNow') || 'Run now'}
-                      className='sentry-icon-btn' style={{ ...btnSmall, color: '#1CE783', borderColor: 'rgba(28,231,131,0.3)' }}>▶</button>
+                      disabled={runningSlug === m.project_slug}
+                      className='sentry-icon-btn' style={{ ...btnSmall, color: '#1CE783', borderColor: 'rgba(28,231,131,0.3)', opacity: runningSlug === m.project_slug ? 0.6 : 1 }}>
+                      {runningSlug === m.project_slug ? '…' : '▶'}
+                    </button>
+                    {rowResult[m.project_slug] && (
+                      <span style={{
+                        fontSize: 10, fontWeight: 700, padding: '4px 8px', borderRadius: 4,
+                        color: rowResult[m.project_slug].kind === 'ok' ? '#22c55e' : '#f87171',
+                        background: rowResult[m.project_slug].kind === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(248,113,113,0.12)',
+                        whiteSpace: 'nowrap',
+                      }}>{rowResult[m.project_slug].text}</span>
+                    )}
                     <button onClick={() => void openRequestModal(m)} style={{ ...btnSmall, height: 30 }}>
                       {t('integrations.newrelic.request') || 'Request'}
                     </button>

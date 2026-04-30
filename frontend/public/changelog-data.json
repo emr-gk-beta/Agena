@@ -1,5 +1,13 @@
 [
   {
+    "hash": "cbd2b1f",
+    "short": "cbd2b1f",
+    "message": "Sentry: actually fix mobile row layout (flex-wrap > grid hacks)",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "fix"
+  },
+  {
     "hash": "1f472a6",
     "short": "1f472a6",
     "message": "Sentry: compact mobile rows + auto-import countdown so the loop is visible",

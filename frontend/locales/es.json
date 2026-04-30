@@ -3125,5 +3125,9 @@
   "integrations.sentry.runNow": "Ejecutar ahora",
   "integrations.sentry.dueNow": "pendiente",
   "integrations.sentry.nextInM": "próximo en {n}m",
-  "integrations.sentry.nextInH": "próximo en {n}h"
+  "integrations.sentry.nextInH": "próximo en {n}h",
+  "integrations.sentry.allAlreadyImported": "Los {n} ya importados",
+  "integrations.sentry.importedSomeSkipped": "+{i} importados, {s} omitidos",
+  "integrations.sentry.importedN": "+{n} importados",
+  "integrations.sentry.noNewIssues": "Sin novedades"
 }
