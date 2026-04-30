@@ -384,6 +384,39 @@ async def _build_lead_llm_for_task(
     return llm
 
 
+async def _skill_block_for_task(
+    db: AsyncSession,
+    organization_id: int,
+    task: dict[str, Any],
+) -> str:
+    """Retrieve top-K relevant skills for a flow agent prompt. Mirrors the
+    injection OrchestrationService does for the task pipeline, so analyzer
+    and planner nodes (which bypass the pipeline) also see prior solutions."""
+    try:
+        from agena_services.services.skill_service import SkillService
+        svc = SkillService(db)
+        hits = await svc.find_relevant(
+            organization_id,
+            title=str(task.get('title', '') or ''),
+            description=str(task.get('description', '') or '')[:3000],
+            touched_files=None,
+            limit=3,
+        )
+        if not hits:
+            return ''
+        block = SkillService.format_for_prompt(hits, is_turkish=True)
+        summary = ', '.join(f'#{h.id} {h.name[:60]}({h.tier})' for h in hits)
+        logger.info('Flow node retrieved %d skill(s): %s', len(hits), summary)
+        return (
+            '--- RELEVANT TEAM SKILLS (from prior completed tasks) ---\n'
+            f'{block}\n'
+            '--- END SKILLS ---\n\n'
+        )
+    except Exception as exc:
+        logger.info('Flow skill retrieval skipped: %s', exc)
+        return ''
+
+
 async def _run_product_review_node(
     node: dict[str, Any],
     context: dict[str, Any],
@@ -431,7 +464,9 @@ async def _run_product_review_node(
             system_prompt = await PromptService.get(db, 'flow_product_review_system_prompt')
     else:
         system_prompt = await PromptService.get(db, 'flow_product_review_system_prompt')
+    skill_block = await _skill_block_for_task(db, organization_id, task)
     user_prompt = (
+        f"{skill_block}"
         f"Task title: {task.get('title', '')}\n"
         f"Task description: {task.get('description', '')}\n"
         f"Source: {task.get('source', 'internal')}\n"
@@ -551,7 +586,9 @@ async def _run_planner_node(
         system_prompt = await PromptService.get(db, 'ai_plan_system_prompt')
 
     # Build user prompt including analyzer output if available
+    skill_block = await _skill_block_for_task(db, organization_id, task)
     user_prompt = (
+        f"{skill_block}"
         f"Task title: {task.get('title', '')}\n"
         f"Task description: {task.get('description', '')}\n"
     )
