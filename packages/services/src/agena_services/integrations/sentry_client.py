@@ -113,8 +113,13 @@ class SentryClient:
             'limit': str(max(1, min(limit, 100))),
             'sort': 'freq',
         }
-        # Always request 24h sparkline buckets so the UI can render trend.
-        params['statsPeriod'] = stats_period if stats_period in ('24h', '14d', '30d') else '24h'
+        # Sentry's issues endpoint only accepts 24h or 14d for statsPeriod;
+        # other windows (7d, 30d) are filtered through the `age:` query token above
+        # while we still request 24h buckets so the UI can render a trend sparkline.
+        if stats_period == '14d':
+            params['statsPeriod'] = '14d'
+        else:
+            params['statsPeriod'] = '24h'
         if environment:
             params['environment'] = environment.strip()
 

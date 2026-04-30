@@ -1,5 +1,29 @@
 [
   {
+    "hash": "45fcab5",
+    "short": "45fcab5",
+    "message": "Sentry: project health header, bulk filtered import, repo deeplinks, AI status badges",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
+    "hash": "ce2daa8",
+    "short": "ce2daa8",
+    "message": "Sentry: premium issue UX — sparklines, badges, env/release filters, inline stack trace, AI Fix Preview",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "fix"
+  },
+  {
+    "hash": "6f363e0",
+    "short": "6f363e0",
+    "message": "Skills: inject relevant skills into flow analyzer + planner prompts",
+    "date": "2026-04-30",
+    "author": "Ali Ozyildirim",
+    "type": "other"
+  },
+  {
     "hash": "1d76e8b",
     "short": "1d76e8b",
     "message": "Fix flow agent dropdown + propagate Sentry/NewRelic/Datadog/AppDynamics repo mapping to imported tasks",
