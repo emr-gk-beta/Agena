@@ -1,5 +1,13 @@
 [
   {
+    "hash": "1f472a6",
+    "short": "1f472a6",
+    "message": "Sentry: compact mobile rows + auto-import countdown so the loop is visible",
+    "date": "2026-04-30",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "ae305d1",
     "short": "ae305d1",
     "message": "Sentry: project + mapping list redesign, polished empty state, mobile-responsive issue cards",

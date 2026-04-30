@@ -496,12 +496,20 @@ export default function SentryPage() {
   return (
     <div className='integrations-page' style={{ display: 'grid', gap: 16, maxWidth: 980, margin: '0 auto' }}>
       <style>{`
-        @media (max-width: 640px) {
+        .sentry-row-card {
+          display: flex !important;
+          flex-wrap: wrap;
+          gap: 10px;
+          align-items: center;
+        }
+        .sentry-row-card > .sentry-row-icon { flex: 0 0 auto; }
+        .sentry-row-card > .sentry-row-title { flex: 1 1 180px; min-width: 0; }
+        .sentry-row-card > .sentry-row-actions { flex: 0 0 auto; margin-left: auto; display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+        @media (max-width: 700px) {
+          .sentry-row-card > .sentry-row-actions { flex: 1 1 100% !important; margin-left: 0 !important; padding-top: 8px; margin-top: 2px; border-top: 1px dashed var(--panel-border); justify-content: flex-start !important; }
+          .sentry-row-actions select { flex: 1 1 auto; min-width: 0; max-width: 220px; }
           .sentry-issue-card { flex-direction: column; align-items: stretch !important; }
           .sentry-issue-right { flex-direction: row !important; align-items: center !important; justify-content: space-between !important; flex-wrap: wrap; gap: 8px !important; padding-top: 6px; border-top: 1px dashed var(--panel-border); }
-          .sentry-row-card { grid-template-columns: auto 1fr !important; }
-          .sentry-row-actions { grid-column: 1 / -1; padding-top: 8px; border-top: 1px dashed var(--panel-border); margin-top: 4px; justify-content: flex-start !important; }
-          .sentry-row-actions select { flex: 1; min-width: 0; }
         }
         .sentry-icon-btn { width: 30px; height: 30px; display: inline-flex; align-items: center; justify-content: center; padding: 0 !important; font-size: 13px !important; }
       `}</style>
@@ -593,13 +601,12 @@ export default function SentryPage() {
               const isSelected = selectedProject === p.slug;
               return (
                 <div key={p.slug} className='int-row sentry-row-card' style={{
-                  display: 'grid', gridTemplateColumns: 'auto 1fr auto', alignItems: 'center', gap: 10,
                   padding: '10px 12px', borderRadius: 10,
                   background: isSelected ? 'rgba(75,46,131,0.10)' : 'var(--glass)',
                   border: `1px solid ${isSelected ? 'rgba(75,46,131,0.4)' : 'var(--panel-border)'}`,
                   transition: 'background 0.15s, border 0.15s',
                 }}>
-                  <div style={{
+                  <div className='sentry-row-icon' style={{
                     width: 30, height: 30, borderRadius: 8,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: mapping ? 'rgba(28,231,131,0.12)' : 'rgba(148,163,184,0.10)',
@@ -608,7 +615,7 @@ export default function SentryPage() {
                   }}>
                     {mapping ? '✓' : '○'}
                   </div>
-                  <div style={{ minWidth: 0 }}>
+                  <div className='sentry-row-title'>
                     <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {p.name}
                     </div>
@@ -622,7 +629,7 @@ export default function SentryPage() {
                       )}
                     </div>
                   </div>
-                  <div className='sentry-row-actions' style={{ display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'flex-end' }}>
+                  <div className='sentry-row-actions'>
                     <button onClick={() => void fetchIssues(p.slug)} title={t('integrations.sentry.issuesBtn')}
                       className='sentry-icon-btn' style={{ ...btnSmall }}>📋</button>
                     {!mapping ? (
@@ -939,13 +946,11 @@ export default function SentryPage() {
               })() : null;
               return (
                 <div key={m.id} className='int-row sentry-row-card' style={{
-                  display: 'grid', gridTemplateColumns: 'auto 1fr auto', gap: 12,
-                  alignItems: 'center',
                   padding: '12px 14px', borderRadius: 12,
                   background: 'var(--glass)',
                   border: '1px solid var(--panel-border)',
                 }}>
-                  <div style={{
+                  <div className='sentry-row-icon' style={{
                     width: 36, height: 36, borderRadius: 10,
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     background: m.auto_import ? 'rgba(28,231,131,0.10)' : 'rgba(96,165,250,0.10)',
@@ -954,7 +959,7 @@ export default function SentryPage() {
                   }}>
                     {m.auto_import ? '⚡' : '🔗'}
                   </div>
-                  <div style={{ minWidth: 0 }}>
+                  <div className='sentry-row-title'>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                       <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)' }}>{m.project_name}</span>
                       {m.repo_display_name ? (
@@ -971,7 +976,7 @@ export default function SentryPage() {
                       {!lastImportRel && m.import_interval_minutes && m.auto_import && <span style={{ color: 'var(--ink-50)', fontFamily: 'inherit', marginLeft: 8 }}>· {(t('integrations.sentry.everyN') || 'every {n}min').replace('{n}', String(m.import_interval_minutes))}</span>}
                     </div>
                   </div>
-                  <div className='sentry-row-actions' style={{ display: 'flex', gap: 6, alignItems: 'center', justifyContent: 'flex-end' }}>
+                  <div className='sentry-row-actions'>
                     <select
                       value={m.repo_mapping_id ?? ''}
                       onChange={(e) => void updateMapping(m.id, { repo_mapping_id: e.target.value ? parseInt(e.target.value) : null })}
