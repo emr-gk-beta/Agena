@@ -2286,8 +2286,23 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, defaultCreatePr: init
   const [createPr, setCreatePr] = useState(initialCreatePr);
   const [selected, setSelected] = useState<{ type: 'agent' | 'cli' | 'flow'; agent?: { role: string; model: string; provider: string }; flow?: { id: string; name: string } } | null>(null);
   const task = tasks.find((tk) => tk.id === taskId);
-  const taskDesc = ((task as unknown as { description?: string })?.description || '').toLowerCase();
+  const taskDescRaw = ((task as unknown as { description?: string })?.description || '');
+  const taskDesc = taskDescRaw.toLowerCase();
   const hasRepo = taskDesc.includes('local repo path') || taskDesc.includes('remote repo');
+
+  // Pre-select agent from "Preferred Agent Role:" line stamped by the
+  // IntegrationRule engine. Without this the user has to re-pick the
+  // role the rule already chose for them.
+  useEffect(() => {
+    if (selected || mode !== 'ai') return;
+    const m = taskDescRaw.match(/Preferred Agent Role:\s*([A-Za-z0-9_\-]+)/i);
+    const preferredRole = (m?.[1] || '').trim().toLowerCase();
+    if (!preferredRole) return;
+    const match = agents.find((a) => (a.role || '').toLowerCase() === preferredRole && a.enabled !== false);
+    if (match) {
+      setSelected({ type: 'agent', agent: { role: match.role, model: match.model, provider: match.provider } });
+    }
+  }, [taskDescRaw, agents, mode, selected]);
 
   useEffect(() => {
     apiFetch<BackendRepoMapping[]>('/repo-mappings')
