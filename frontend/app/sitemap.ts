@@ -29,6 +29,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/vs/copilot', modified: '2026-04-05', freq: 'monthly' as const, priority: 0.8 },
     { path: '/vs/devin', modified: '2026-04-05', freq: 'monthly' as const, priority: 0.8 },
     { path: '/vs/codex', modified: '2026-04-05', freq: 'monthly' as const, priority: 0.8 },
+    { path: '/sentry-ai-auto-fix', modified: '2026-04-30', freq: 'monthly' as const, priority: 0.95 },
+    { path: '/jira-ai-agent', modified: '2026-04-30', freq: 'monthly' as const, priority: 0.95 },
+    { path: '/azure-devops-ai-bot', modified: '2026-04-30', freq: 'monthly' as const, priority: 0.95 },
+    { path: '/ai-code-review', modified: '2026-04-30', freq: 'monthly' as const, priority: 0.95 },
   ];
 
   // All blog slugs
@@ -58,6 +62,11 @@ export default function sitemap(): MetadataRoute.Sitemap {
     'github-copilot-alternatifi', 'alternativa-github-copilot',
     'github-copilot-alternative-de', 'github-copilot-tidai',
     'alternativa-github-copilot-it', 'github-copilot-daitai',
+    'sentry-error-to-merged-pr-12-minutes',
+    'jira-reporter-rules-tutorial',
+    'owasp-ai-code-review',
+    'custom-reviewer-agent-setup',
+    'azure-devops-ai-bot-tutorial',
   ];
 
   return [

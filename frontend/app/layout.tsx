@@ -21,7 +21,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: {
-    default: 'AGENA – Agentic AI Platform | Pixel Agent & Autonomous Code Generation',
+    default: 'AGENA – AI Agents That Fix Sentry, Jira & Azure DevOps Tickets, Open the PR',
     template: '%s | AGENA',
   },
   description:

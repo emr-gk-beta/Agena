@@ -1709,6 +1709,484 @@ This article covers the key concepts. Visit [Documentation](/docs) and [Use Case
 
 This article covers the key concepts. Visit [Documentation](/docs) and [Use Cases](/use-cases) to learn more.
     `,
+  },
+  'sentry-error-to-merged-pr-12-minutes': {
+    title: 'From Sentry Alert to Merged PR in 12 Minutes — A Real Case Study',
+    description: 'How AGENA turned a Sentry production error into an OWASP-reviewed pull request, merged it, and auto-resolved the Sentry issue — in 12 minutes end-to-end. Step-by-step timeline with real timestamps.',
+    date: '2026-04-29',
+    readTime: '7 min read',
+    content: `
+## The 12-minute timeline
+
+This is a real run on the AGENA team's own backend. Sentry fired an alert at **14:02:18 UTC**. The PR landed in main at **14:14:51**. Total: **12 minutes 33 seconds**, with three AI agents (analyzer, developer, security_developer reviewer) and zero human keystrokes between the alert and the merge.
+
+### 14:02:18 — Sentry alert fires
+
+\`UnboundLocalError: local variable 'order_id' referenced before assignment\` in \`order_service.py:88\`. The Sentry issue is created in the [\`backend\`](/dashboard/integrations/sentry) project, mapped in AGENA to the \`backend\` repo on Azure DevOps.
+
+### 14:02:51 — AGENA polls Sentry, imports the issue
+
+The Sentry poller picks up the new issue on its 30-second cycle. Stack trace, breadcrumbs, request meta, and the \`UNBOUNDLOCAL\` fingerprint are converted into a Task with a backlink to the Sentry permalink.
+
+### 14:02:55 — Integration Rule routes to security_developer
+
+An [Integration Rule](/dashboard/integrations/rules) matches on \`tags.error_type = UnboundLocalError AND environment = production\`. Action: tag = \`security_review\`, agent = \`security_developer\`, priority = \`critical\`. The task lands in the security developer's inbox with an OWASP-aware reviewer auto-selected.
+
+### 14:03:10 — Worker picks up the task
+
+The Redis worker picks up the task. Repo lock acquired on \`backend\`. Pipeline starts.
+
+### 14:03:42 — Analyzer agent finishes
+
+\`gpt-5\` analyzer reads the stack trace, identifies the assignment branch where \`order_id\` is set inside an \`if\` block but used unconditionally afterward.
+
+### 14:06:02 — Developer agent commits the fix
+
+The developer agent reads the file, replaces the unguarded reference with a default value pulled from the request, adds a regression test, and pushes the branch \`agena/fix-unbound-order-id\`.
+
+### 14:08:21 — security_developer reviewer runs
+
+The OWASP-aware reviewer agent runs. Output:
+
+\`\`\`
+### Summary
+The fix is correct but introduces a new code path where \`order_id\` is read directly from
+the request without sanitization. Low risk because downstream uses parameterized queries.
+
+### Findings
+1. order_service.py:88 — order_id pulled from request param without type validation (LOW).
+   Recommend coercing to int before use.
+
+### Severity
+low
+
+### Score
+86
+\`\`\`
+
+### 14:09:02 — Pull request opened on Azure DevOps
+
+PR #4427 opened with the AI review attached as the description, the Sentry issue link in the body, and \`security_review\` label applied. Required reviewers: \`@platform-leads\`.
+
+### 14:11:18 — Auto-complete triggered after CI green
+
+The team's branch policy requires a green build. Pipeline finishes at 14:11:14. PR auto-completes (squash, branch deleted).
+
+### 14:11:54 — GitHub-style webhook fires Agena's /webhooks/pr-merged
+
+AGENA flips the Sentry issue to **resolved**, posts a comment on the Sentry issue with the merged commit URL, and updates the AGENA task to **completed**.
+
+### 14:14:51 — Merged commit deploys via the team's Azure pipeline
+
+Production deploy finishes. Sentry confirms zero new occurrences of the error.
+
+## What this proves
+
+A meaningful chunk of Sentry traffic is **deterministic, fixable, and boring** — the exact shape AI handles well: type errors, NPEs, off-by-one, missing nullchecks, leaky try/except. The hard parts of an outage (which deploy caused it, which feature flag flipped, which customer impact) are still human work. AI doesn't replace the on-call rotation; it just handles the boring 60% of issues so on-call can sleep.
+
+## How to set this up for your team
+
+1. Connect [Sentry to AGENA](/sentry-ai-auto-fix) (5 minutes).
+2. Map your Sentry projects to AGENA repo mappings.
+3. Create one Integration Rule for security-tagged issues to route to \`security_developer\`.
+4. Set Auto-Complete on the AI's PRs in Azure DevOps with required CI green + security review.
+5. Watch the AGENA reviews dashboard for the first week to tune thresholds.
+
+## Related reading
+
+- [Sentry AI Auto-Fix landing](/sentry-ai-auto-fix)
+- [AI Code Review with OWASP-aware reviewer agents](/ai-code-review)
+- [Custom reviewer agent setup tutorial](/blog/custom-reviewer-agent-setup)
+    `,
+  },
+  'jira-reporter-rules-tutorial': {
+    title: 'Reporter-Based Routing in Jira: Send Security Tickets to a Different AI Reviewer',
+    description: 'Step-by-step tutorial — set up Integration Rules in AGENA so Jira tickets reported by your security team auto-route to an OWASP-aware reviewer agent. With JQL examples and screenshots.',
+    date: '2026-04-28',
+    readTime: '6 min read',
+    content: `
+## The pattern
+
+Big-company Jira instances usually have a **security backlog** that lives alongside the regular feature backlog. Tickets reported by \`security@yourcompany.com\` (or labelled \`security\`, or filed under a \`Security\` project) need a different review than a normal feature ticket — paranoid threat-model thinking, OWASP awareness, residual-risk notes.
+
+In most setups today, this routing is done **in someone's head**: the team lead reads the reporter, mentally tags the ticket, and assigns it to the security-minded engineer. That's a human bottleneck and it doesn't scale.
+
+[AGENA Integration Rules](/dashboard/integrations/rules) make the routing **declarative**: the same rule engine that handles Jira reporters also handles Azure DevOps area paths, Sentry tags, and New Relic entity GUIDs.
+
+## What we'll build
+
+- Pull all open issues from a Jira project into AGENA.
+- Auto-tag any issue **reported by anyone in the security team** with \`security_review\`.
+- Auto-route those tickets to the \`security_developer\` AI reviewer agent (OWASP-aware).
+- Auto-set priority to \`critical\` so they jump the queue.
+
+## Step 1 — Connect Jira
+
+1. Go to AGENA → Integrations → Jira.
+2. Paste your Atlassian email + API token + site URL.
+3. Pick the project to sync. Use a JQL filter like:
+   \`\`\`
+   resolution = Unresolved AND project = "BACK" ORDER BY priority DESC
+   \`\`\`
+4. Map the Jira project to your target repo (GitHub or Azure DevOps).
+
+## Step 2 — Define the security developer agent
+
+1. Go to /dashboard/agents → New Agent.
+2. Name it \`security_developer\` (the slug AGENA uses for OWASP-aware reviews).
+3. Toggle **is_reviewer** on.
+4. Pick a model. We use GPT-5-pro for security reviews — quality > cost.
+5. The system prompt is pre-populated from \`security_dev_system_prompt\` in [Prompt Studio](/dashboard/prompts). Customize if needed.
+6. Save.
+
+## Step 3 — Create the Integration Rule
+
+1. Go to /dashboard/integrations/rules.
+2. Click **New Rule** → Provider = Jira.
+3. **Match clause**:
+   - Field: \`reporter.emailAddress\`
+   - Operator: \`in\`
+   - Value: \`security@yourcompany.com\`, \`security-team@yourcompany.com\`
+4. **Action clause**:
+   - Tag: \`security_review\`
+   - Preferred agent role: \`security_developer\`
+   - Priority: \`critical\`
+   - (Optional) Target repo: override the default mapping.
+
+You can also match on labels (\`labels contains "security"\`) or issue type (\`issuetype = "Vulnerability"\`) — same engine.
+
+## Step 4 — Verify
+
+The next time a Jira ticket lands in AGENA from the security team, it will:
+
+- Carry the \`security_review\` tag.
+- Stamp \`Preferred Agent Role: security_developer\` in the description metadata.
+- Have priority bumped to critical.
+- When you click 🔎 Review on the task, the security_developer agent is preselected.
+
+## Why this is better than a JQL filter + manual triage
+
+JQL filters tell you **which** tickets are security-related. Integration Rules tell AGENA **what to do** with them. The same rule applies to:
+
+- Imported Sentry issues (match on environment, project, error type).
+- Azure DevOps work items (match on Created By, Area Path, Tag).
+- New Relic auto-imports (match on entity GUID, error class).
+
+One rule engine across every source.
+
+## Related reading
+
+- [Jira AI Agent landing page](/jira-ai-agent)
+- [AI Code Review with custom reviewer personas](/ai-code-review)
+- [From Sentry alert to merged PR in 12 minutes](/blog/sentry-error-to-merged-pr-12-minutes)
+    `,
+  },
+  'owasp-ai-code-review': {
+    title: 'OWASP-Aware AI Code Review: How to Catch SQL Injection Before Merge',
+    description: 'A practical guide to running an OWASP-aware AI reviewer agent on every PR. Catches SQL injection, XSS, SSRF, auth bypass, and insecure deserialization — with severity scoring and audit history.',
+    date: '2026-04-26',
+    readTime: '9 min read',
+    content: `
+## Why generic AI reviewers miss security bugs
+
+Generic LLM reviewers (CodeRabbit, GitHub Copilot review, default AGENA reviewer) are tuned to be **helpful**: they comment on style, naming, edge cases, and obvious bugs. They are not tuned to be **paranoid** — and security review needs paranoia.
+
+A typical generic reviewer comment on a SQL string concat:
+> "Consider using parameterized queries here for clarity."
+
+A paranoid security reviewer comment on the same line:
+> "**SQL injection — CRITICAL.** This query string is built from request input via f-string. The downstream call hits a writeable Postgres connection. An attacker can drop tables, exfiltrate data, or escalate to OS-level command execution via \`COPY ... TO PROGRAM\`. Fix: replace f-string with \`text(':order_id')\` and pass \`{'order_id': order_id}\` to \`.execute()\`. Verify no other call site builds queries this way."
+
+The first comment is technically right. The second is **actionable, severity-ranked, and threat-modeled**. That's the difference an OWASP-aware reviewer makes.
+
+## What an OWASP-aware reviewer does
+
+The \`security_developer\` reviewer agent in [AGENA](/) runs a system prompt that makes it:
+
+- **Treat every input as malicious** by default.
+- **Trace the data flow**: where does this string come from, where does it go, who can reach it?
+- **Map findings to the OWASP Top 10** explicitly: A03 Injection, A01 Broken Access Control, A07 Authentication Failures, A10 SSRF, etc.
+- **Output a threat model**, not just a fix.
+- **Score severity** on a fixed scale: critical / high / medium / low / clean.
+
+## The OWASP Top 10 cheat sheet
+
+The reviewer prompt explicitly checks for:
+
+| Risk | What the reviewer looks for |
+|------|------------------------------|
+| **A01 Broken Access Control** | Missing authorization, IDOR, role checks bypassable by request input |
+| **A02 Cryptographic Failures** | Hardcoded keys, weak algorithms (MD5/SHA1 for passwords), missing encryption-in-transit |
+| **A03 Injection** | SQL, NoSQL, LDAP, OS command, XPath, SSI; any string concat with user input |
+| **A04 Insecure Design** | Missing rate limiting, predictable IDs, unscoped resource access |
+| **A05 Security Misconfiguration** | CORS \`*\`, debug = True, default creds, exposed admin paths |
+| **A06 Vulnerable Components** | New deps without pinning, removed pin on a known-CVE package |
+| **A07 Auth Failures** | Brute-force-able login, plaintext token storage, JWT \`alg: none\` |
+| **A08 Data Integrity** | Insecure deserialization (pickle, yaml.load), unsigned webhooks |
+| **A09 Logging Failures** | Missing audit trail on auth events, logging secrets |
+| **A10 SSRF** | Outbound HTTP from user-controlled URL without allowlist |
+
+## Setting it up in AGENA
+
+\`security_developer\` ships pre-built. To use it on every PR generated for a specific source:
+
+1. Go to /dashboard/integrations/rules.
+2. Match the source you want covered (e.g. all Sentry imports, or all Jira tickets in the \`SEC\` project).
+3. Set the action: \`Preferred Agent Role = security_developer\`.
+
+Now every imported task in that source automatically routes through the OWASP reviewer when it reaches the review stage. You can also click 🔎 Review on any task and pick \`security_developer\` manually.
+
+## Sample output
+
+\`\`\`
+### Summary
+The patch removes the missing-nullcheck but introduces a SQL injection on /api/orders/refund.
+
+### Findings
+1. order_service.py:88 — SQL injection (CRITICAL). String concat builds WHERE clause from request param.
+   Fix: parameterize. Verify no sister functions do the same. Consider an allowlist on order_id format.
+2. routes/orders.py:42 — Missing auth (HIGH). /orders/{id}/refund has no Depends(get_current_user).
+3. order_service.py:103 — Logging request body unconditionally (MEDIUM). May log card numbers.
+
+### Severity
+critical
+
+### Score
+24
+\`\`\`
+
+## Audit history
+
+Every review the \`security_developer\` agent has done is on the [reviews page](/dashboard/reviews) — filterable by severity, agent, repo, time range. Per-agent history banner shows severity distribution and average score, which is what you want at QBR time when leadership asks "how much did our security reviewer catch this quarter."
+
+## Why not just use a SAST tool?
+
+SAST and AI review are complementary. SAST tools (Semgrep, Snyk Code, CodeQL) excel at **pattern matching** — they catch every \`exec(input())\` even at 3am. AI reviewers excel at **semantic reasoning** — they understand that the input came from a request param three call sites away. Run both. SAST blocks merge on known patterns; AI flags risky design before it ships.
+
+## Related reading
+
+- [AI Code Review landing page](/ai-code-review)
+- [Custom reviewer agent setup tutorial](/blog/custom-reviewer-agent-setup)
+- [From Sentry alert to merged PR in 12 minutes](/blog/sentry-error-to-merged-pr-12-minutes)
+    `,
+  },
+  'custom-reviewer-agent-setup': {
+    title: 'How to Build a Custom AI Reviewer Agent (Performance, Accessibility, Style Cop)',
+    description: 'Build your own reviewer personas in AGENA — performance reviewer, accessibility reviewer, frontend state reviewer, SQL style cop. Each gets its own system prompt and model. Step-by-step.',
+    date: '2026-04-25',
+    readTime: '5 min read',
+    content: `
+## Why custom reviewers
+
+The default AGENA reviewer is a generalist — it will catch common bugs and style issues across any code. But teams almost always want **specialist** reviewers too:
+
+- A **Performance Reviewer** that knows about N+1 queries, missing indexes, allocation hot paths.
+- An **Accessibility Reviewer** that flags missing aria labels, contrast issues, keyboard traps.
+- A **Frontend State Reviewer** that knows your Zustand patterns and flags useState misuse.
+- A **SQL Style Cop** that enforces your in-house naming conventions on migrations.
+
+Each persona is just a prompt + a model. AGENA gives you the harness to define them and pick which one runs on each task.
+
+## The five-minute setup
+
+### 1. Create the agent
+
+\`/dashboard/agents → New Agent\`. Set:
+
+- **Name**: \`Performance Reviewer\` (or whatever).
+- **Role**: pick one of \`reviewer\`, \`security_developer\`, \`qa\`, \`lead_developer\` — used for routing.
+- **is_reviewer**: ON. (This makes the agent appear in the 🔎 Review picker.)
+- **Provider**: OpenAI / Anthropic / Google / your self-hosted endpoint.
+- **Model**: pick the right tradeoff. Performance review is mostly pattern-matching, so \`gpt-5-mini\` is plenty.
+- **System prompt**: this is where the persona lives. See examples below.
+
+### 2. Write the system prompt
+
+Performance Reviewer (paste this):
+
+\`\`\`
+You are a senior backend performance reviewer. For every patch, focus on:
+1. N+1 query patterns (check ORM relationship loading).
+2. Missing or unused indexes (look at WHERE/JOIN columns).
+3. Synchronous I/O on the hot path.
+4. Unbounded loops, list comprehensions, or in-memory accumulations.
+5. JSON serialization of large objects.
+6. Cache reads that fall through to slow backends.
+
+Output format:
+### Summary
+### Findings (file/line, what's slow, magnitude estimate, fix)
+### Severity (critical/high/medium/low/clean)
+### Score (0-100)
+
+Cite specific code. Do not comment on style or naming.
+\`\`\`
+
+Accessibility Reviewer:
+
+\`\`\`
+You are a WCAG 2.2 AA accessibility reviewer. Focus only on the diff. Check:
+1. Interactive elements have keyboard handlers (button vs div onClick).
+2. Form inputs have labels (aria-label or <label htmlFor>).
+3. Color contrast for new colors against panel-bg.
+4. Focus traps in modals.
+5. ARIA roles correctly applied (no role="button" on actual <button>).
+6. Screen-reader-only context for icons.
+
+Severity guidelines:
+- critical: keyboard inaccessible critical flow
+- high: missing label / WCAG fail on auth/form path
+- medium: WCAG fail on non-critical UI
+- low: nit
+\`\`\`
+
+### 3. Pick the agent on a task
+
+Click **🔎 Review** on any task. The picker shows:
+- ✨ Auto (resolves from task tags / Integration Rules)
+- Default Reviewer
+- Performance Reviewer
+- Security Developer
+- Accessibility Reviewer
+- (any other is_reviewer agent you've defined)
+
+Pick yours. The review runs synchronously and the report appears on the task's Reviews tab.
+
+### 4. (Optional) Auto-route
+
+For a persona to fire automatically on certain tasks, define an [Integration Rule](/dashboard/integrations/rules):
+
+- "All Sentry issues from the \`backend-api\` project → Performance Reviewer"
+- "All Jira tickets with label \`accessibility\` → Accessibility Reviewer"
+- "All Azure DevOps work items in \`Area\\\\Frontend\` → Frontend State Reviewer"
+
+Same rule engine, every source.
+
+## Audit history
+
+Every reviewer agent has its own history banner on the agent card: severity distribution, average score, click-through to past reports. Filterable on /dashboard/reviews.
+
+## Pro tips
+
+- **Run a cheap model for nits, an expensive model for security.** \`gpt-5-mini\` for the SQL style cop, \`gpt-5-pro\` for the security_developer.
+- **Iterate on prompts in [Prompt Studio](/dashboard/prompts).** Roll back to previous versions if a prompt change degrades quality.
+- **Don't mix concerns.** A reviewer that checks performance AND security AND style will be mediocre at all three. Build narrow personas.
+
+## Related reading
+
+- [AI Code Review landing page](/ai-code-review)
+- [OWASP-aware AI code review tutorial](/blog/owasp-ai-code-review)
+- [From Sentry alert to merged PR in 12 minutes](/blog/sentry-error-to-merged-pr-12-minutes)
+    `,
+  },
+  'azure-devops-ai-bot-tutorial': {
+    title: 'How to Build an Azure DevOps AI Bot That Auto-Closes Work Items',
+    description: 'End-to-end guide — connect Azure DevOps to AGENA, set up area-path-based routing, and let AI agents pick up work items, ship PRs, and auto-close on merge. With PAT scopes and WIQL examples.',
+    date: '2026-04-23',
+    readTime: '6 min read',
+    content: `
+## What you'll have at the end
+
+- Every open work item in your Azure DevOps project syncs to AGENA every 5 minutes.
+- AI agents (analyzer → developer → reviewer) generate the patch.
+- A pull request is opened on Azure Repos with the AI review attached.
+- Work item state transitions automatically: Active → Resolved when the PR opens, Closed when it auto-completes.
+- Security-tagged work items route to the OWASP-aware \`security_developer\` reviewer.
+- Story points are written back to the work item by AI Refinement.
+
+## Step 1 — Create the PAT
+
+Go to dev.azure.com/yourorg/_usersSettings/tokens. Create a token with these scopes:
+
+- **Code (Read & Write)** — required to push branches, open PRs.
+- **Work Items (Read & Write)** — required to import and update.
+- **Build (Read)** — required to read CI status before auto-completing.
+- **Identity (Read)** — required to look up reviewers.
+
+Copy the token. You won't see it again.
+
+## Step 2 — Connect AGENA
+
+In AGENA → Integrations → Azure DevOps:
+
+- **PAT**: paste it.
+- **Org URL**: \`https://dev.azure.com/yourorg\`.
+
+AGENA validates by listing your projects. If you see project names, you're connected.
+
+## Step 3 — Map projects to repos
+
+For each project, AGENA shows you its repos. Click **Map** on each repo you want AI to target. The mapping stores:
+
+- Provider: Azure DevOps
+- Owner: project name
+- Repo name: repo name
+- Base branch: default (\`main\` or \`master\`)
+- Playbook: optional repo-specific instructions for the AI
+
+## Step 4 — Configure the WIQL filter
+
+The default work item filter:
+
+\`\`\`
+SELECT [System.Id] FROM workitems
+WHERE [System.State] <> 'Closed' AND [System.AssignedTo] = @Me
+\`\`\`
+
+Customize per project. Common patterns:
+
+- **All open bugs**: \`WorkItemType = 'Bug' AND State <> 'Closed'\`
+- **Specific area path**: \`AreaPath UNDER 'Project\\\\Backend\\\\API'\`
+- **Security backlog**: \`Tags CONTAINS 'security' AND State <> 'Closed'\`
+
+## Step 5 — Set up routing rules
+
+Go to /dashboard/integrations/rules. Add rules per provider:
+
+- **Match**: Provider = Azure DevOps, Tag contains "security"
+- **Action**: Tag = \`security_review\`, Preferred Agent Role = \`security_developer\`, Priority = critical
+
+Or by area path:
+
+- **Match**: Area Path matches \`Project\\\\Frontend\`
+- **Action**: Preferred Agent Role = \`accessibility_reviewer\`
+
+## Step 6 — Enable auto-import
+
+On any work item, the AGENA task page shows a toggle: **Auto-import for this query**. Turn it on. The worker polls every 5 minutes.
+
+## Step 7 — Optional: auto-complete the AI's PRs
+
+In Azure DevOps branch policies for \`main\`:
+
+- Require minimum 1 reviewer.
+- Require successful CI build.
+- Require linked work items.
+
+In AGENA → Integrations → Azure DevOps → Settings:
+
+- **Auto-complete AI PRs**: ON (recommended).
+- **Squash on auto-complete**: ON.
+- **Delete branch on auto-complete**: ON.
+
+When the AI's PR satisfies the policies, it auto-completes. The work item transitions to Closed via the merge commit message linkage. AGENA's webhook also fires to close the AGENA task.
+
+## Step 8 — Watch the first run
+
+The first import run will pull every work item that matches your filter. Expect the first batch to be large. Subsequent runs only pick up new or changed work items.
+
+## Common gotchas
+
+- **Story points field**: if your project uses a custom field for story points (not \`Microsoft.VSTS.Scheduling.StoryPoints\`), set the field reference name in AGENA → Integrations → Azure DevOps → Field Map.
+- **Work item type names**: AGENA filters by lowercase types. \`User Story\` works, \`PBI\` works, \`Bug\` works.
+- **Self-hosted Azure DevOps Server**: same flow, different base URL. AGENA supports both.
+
+## Related reading
+
+- [Azure DevOps AI Bot landing page](/azure-devops-ai-bot)
+- [Reporter-based routing in Jira](/blog/jira-reporter-rules-tutorial)
+- [Custom reviewer agent setup](/blog/custom-reviewer-agent-setup)
+    `,
   },};
 
 export function generateStaticParams() {
