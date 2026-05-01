@@ -977,7 +977,18 @@ async def update_task_repo_assignments(
 
     # If the task's primary repo_mapping_id was on a removed assignment,
     # rotate it to the first remaining mapping (or clear it).
-    if task.repo_mapping_id and task.repo_mapping_id not in requested_set:
+    #
+    # Only rotate when the primary actually corresponded to one of the
+    # `existing` assignment rows. Tasks routed by IntegrationRule auto-
+    # routing (or any other code path that writes the legacy
+    # repo_mapping_id column directly without creating a
+    # task_repo_assignments row) would otherwise get silently nulled
+    # whenever the user saved the Edit modal with an unrelated change.
+    if (
+        task.repo_mapping_id
+        and task.repo_mapping_id in existing_set
+        and task.repo_mapping_id not in requested_set
+    ):
         task.repo_mapping_id = next(iter(requested_set), None)
 
     await db.commit()
