@@ -271,6 +271,17 @@ export default function SprintsPage() {
   // page re-reads prefs and switches without a full reload — same pattern
   // as /dashboard/refinement.
   const [sprintRefreshKey, setSprintRefreshKey] = useState(0);
+  // Server-side prefs cached for the inactive provider tab. SprintSwitcher
+  // writes Jira selection to backend prefs (not localStorage), so when
+  // the user clicks the Jira tab here we need a fallback beyond LS.
+  const [serverPrefs, setServerPrefs] = useState<{
+    azure_project: string;
+    azure_team: string;
+    azure_sprint: string;
+    jira_project: string;
+    jira_board: string;
+    jira_sprint: string;
+  }>({ azure_project: '', azure_team: '', azure_sprint: '', jira_project: '', jira_board: '', jira_sprint: '' });
   const [importPickerItem, setImportPickerItem] = useState<WorkItem | null>(null);
   const [importPickerRepoId, setImportPickerRepoId] = useState<string>('');
   const isJiraAuthError = (message: string) => message.toLowerCase().includes('jira credentials are invalid');
@@ -311,6 +322,17 @@ export default function SprintsPage() {
         jiraProjectPref = jiraProject;
         jiraBoardPref = jiraBoard;
         jiraSprintPref = jiraSprint;
+        // Cache both providers' server prefs so the provider-switch effect
+        // can seed the Jira tab even if LS_JIRA_* are empty (SprintSwitcher
+        // saves to backend, not localStorage).
+        setServerPrefs({
+          azure_project: prefs.azure_project || '',
+          azure_team: prefs.azure_team || '',
+          azure_sprint: prefs.azure_sprint_path || '',
+          jira_project: jiraProject,
+          jira_board: jiraBoard,
+          jira_sprint: jiraSprint,
+        });
         if (savedProvider === 'jira') {
           if (jiraProject) savedProject = jiraProject;
           if (jiraBoard) savedTeam = jiraBoard;
@@ -512,8 +534,14 @@ export default function SprintsPage() {
 
   useEffect(() => {
     if (hydrating) return;
-    const storedProject = localStorage.getItem(provider === 'jira' ? LS_JIRA_PROJECT : LS_PROJECT) || '';
-    const storedSprint = localStorage.getItem(provider === 'jira' ? LS_JIRA_SPRINT : LS_SPRINT) || '';
+    // localStorage holds whatever the user picked on this page; backend
+    // serverPrefs holds the SprintSwitcher selection. The switcher only
+    // writes to backend, so the Jira tab needs the server fallback to
+    // pre-select correctly when LS_JIRA_* is empty.
+    const lsProject = localStorage.getItem(provider === 'jira' ? LS_JIRA_PROJECT : LS_PROJECT) || '';
+    const lsSprint  = localStorage.getItem(provider === 'jira' ? LS_JIRA_SPRINT : LS_SPRINT) || '';
+    const storedProject = lsProject || (provider === 'jira' ? serverPrefs.jira_project : serverPrefs.azure_project);
+    const storedSprint  = lsSprint  || (provider === 'jira' ? serverPrefs.jira_sprint  : serverPrefs.azure_sprint);
     setPreferredSprint(storedSprint);
     setProjectRaw('');
     setTeamRaw('');
@@ -582,7 +610,8 @@ export default function SprintsPage() {
       const validProject = projects.some((p) => (p.id ?? p.name) === project || p.name === project);
       if (!validProject) return;
     }
-    const storedTeam = localStorage.getItem(provider === 'jira' ? LS_JIRA_BOARD : LS_TEAM) || '';
+    const lsTeam = localStorage.getItem(provider === 'jira' ? LS_JIRA_BOARD : LS_TEAM) || '';
+    const storedTeam = lsTeam || (provider === 'jira' ? serverPrefs.jira_board : serverPrefs.azure_team);
     setLtm(true);
     const url = provider === 'jira'
       ? (project ? '/tasks/jira/boards?project_key=' + encodeURIComponent(project) : '/tasks/jira/boards')
