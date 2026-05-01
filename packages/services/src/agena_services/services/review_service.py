@@ -303,7 +303,17 @@ async def _resolve_reviewer_prompt(db: AsyncSession, role: str, user_id: int) ->
 
 async def _resolve_reviewer_model(db: AsyncSession, user_id: int, role: str) -> tuple[str | None, str | None]:
     """Look up the user's saved agent for this role and return (provider,
-    model). Falls back to (None, None) so the LLMProvider uses defaults."""
+    model).
+
+    Resolution order:
+      1. Exact role match in user's agents.
+      2. Fallback to ANY enabled claude_cli / codex_cli agent — these
+         use the host's CLI auth so they always work without API keys,
+         and picking one is far better than dropping into LLMProvider's
+         mock fallback when the role string doesn't match (e.g. picker
+         offers 'security_developer' but the user only has a typo'd
+         'security_rewiever' agent).
+      3. (None, None) so LLMProvider falls through to its own defaults."""
     from sqlalchemy import select
     pref = (await db.execute(
         select(UserPreference).where(UserPreference.user_id == user_id)
@@ -316,12 +326,32 @@ async def _resolve_reviewer_model(db: AsyncSession, user_id: int, role: str) -> 
         return None, None
     if not isinstance(agents, list):
         return None, None
+
+    role_norm = role.strip().lower()
     for a in agents:
         if not isinstance(a, dict):
             continue
-        if str(a.get('role') or '').strip().lower() == role.strip().lower():
+        if str(a.get('role') or '').strip().lower() == role_norm:
             provider = str(a.get('provider') or '').strip() or None
             model = str(a.get('custom_model') or a.get('model') or '').strip() or None
+            return provider, model
+
+    # Role miss — prefer any enabled CLI agent so review hits the bridge
+    # instead of the openai mock fallback. Pick claude_cli first
+    # (slightly better at code reasoning), then codex_cli, then anything.
+    for preferred in ('claude_cli', 'codex_cli'):
+        for a in agents:
+            if not isinstance(a, dict) or a.get('enabled') is False:
+                continue
+            if str(a.get('provider') or '').strip().lower() == preferred:
+                model = str(a.get('custom_model') or a.get('model') or '').strip() or None
+                return preferred, model
+    for a in agents:
+        if not isinstance(a, dict) or a.get('enabled') is False:
+            continue
+        provider = str(a.get('provider') or '').strip() or None
+        model = str(a.get('custom_model') or a.get('model') or '').strip() or None
+        if provider:
             return provider, model
     return None, None
 
