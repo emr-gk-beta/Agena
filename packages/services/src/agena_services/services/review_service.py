@@ -173,6 +173,73 @@ async def _fetch_pr_diff_for_review(
     return '', ''
 
 
+async def _resolve_repo_path_for_task(db: AsyncSession, task: TaskRecord) -> str:
+    """Look up the local checkout path for a task's repo_mapping. Falls
+    back to /tmp when nothing is configured — the CLI bridge will still
+    run, just without filesystem access for Read/Grep/Bash."""
+    if not task.repo_mapping_id:
+        return '/tmp'
+    try:
+        from agena_models.models.repo_mapping import RepoMapping
+        from sqlalchemy import select as _sel
+        row = (await db.execute(
+            _sel(RepoMapping).where(
+                RepoMapping.id == task.repo_mapping_id,
+                RepoMapping.organization_id == task.organization_id,
+                RepoMapping.is_active.is_(True),
+            )
+        )).scalar_one_or_none()
+        if row is None:
+            return '/tmp'
+        p = (row.local_repo_path or '').strip()
+        return p or '/tmp'
+    except Exception:
+        return '/tmp'
+
+
+async def _run_cli_review(
+    *,
+    cli_provider: str,
+    model: str,
+    system_prompt: str,
+    user_prompt: str,
+    repo_path: str,
+) -> tuple[str, str]:
+    """Run the reviewer prompt through the local Claude / Codex CLI via
+    the host-side bridge. Mirrors RefinementService._run_cli_refinement —
+    read-only sandbox so the reviewer can Read/Grep/Bash but cannot
+    mutate the repo. Returns (stdout, used_model)."""
+    import os
+    bridge_url = os.getenv('CLI_BRIDGE_URL', 'http://cli-bridge:9876')
+    cli = 'claude' if cli_provider == 'claude_cli' else 'codex'
+    full_prompt = f'{system_prompt}\n\n---\n\n{user_prompt}' if system_prompt else user_prompt
+    try:
+        async with httpx.AsyncClient(timeout=300) as client:
+            resp = await client.post(
+                f'{bridge_url}/{cli}',
+                json={
+                    'repo_path': repo_path,
+                    'prompt': full_prompt,
+                    'model': model or '',
+                    'timeout': 240,
+                    'read_only': True,
+                },
+            )
+            data = resp.json()
+    except httpx.ConnectError:
+        raise RuntimeError(f'CLI bridge unreachable at {bridge_url}')
+    except httpx.TimeoutException:
+        raise RuntimeError('CLI bridge request timed out (300s)')
+    except (httpx.RequestError, ValueError) as exc:
+        raise RuntimeError(f'CLI bridge request failed: {exc}')
+    if data.get('status') != 'ok':
+        raise RuntimeError(f'{cli} bridge error: {data.get("message", data.get("stderr", "unknown"))}')
+    content = (data.get('stdout') or '').strip()
+    if not content:
+        raise RuntimeError(f'{cli} bridge returned empty output')
+    return content, model or cli
+
+
 _KNOWN_SLUGS = {
     'reviewer_system_prompt', 'security_dev_system_prompt',
     'pm_system_prompt', 'dev_system_prompt', 'ai_code_system_prompt',
@@ -427,17 +494,34 @@ async def trigger_review(
             f'### Score\n(0-100 integer — your confidence that this task / PR is ready to merge)'
         )
 
-        llm = LLMProvider(provider=provider or 'openai')
-        if model:
-            # We don't override the model selection on LLMProvider directly,
-            # but we can stamp it through complexity hints + record what we used.
-            pass
-        output, _usage, used_model, _cached = await llm.generate(
-            system_prompt=system_prompt,
-            user_prompt=user_prompt,
-            complexity_hint='normal',
-            max_output_tokens=2500,
-        )
+        # Route by provider. claude_cli / codex_cli go through the local
+        # CLI bridge — no API key needed, the CLI uses the host's auth.
+        # API providers (openai/gemini/anthropic) go through LLMProvider
+        # which uses the org's integration_configs credentials. Without
+        # a key the LLMProvider falls back to mock — that's why the
+        # earlier review came back as "generated/mock_output.py" boilerplate.
+        provider_norm = (provider or '').strip().lower()
+        if provider_norm in ('claude_cli', 'codex_cli'):
+            repo_path = await _resolve_repo_path_for_task(db, task)
+            output, used_model = await _run_cli_review(
+                cli_provider=provider_norm,
+                model=model or '',
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                repo_path=repo_path,
+            )
+            review.input_snapshot = (review.input_snapshot or '') + (
+                f'\nCLI bridge: {provider_norm} repo_path={repo_path}'
+            )
+            await db.commit()
+        else:
+            llm = LLMProvider(provider=provider_norm or 'openai')
+            output, _usage, used_model, _cached = await llm.generate(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                complexity_hint='normal',
+                max_output_tokens=2500,
+            )
 
         count, score, severity = _parse_findings(output or '')
         review.output = output
