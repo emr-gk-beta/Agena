@@ -97,6 +97,16 @@ async def startup_event() -> None:
         )
         await session.commit()
 
+    # Same idea for TaskReview rows: reviews now run as background asyncio
+    # tasks tied to the previous process — restart kills them mid-flight
+    # and the row would stay 'running' forever otherwise. The reaper also
+    # catches reviews abandoned by a cancelled HTTP request.
+    try:
+        from agena_services.services.review_service import reap_stale_running_reviews
+        await reap_stale_running_reviews()
+    except Exception as exc:
+        logger.warning('review reaper at startup failed: %s', exc)
+
 
 @app.get('/health')
 async def health() -> dict[str, str]:

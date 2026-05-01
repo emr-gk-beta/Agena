@@ -3,10 +3,11 @@ description / diff / PR context and stores the verdict + findings as a
 TaskReview record. No code is mutated and no PR is opened."""
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import re
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +26,51 @@ logger = logging.getLogger(__name__)
 # Cap diff size to keep prompts under control. 6000 chars ≈ 1500 tokens —
 # leaves enough headroom for the system prompt + description + verdict.
 _MAX_DIFF_CHARS = 6000
+
+# Strong references to in-flight review tasks. asyncio only weak-refs
+# Tasks scheduled with create_task; without this set GC may cancel a
+# review mid-flight. (See default_skill: "asyncio.create_task: hold a
+# strong reference".) Each task removes itself in done_callback.
+_REVIEW_BG_TASKS: set[asyncio.Task] = set()
+
+# Reviews stuck in 'running' for longer than this are considered abandoned
+# (e.g. backend restart mid-review, or client closed connection on the
+# old inline path). reap_stale_running_reviews() flips them to 'failed'.
+_STALE_RUNNING_TIMEOUT = timedelta(minutes=10)
+
+
+async def reap_stale_running_reviews() -> int:
+    """Mark abandoned 'running' reviews as failed. Called once at API
+    startup so a restart doesn't leave rows spinning forever in the UI.
+
+    Returns the number of rows updated. Errors are swallowed and
+    logged — startup must not block on this."""
+    from sqlalchemy import select, update
+    from agena_core.database import SessionLocal
+    cutoff = datetime.utcnow() - _STALE_RUNNING_TIMEOUT
+    try:
+        async with SessionLocal() as db:
+            stmt = select(TaskReview).where(
+                TaskReview.status == 'running',
+                TaskReview.created_at < cutoff,
+            )
+            rows = (await db.execute(stmt)).scalars().all()
+            n = 0
+            for row in rows:
+                row.status = 'failed'
+                row.error_message = (
+                    'Review abandoned (>10 min in running state — likely a '
+                    'backend restart or cancelled HTTP request).'
+                )
+                row.completed_at = datetime.utcnow()
+                n += 1
+            if n:
+                await db.commit()
+                logger.info('Reaped %s stale running reviews on startup', n)
+            return n
+    except Exception as exc:
+        logger.warning('reap_stale_running_reviews failed: %s', exc)
+        return 0
 
 
 _ROLE_TO_SLUG = {
@@ -483,20 +529,21 @@ async def trigger_review(
     requested_by_user_id: int,
     reviewer_agent_role: str,
 ) -> TaskReview:
-    """Create a TaskReview row in 'pending' state, run the reviewer prompt
-    inline, write the output back. Returns the persisted TaskReview row.
+    """Validate the request, persist a TaskReview row in 'running' state,
+    and schedule the LLM/CLI work as a fire-and-forget background task.
+    Returns immediately so the API response unblocks the user.
 
-    NOTE: review runs synchronously (single LLM call, no code execution).
-    For now we don't queue it through Redis — keeps this surface simple."""
+    The frontend polls /reviews to see status flip to 'completed' /
+    'failed'. If the API process restarts mid-review,
+    reap_stale_running_reviews() cleans up on next startup.
+
+    Validation errors (no code anchor, task not found) are raised here
+    synchronously so the POST /reviews route returns 400 instead of
+    leaving a 'failed' row behind for nothing."""
     task = await db.get(TaskRecord, task_id)
     if task is None or task.organization_id != organization_id:
         raise ValueError('Task not found')
 
-    # Refuse to review tasks with no actual code to inspect — a
-    # repo_mapping_id alone just says "this task is associated with a
-    # repo", not "there's a PR/branch/checkout we can read". Reviewing
-    # blind on the description produces generic boilerplate that looks
-    # authoritative but evaluates nothing.
     desc_lower = (task.description or '').lower()
     has_code_anchor = bool(
         (task.pr_url or '').strip()
@@ -511,7 +558,6 @@ async def trigger_review(
 
     role_norm = _resolve_reviewer_role_from_task(task, reviewer_agent_role)
 
-    # Snapshot what the reviewer is looking at.
     snapshot_lines = [
         f'Task: #{task.id} {task.title or ""}',
         f'Source: {task.source}',
@@ -535,101 +581,128 @@ async def trigger_review(
     await db.commit()
     await db.refresh(review)
 
-    try:
-        system_prompt = await _resolve_reviewer_prompt(db, role_norm, requested_by_user_id)
-        provider, model = await _resolve_reviewer_model(db, requested_by_user_id, role_norm)
-
-        # Pull the actual diff (or change list for Azure) so the reviewer
-        # has something concrete to evaluate. Empty when fetch fails or
-        # the URL doesn't match a known provider — prompt section is
-        # then omitted entirely instead of saying "(no diff)".
-        diff_text, diff_source = '', ''
-        if task.pr_url:
-            diff_text, diff_source = await _fetch_pr_diff_for_review(
-                db, organization_id=organization_id, pr_url=task.pr_url,
-            )
-
-        diff_section = ''
-        if diff_text:
-            diff_section = (
-                f'## Diff ({diff_source})\n'
-                f'```\n{diff_text}\n```\n\n'
-            )
-            # Stamp the snapshot too so the UI can show what was looked at.
-            review.input_snapshot = (review.input_snapshot or '') + (
-                f'\nDiff source: {diff_source} ({len(diff_text)} chars)'
-            )
-            await db.commit()
-
-        user_prompt = (
-            f'You are reviewing the following task. Produce a structured code-review report. '
-            f'Do NOT write code, do NOT propose patches — only review.\n\n'
-            f'Task ID: #{task.id}\n'
-            f'Title: {task.title or ""}\n'
-            f'Source: {task.source}\n'
-            f'PR URL: {task.pr_url or "(no PR yet)"}\n'
-            f'Branch: {task.branch_name or "(no branch)"}\n\n'
-            f'## Description\n{(task.description or "")[:6000]}\n\n'
-            f'{diff_section}'
-            f'## Output format (REQUIRED)\n'
-            f'### Summary\n(1-2 sentence overall verdict — anchor it on what you saw in the diff above when present)\n\n'
-            f'### Findings\n(numbered list — each finding has: file/area, what is wrong, severity, suggested fix; reference specific lines from the diff)\n\n'
-            f'### Severity\n(one of: critical / high / medium / low / clean)\n\n'
-            f'### Score\n(0-100 integer — your confidence that this task / PR is ready to merge)'
-        )
-
-        # Route by provider. claude_cli / codex_cli go through the local
-        # CLI bridge — no API key needed, the CLI uses the host's auth.
-        # API providers (openai/gemini/anthropic) go through LLMProvider
-        # which uses the org's integration_configs credentials. Without
-        # a key the LLMProvider falls back to mock — that's why the
-        # earlier review came back as "generated/mock_output.py" boilerplate.
-        provider_norm = (provider or '').strip().lower()
-        if provider_norm in ('claude_cli', 'codex_cli'):
-            repo_path = await _resolve_repo_path_for_task(db, task)
-            output, used_model = await _run_cli_review(
-                cli_provider=provider_norm,
-                model=model or '',
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                repo_path=repo_path,
-            )
-            review.input_snapshot = (review.input_snapshot or '') + (
-                f'\nCLI bridge: {provider_norm} repo_path={repo_path}'
-            )
-            await db.commit()
-        else:
-            llm = await _build_llm_for_org(
-                db,
-                organization_id=organization_id,
-                provider=provider_norm or 'openai',
-                model=model,
-            )
-            output, _usage, used_model, _cached = await llm.generate(
-                system_prompt=system_prompt,
-                user_prompt=user_prompt,
-                complexity_hint='normal',
-                max_output_tokens=2500,
-            )
-
-        count, score, severity = _parse_findings(output or '')
-        review.output = output
-        review.score = score
-        review.findings_count = count
-        review.severity = severity
-        review.reviewer_provider = provider
-        review.reviewer_model = used_model or model
-        review.status = 'completed'
-        review.completed_at = datetime.utcnow()
-        await db.commit()
-        await db.refresh(review)
-        logger.info('Review #%s completed task=%s role=%s findings=%s severity=%s', review.id, task.id, role_norm, count, severity)
-    except Exception as exc:
-        review.status = 'failed'
-        review.error_message = str(exc)[:500]
-        review.completed_at = datetime.utcnow()
-        await db.commit()
-        await db.refresh(review)
-        logger.exception('Review #%s failed: %s', review.id, exc)
+    # Detach: spawn a background task with its own DB session. The HTTP
+    # request's session closes when this function returns; using it from
+    # a long-running task would race with the response cycle.
+    bg = asyncio.create_task(_run_review_background(
+        review_id=review.id,
+        organization_id=organization_id,
+        task_id=task.id,
+        requested_by_user_id=requested_by_user_id,
+        role_norm=role_norm,
+    ))
+    _REVIEW_BG_TASKS.add(bg)
+    bg.add_done_callback(_REVIEW_BG_TASKS.discard)
 
     return review
+
+
+async def _run_review_background(
+    *,
+    review_id: int,
+    organization_id: int,
+    task_id: int,
+    requested_by_user_id: int,
+    role_norm: str,
+) -> None:
+    """Long-running half of the review pipeline — opens a fresh DB
+    session, fetches the diff, builds the prompt, calls the CLI bridge
+    or LLMProvider, parses findings, and writes the result back. Runs
+    independently of the HTTP request that scheduled it; cancellation
+    is okay (reap_stale_running_reviews picks up orphans on restart)."""
+    from agena_core.database import SessionLocal
+    async with SessionLocal() as db:
+        review = await db.get(TaskReview, review_id)
+        task = await db.get(TaskRecord, task_id)
+        if review is None or task is None:
+            logger.warning('background review skipped: review=%s task=%s missing', review_id, task_id)
+            return
+        try:
+            system_prompt = await _resolve_reviewer_prompt(db, role_norm, requested_by_user_id)
+            provider, model = await _resolve_reviewer_model(db, requested_by_user_id, role_norm)
+
+            diff_text, diff_source = '', ''
+            if task.pr_url:
+                diff_text, diff_source = await _fetch_pr_diff_for_review(
+                    db, organization_id=organization_id, pr_url=task.pr_url,
+                )
+
+            diff_section = ''
+            if diff_text:
+                diff_section = (
+                    f'## Diff ({diff_source})\n'
+                    f'```\n{diff_text}\n```\n\n'
+                )
+                review.input_snapshot = (review.input_snapshot or '') + (
+                    f'\nDiff source: {diff_source} ({len(diff_text)} chars)'
+                )
+                await db.commit()
+
+            user_prompt = (
+                f'You are reviewing the following task. Produce a structured code-review report. '
+                f'Do NOT write code, do NOT propose patches — only review.\n\n'
+                f'Task ID: #{task.id}\n'
+                f'Title: {task.title or ""}\n'
+                f'Source: {task.source}\n'
+                f'PR URL: {task.pr_url or "(no PR yet)"}\n'
+                f'Branch: {task.branch_name or "(no branch)"}\n\n'
+                f'## Description\n{(task.description or "")[:6000]}\n\n'
+                f'{diff_section}'
+                f'## Output format (REQUIRED)\n'
+                f'### Summary\n(1-2 sentence overall verdict — anchor it on what you saw in the diff above when present)\n\n'
+                f'### Findings\n(numbered list — each finding has: file/area, what is wrong, severity, suggested fix; reference specific lines from the diff)\n\n'
+                f'### Severity\n(one of: critical / high / medium / low / clean)\n\n'
+                f'### Score\n(0-100 integer — your confidence that this task / PR is ready to merge)'
+            )
+
+            provider_norm = (provider or '').strip().lower()
+            if provider_norm in ('claude_cli', 'codex_cli'):
+                repo_path = await _resolve_repo_path_for_task(db, task)
+                output, used_model = await _run_cli_review(
+                    cli_provider=provider_norm,
+                    model=model or '',
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    repo_path=repo_path,
+                )
+                review.input_snapshot = (review.input_snapshot or '') + (
+                    f'\nCLI bridge: {provider_norm} repo_path={repo_path}'
+                )
+                await db.commit()
+            else:
+                llm = await _build_llm_for_org(
+                    db,
+                    organization_id=organization_id,
+                    provider=provider_norm or 'openai',
+                    model=model,
+                )
+                output, _usage, used_model, _cached = await llm.generate(
+                    system_prompt=system_prompt,
+                    user_prompt=user_prompt,
+                    complexity_hint='normal',
+                    max_output_tokens=2500,
+                )
+
+            count, score, severity = _parse_findings(output or '')
+            review.output = output
+            review.score = score
+            review.findings_count = count
+            review.severity = severity
+            review.reviewer_provider = provider
+            review.reviewer_model = used_model or model
+            review.status = 'completed'
+            review.completed_at = datetime.utcnow()
+            await db.commit()
+            logger.info(
+                'Review #%s completed task=%s role=%s findings=%s severity=%s',
+                review.id, task.id, role_norm, count, severity,
+            )
+        except Exception as exc:
+            review.status = 'failed'
+            review.error_message = str(exc)[:500]
+            review.completed_at = datetime.utcnow()
+            try:
+                await db.commit()
+            except Exception:
+                pass
+            logger.exception('Review #%s failed: %s', review.id, exc)
