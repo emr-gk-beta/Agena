@@ -2007,15 +2007,21 @@ function RunConfigModal({ task, onRun, onClose }: {
       if (prefs.repo_mappings?.length) {
         const mList = prefs.repo_mappings as typeof mappings;
         setMappings(mList);
-        // Auto-select mapping: try repo_mapping_name from API, then parse from description
+        // Auto-select mapping: prefer the canonical numeric repo_mapping_id
+        // (set by IntegrationRule auto-routing or explicit assignment), then
+        // fall back to repo_mapping_name and finally a description regex.
         const taskAny = task as Record<string, unknown> | null;
+        const dbMappingId = taskAny?.repo_mapping_id;
+        const byDbId = (typeof dbMappingId === 'number' && dbMappingId > 0)
+          ? mList.find((m) => m.id === String(dbMappingId))
+          : null;
         const dbMappingName = taskAny?.repo_mapping_name as string | undefined;
         const byDbName = dbMappingName ? mList.find((m) => m.name === dbMappingName) : null;
         const taskDesc = task?.description || '';
         const mappingMatch = taskDesc.match(/Local Repo Mapping:\s*(.+)/i);
         const descName = mappingMatch?.[1]?.trim();
         const byDescName = descName ? mList.find((m) => m.name === descName) : null;
-        const matched = byDbName || byDescName;
+        const matched = byDbId || byDbName || byDescName;
         setSelectedMapping(matched?.id || mList[0]?.id || '');
         if (matched) setRepoMode('mapping');
       }

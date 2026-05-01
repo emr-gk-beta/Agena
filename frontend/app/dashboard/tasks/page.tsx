@@ -531,6 +531,28 @@ export default function DashboardTasksPage() {
     setReviewPickerTaskId(reviewPickerTaskId === taskId ? null : taskId);
   }
 
+  // Close the reviewer popover when the user clicks outside it or hits Esc.
+  // Without this the floating menu sticks open forever after triggering it,
+  // since the inline render has e.stopPropagation() on the inner div.
+  useEffect(() => {
+    if (reviewPickerTaskId === null) return;
+    const onDocClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest('[data-review-picker]')) return;
+      if (target?.closest('[data-review-trigger]')) return;
+      setReviewPickerTaskId(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setReviewPickerTaskId(null);
+    };
+    document.addEventListener('mousedown', onDocClick);
+    document.addEventListener('keydown', onKey);
+    return () => {
+      document.removeEventListener('mousedown', onDocClick);
+      document.removeEventListener('keydown', onKey);
+    };
+  }, [reviewPickerTaskId]);
+
   async function triggerReview(taskId: number, role: string) {
     setReviewPickerTaskId(null);
     setError('');
@@ -659,7 +681,19 @@ export default function DashboardTasksPage() {
     setEditEdgeCases('');
     setEditMaxTokens('');
     setEditMaxCost('');
-    setEditRepoMappingIds([]);
+    // Seed repo selection from the list-row task immediately so the
+    // checkbox flips as soon as the modal opens — without this the modal
+    // showed empty for a beat (and stayed empty for tasks without
+    // repo_assignments rows, e.g. IntegrationRule auto-routed tasks).
+    const initialRepoIds: number[] = [];
+    if (task.repo_assignments && task.repo_assignments.length > 0) {
+      for (const a of task.repo_assignments) {
+        if (typeof a.repo_mapping_id === 'number') initialRepoIds.push(a.repo_mapping_id);
+      }
+    } else if (typeof task.repo_mapping_id === 'number' && task.repo_mapping_id > 0) {
+      initialRepoIds.push(task.repo_mapping_id);
+    }
+    setEditRepoMappingIds(initialRepoIds);
     setEditDepIds([]);
     setEditDepSearch('');
     setEditShowDeps(false);
@@ -1557,11 +1591,12 @@ export default function DashboardTasksPage() {
                     <div style={{ position: 'relative' }}>
                       <button onClick={() => openReviewPicker(task.id)}
                         title={t('reviews.runReview' as TranslationKey) || 'Run review'}
+                        data-review-trigger
                         style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         🔎 Review
                       </button>
                       {reviewPickerTaskId === task.id && (
-                        <div onClick={(e) => e.stopPropagation()} style={{
+                        <div data-review-picker onClick={(e) => e.stopPropagation()} style={{
                           position: 'absolute', top: 'calc(100% + 4px)', right: 0, zIndex: 100,
                           minWidth: 200, padding: 4,
                           background: 'var(--surface)', border: '1px solid var(--panel-border)',
@@ -1702,11 +1737,12 @@ export default function DashboardTasksPage() {
                         <>
                           <div style={{ position: 'relative' }}>
                             <button onClick={() => openReviewPicker(task.id)}
+                              data-review-trigger
                               style={{ padding: '7px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.4)', background: 'rgba(168,85,247,0.10)', color: '#c084fc', cursor: 'pointer' }}>
                               🔎 Review
                             </button>
                             {reviewPickerTaskId === task.id && (
-                              <div onClick={(e) => e.stopPropagation()} style={{
+                              <div data-review-picker onClick={(e) => e.stopPropagation()} style={{
                                 position: 'absolute', top: 'calc(100% + 4px)', left: 0, zIndex: 100,
                                 minWidth: 220, padding: 4,
                                 background: 'var(--surface)', border: '1px solid var(--panel-border)',
