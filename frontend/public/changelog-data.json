@@ -1,5 +1,13 @@
 [
   {
+    "hash": "c35e368",
+    "short": "c35e368",
+    "message": "Insights: undo button to clear a triage decision",
+    "date": "2026-05-01",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "5327f63",
     "short": "5327f63",
     "message": "Insights: tighter mobile layout + triaged-toggle filter",
