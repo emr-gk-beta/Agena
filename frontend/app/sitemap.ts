@@ -33,6 +33,10 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/jira-ai-agent', modified: '2026-04-30', freq: 'monthly' as const, priority: 0.95 },
     { path: '/azure-devops-ai-bot', modified: '2026-04-30', freq: 'monthly' as const, priority: 0.95 },
     { path: '/ai-code-review', modified: '2026-04-30', freq: 'monthly' as const, priority: 0.95 },
+    { path: '/newrelic-ai-agent', modified: '2026-05-01', freq: 'monthly' as const, priority: 0.9 },
+    { path: '/ai-sprint-refinement', modified: '2026-05-01', freq: 'monthly' as const, priority: 0.9 },
+    { path: '/vs/seer', modified: '2026-05-01', freq: 'monthly' as const, priority: 0.85 },
+    { path: '/vs/coderabbit', modified: '2026-05-01', freq: 'monthly' as const, priority: 0.85 },
   ];
 
   // All blog slugs
@@ -67,6 +71,9 @@ export default function sitemap(): MetadataRoute.Sitemap {
     'owasp-ai-code-review',
     'custom-reviewer-agent-setup',
     'azure-devops-ai-bot-tutorial',
+    'best-ai-code-review-tools-2026',
+    'sentry-seer-vs-agena',
+    'how-to-estimate-jira-story-points-with-ai',
   ];
 
   return [

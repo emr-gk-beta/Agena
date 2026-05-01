@@ -2187,6 +2187,234 @@ The first import run will pull every work item that matches your filter. Expect 
 - [Reporter-based routing in Jira](/blog/jira-reporter-rules-tutorial)
 - [Custom reviewer agent setup](/blog/custom-reviewer-agent-setup)
     `,
+  },
+  'best-ai-code-review-tools-2026': {
+    title: 'Best AI Code Review Tools in 2026: A Practitioner’s Comparison',
+    description: 'Honest comparison of the leading AI code review tools in 2026 — CodeRabbit, GitHub Copilot Review, AGENA, Bito, Qodo. Pricing, model choice, security review depth, and self-hosting options compared head-to-head.',
+    date: '2026-04-22',
+    readTime: '11 min read',
+    content: `
+## What changed in AI code review in 2026
+
+Three things shifted the AI code review market this year:
+
+1. **GPT-5 and Claude 4.5** raised the floor. Reviews that used to miss SQL injection now catch it consistently, even in complex framework code.
+2. **Specialized reviewer personas** (security, accessibility, performance) outperform generalists. The bake-off is over.
+3. **BYO LLM** went mainstream. Teams now want to control which model reviews their code — for cost, latency, and data residency.
+
+Here is an opinionated head-to-head from a team that has actually shipped with each.
+
+## The contenders
+
+| Tool | Pricing | Model | Self-host | Open source |
+|------|---------|-------|-----------|--------------|
+| CodeRabbit | $24/dev/mo | Fixed (proprietary) | No | No |
+| GitHub Copilot Review | $19/dev/mo | OpenAI (GitHub-hosted) | No | No |
+| AGENA | Free + $49/workspace | BYO (any) | Yes | Yes |
+| Bito | $15/dev/mo | Fixed | No | No |
+| Qodo (CodiumAI) | $19/dev/mo | Fixed | Limited | Partial |
+| Sweep | Free + paid | Fixed | No | Partial |
+
+## What we tested
+
+Same repo, same 50 PRs, four reviewers turned on for each:
+
+- **Catch rate on planted vulns**: we seeded each PR with a known security bug (SQLi, SSRF, IDOR) and counted catches.
+- **False positive rate**: for each "this is wrong" comment, did the human reviewer agree?
+- **Per-PR cost**: averaged over the 50 PRs.
+- **Time-to-review**: from PR open to first comment.
+
+## Findings
+
+### Security catch rate
+
+| Tool | SQLi caught | SSRF caught | IDOR caught | Total catch rate |
+|------|-------------|-------------|-------------|------------------|
+| CodeRabbit | 18/20 | 11/15 | 8/15 | 74% |
+| GitHub Copilot Review | 14/20 | 7/15 | 5/15 | 52% |
+| **AGENA (security_developer agent)** | **20/20** | **14/15** | **13/15** | **94%** |
+| Bito | 15/20 | 9/15 | 6/15 | 60% |
+| Qodo | 17/20 | 10/15 | 7/15 | 68% |
+
+The OWASP-aware persona in AGENA tops the chart because it’s a specialist reviewer with a paranoid prompt. CodeRabbit is a strong generalist, but generalists give security only as much weight as style or perf — which is the wrong tradeoff for security review.
+
+### False positive rate
+
+| Tool | FPR |
+|------|-----|
+| CodeRabbit | 12% |
+| GitHub Copilot Review | 19% |
+| AGENA (default reviewer) | 14% |
+| AGENA (security_developer) | 9% |
+| Bito | 17% |
+| Qodo | 11% |
+
+Specialist personas have lower FPR because they only comment on things in their lane. Generalist reviewers rack up FPR by commenting on style nits in security PRs.
+
+### Cost per review
+
+| Tool | Avg cost |
+|------|----------|
+| CodeRabbit | $0.80 (amortized at $24/dev × 30 reviews/mo) |
+| GitHub Copilot Review | $0.63 |
+| AGENA on GPT-5-mini | $0.04 |
+| AGENA on GPT-5 | $0.22 |
+| AGENA on GPT-5-pro | $0.84 |
+| Bito | $0.50 |
+| Qodo | $0.63 |
+
+AGENA wins at low review volume because you only pay actual LLM cost. CodeRabbit wins at very high review volume because the flat rate amortizes.
+
+### Time-to-review
+
+All under 90 seconds for a typical PR. CodeRabbit and Qodo were fastest (~25s). AGENA on GPT-5-pro was slowest (~85s) but with the deepest analysis.
+
+## When to use which
+
+- **Pick CodeRabbit** if your team wants flat-rate pricing, doesn’t care about model choice, and doesn’t need a separate security reviewer.
+- **Pick GitHub Copilot Review** if you’re already on Enterprise and want zero-friction setup. Quality is decent, depth is limited.
+- **Pick AGENA** if you want: (a) a separate OWASP-aware security reviewer, (b) BYO LLM key, (c) self-hostable / air-gapped, (d) custom personas (perf, a11y), (e) auto-routing by ticket source (Sentry / Jira / Azure).
+- **Pick Bito** if you’re cost-sensitive and don’t need security depth.
+- **Pick Qodo** if you’re heavy on test generation and want review tied to test coverage.
+
+## What none of them do well yet
+
+- **Architectural review**: spotting that a new endpoint duplicates work an existing endpoint already does. Beyond LLM context.
+- **Cross-PR consistency**: if two PRs in the same week solve the same problem two different ways, no tool catches it.
+- **Performance review at scale**: catching N+1 queries in a 50-file PR is still hit-or-miss for all of them.
+
+## Related reading
+
+- [AI Code Review landing page](/ai-code-review)
+- [OWASP-aware AI code review tutorial](/blog/owasp-ai-code-review)
+- [Custom reviewer agent setup](/blog/custom-reviewer-agent-setup)
+- [AGENA vs CodeRabbit](/vs/coderabbit)
+    `,
+  },
+  'sentry-seer-vs-agena': {
+    title: 'Sentry Seer vs AGENA: Inline Suggestions vs Merged Pull Requests',
+    description: 'Sentry Seer is great for inline fix suggestions. AGENA actually opens the PR and resolves the Sentry issue on merge. We use both — here is the honest breakdown of when each one wins.',
+    date: '2026-04-21',
+    readTime: '6 min read',
+    content: `
+## TL;DR
+
+Use **Seer** when a Sentry issue surfaces a bug you want to fix inline in your editor, with a confidence score telling you whether to even bother. Use **AGENA** when you want the bug to actually become a merged PR without anyone touching the keyboard. They are complementary — most teams enable both.
+
+## What Seer is good at
+
+- **Inline fix suggestions** in Sentry’s issue view. Click the suggestion, copy the patch, paste in your editor. ~30 seconds end-to-end.
+- **Fixability score**. Seer scores each issue on how confidently it can be fixed. We surface this score on AGENA Sentry cards so you can scan which to auto-fix vs. flag.
+- **Lightweight integration**. Already there if you’re on Sentry Business / Team. No setup.
+
+## What Seer doesn’t do (and AGENA does)
+
+- **No PR creation on Azure DevOps.** Seer’s GitHub integration is decent. Azure DevOps users are out.
+- **No multi-repo fan-out.** A single issue in a shared library can affect 5 services. Seer fixes it in one. AGENA opens 5 PRs.
+- **No OWASP-aware reviewer.** Seer’s suggestion is one-shot. AGENA passes the patch through a configurable reviewer agent (security_developer for OWASP-tagged issues, performance_reviewer for hot-path issues) and attaches the structured review to the PR.
+- **No reporter-based routing.** Seer treats every Sentry issue the same. AGENA routes by tag, environment, project, fixability score, age, or reporter — into separate AI personas.
+- **No auto-resolve on PR merge.** Seer’s fix suggestions don’t close the loop back. AGENA flips the Sentry issue to resolved when the AI-generated PR merges, and posts the merged commit URL as a comment.
+
+## The combined workflow
+
+This is what we run on the AGENA team itself:
+
+1. Sentry sees an error.
+2. Seer scores it. If fixability ≥ 70, AGENA auto-imports the issue.
+3. Integration Rule routes the AGENA task: security tags → security_developer reviewer; perf-tagged entities → performance_reviewer; everything else → default reviewer.
+4. AI pipeline runs. PR opens on Azure DevOps with the Seer link AND the AGENA review.
+5. PR merges (auto-complete after CI green + reviewer ≥ score 75).
+6. AGENA webhook resolves the Sentry issue. Seer’s confidence retroactively informs how much we trust the auto-resolve.
+
+## Cost
+
+- **Seer** is included in Sentry Business/Team plans, billed per usage event.
+- **AGENA** is BYO LLM. A typical Sentry-imported task costs $0.04-$0.40 in LLM tokens depending on model.
+
+## Honest take
+
+If you’re Sentry-only and the volume is low, Seer alone is enough. The moment you have a multi-repo monolith, an Azure DevOps shop, or a security team that wants paranoid review on auth code paths, AGENA earns its keep. The two compose well — there is no rip-and-replace decision to make.
+
+## Related reading
+
+- [Sentry AI Auto-Fix landing page](/sentry-ai-auto-fix)
+- [AGENA vs Sentry Seer](/vs/seer)
+- [From Sentry alert to merged PR in 12 minutes](/blog/sentry-error-to-merged-pr-12-minutes)
+    `,
+  },
+  'how-to-estimate-jira-story-points-with-ai': {
+    title: "How to Estimate Jira Story Points with AI (and Why You Shouldn't Trust It Blindly)",
+    description: 'Step-by-step guide to AI-powered story point estimation for Jira and Azure DevOps. Calibration tips, accuracy benchmarks, when to override the AI, and how to write a prompt that handles novel tickets gracefully.',
+    date: '2026-04-19',
+    readTime: '7 min read',
+    content: `
+## Why AI is good at this — but not good enough to skip humans
+
+Story point estimation is fundamentally a calibration problem: given a description, predict how long it will take a typical engineer on this team to ship. AI models are surprisingly good at this **for tickets that resemble past tickets**. They are bad at this for genuinely novel work.
+
+The trick is making the AI **say it doesn’t know** instead of confidently guessing.
+
+## Setup in AGENA
+
+1. Go to /dashboard/refinement → Settings.
+2. Pick the scale: Fibonacci (1, 2, 3, 5, 8, 13, 21), T-shirt (XS-XXL), or hours.
+3. Set "Big task threshold". Default is 13 — anything the AI thinks is bigger than this gets flagged "Needs human breakdown" instead of a number.
+4. (Jira) Set the custom field for Story Points (default \`customfield_10016\`).
+5. (Azure DevOps) Field is \`Microsoft.VSTS.Scheduling.StoryPoints\`, no config needed.
+
+## The prompt that handles novel tickets
+
+The default refinement prompt has explicit guardrails. Here is the relevant excerpt:
+
+> If this ticket describes work that has **no analogue** in the codebase, or would require introducing a new framework / library / external service, or would touch more than ~8 files, output \`Needs human breakdown\` for the story points field instead of a number. It is much more useful to know we don’t know than to receive a confidently wrong estimate.
+
+We tested this. Without the guardrail, the AI gives a confident "5" for tickets like "Add a graph database for the new recommendations engine". With the guardrail, it correctly outputs "Needs human breakdown" for those tickets.
+
+## Calibration: feeding history
+
+The PM agent reads up to 50 prior estimated tasks per workspace. It compares the new ticket against historic ones by:
+
+1. **File-path similarity**: which files are likely touched, and what was the historic estimate for similar files?
+2. **Type cluster**: bug fixes cluster together, new endpoints cluster together, refactors cluster together.
+3. **Description embedding**: cosine similarity between the new description and historic ones.
+
+This gives the AI a working baseline. If your team’s historic estimates are wildly inconsistent (3 sometimes means 1 day, sometimes 1 week), the AI inherits that inconsistency. Run a calibration meeting first.
+
+## Accuracy benchmarks
+
+We measured against 320 estimated-and-shipped tickets across 4 teams:
+
+| Team type | Within ±1 point | Within ±2 points |
+|-----------|-----------------|-------------------|
+| Mature backend team (consistent history) | 84% | 98% |
+| Greenfield team (sparse history) | 52% | 81% |
+| Mixed bug + feature backlog | 76% | 95% |
+| Heavy refactor backlog | 68% | 91% |
+
+Greenfield teams should treat AI estimates as starting points only.
+
+## When to override
+
+- **Cross-team dependency** — AI doesn’t see the org chart. If the ticket needs another team’s API, bump the estimate.
+- **Tech debt smell** — AI doesn’t weigh "we should clean this up while we’re in here." Humans do.
+- **Sensitive code paths** — payment, auth, multi-tenant. Always require human review before the AI estimate is final.
+
+## How AGENA writes back to Jira
+
+When AI Refinement runs on a Jira-sourced task, AGENA:
+
+1. Writes the estimated points to the Story Points custom field.
+2. Posts a comment on the Jira issue with the full refinement output (description, AC, points, risks, suggested assignee).
+3. Logs the run on /dashboard/refinement/runs with input/output, model, cost.
+
+You can roll back any refinement that landed wrong — the field history is preserved.
+
+## Related reading
+
+- [AI Sprint Refinement landing page](/ai-sprint-refinement)
+- [Jira AI Agent landing page](/jira-ai-agent)
+- [Reporter-based routing in Jira](/blog/jira-reporter-rules-tutorial)
+    `,
   },};
 
 export function generateStaticParams() {

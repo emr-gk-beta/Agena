@@ -1,5 +1,13 @@
 [
   {
+    "hash": "0ac23e2",
+    "short": "0ac23e2",
+    "message": "seo: 4 provider landing pages + 5 blog posts + sitemap + home title",
+    "date": "2026-05-01",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "e48cc2c",
     "short": "e48cc2c",
     "message": "Reviews: fix giant mobile filter inputs (flex shorthand \u2192 grid layout)",
