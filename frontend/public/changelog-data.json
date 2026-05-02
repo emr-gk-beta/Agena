@@ -1,5 +1,13 @@
 [
   {
+    "hash": "5e5c986",
+    "short": "5e5c986",
+    "message": "LangToggle: trigger router.refresh() so server-rendered pages re-render",
+    "date": "2026-05-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "f55952b",
     "short": "f55952b",
     "message": "Landing i18n: read agena_lang cookie so the navbar toggle wins",

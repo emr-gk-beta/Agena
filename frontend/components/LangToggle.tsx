@@ -1,19 +1,18 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
 import { useLocale } from '@/lib/i18n';
 
 export default function LangToggle({ style }: { style?: React.CSSProperties }) {
   const { lang, setLang, t } = useLocale();
-  const router = useRouter();
 
   function onChangeLang(next: 'tr' | 'en' | 'es' | 'zh' | 'it' | 'de' | 'ja') {
     setLang(next);
-    // Server-rendered pages (landings, OG metadata) cache the locale at
-    // render time, so picking a new language has to re-fetch the route.
-    // router.refresh() tells Next.js to rerun the server component for
-    // the current path with the freshly-written cookie.
-    router.refresh();
+    // Hard reload so server-rendered pages (landings, OG metadata,
+    // anything reading the agena_lang cookie) repaint immediately. We
+    // tried router.refresh() but Next.js's RSC cache sometimes serves
+    // the previous payload — full reload is the only reliable way to
+    // make "click TR → see TR" feel instant.
+    if (typeof window !== 'undefined') window.location.reload();
   }
 
   return (
