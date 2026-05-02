@@ -20,6 +20,9 @@ class OrgWorkflowSettings(Base):
     # Triage
     triage_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     triage_idle_days: Mapped[int] = mapped_column(Integer, nullable=False, default=30)
+    # Cap how far back the scan reaches. updated_at older than this is
+    # treated as ancient history and skipped. 0 disables the cap.
+    triage_max_age_days: Mapped[int] = mapped_column(Integer, nullable=False, default=365)
     triage_schedule_cron: Mapped[str] = mapped_column(String(64), nullable=False, default='0 18 * * 0')
     triage_sources: Mapped[str] = mapped_column(String(128), nullable=False, default='jira,azure_devops')
 

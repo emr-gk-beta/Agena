@@ -28,6 +28,7 @@ type Decision = {
 type Settings = {
   triage_enabled: boolean;
   triage_idle_days: number;
+  triage_max_age_days?: number;
   triage_schedule_cron: string;
   triage_sources: string;
   backlog_enabled: boolean;
@@ -552,6 +553,27 @@ export default function TriagePage() {
                 { value: 30, label: t('duration.30d') },
                 { value: 60, label: t('duration.60d') },
                 { value: 90, label: t('duration.90d') },
+              ]}
+              allowCustom
+              customLabel={t('common.custom')}
+              customPlaceholder={t('duration.daysPlaceholder')}
+            />
+          </SettingsField>
+          <SettingsField
+            label={t('triage.set.maxAge' as TranslationKey)}
+            hint={t('triage.set.maxAgeHint' as TranslationKey)}
+          >
+            <ChipSelect<number>
+              value={settings.triage_max_age_days ?? 365}
+              onChange={(v) => void saveSettings({ triage_max_age_days: v } as Partial<Settings>)}
+              accent='#06b6d4'
+              options={[
+                { value: 30, label: t('duration.1mo' as TranslationKey) },
+                { value: 90, label: t('duration.3mo' as TranslationKey) },
+                { value: 180, label: t('duration.6mo' as TranslationKey) },
+                { value: 365, label: t('duration.1y' as TranslationKey) },
+                { value: 730, label: t('duration.2y' as TranslationKey) },
+                { value: 0, label: t('triage.set.maxAge.none' as TranslationKey) },
               ]}
               allowCustom
               customLabel={t('common.custom')}

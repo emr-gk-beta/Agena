@@ -355,6 +355,7 @@ async def _scan_jira_source(
     org_id: int,
     *,
     idle_days: int,
+    max_age_days: int = 0,
     max_results: int = 500,
 ) -> list[dict]:
     """Pull stale Jira issues directly via JQL — no AGENA import needed.
@@ -378,7 +379,16 @@ async def _scan_jira_source(
     email = (cfg.username or '').strip()
     auth = _b64.b64encode(f'{email}:{cfg.secret}'.encode()).decode()
     headers = {'Authorization': f'Basic {auth}', 'Accept': 'application/json'}
-    jql = f'statusCategory != Done AND updated <= -{int(idle_days)}d ORDER BY updated ASC'
+    # Two-sided window: tickets idle ≥ idle_days AND not older than
+    # max_age_days. The upper cap stops us from triaging 2019-vintage
+    # ghost tickets that have been silent for years.
+    jql_parts = [
+        'statusCategory != Done',
+        f'updated <= -{int(idle_days)}d',
+    ]
+    if max_age_days and max_age_days > idle_days:
+        jql_parts.append(f'updated >= -{int(max_age_days)}d')
+    jql = ' AND '.join(jql_parts) + ' ORDER BY updated ASC'
     # Atlassian deprecated /rest/api/3/search in 2024 — the new endpoint
     # is /rest/api/3/search/jql (POST). Old endpoint returns 410 on
     # cloud instances now. Switch to the new one.
@@ -459,6 +469,7 @@ async def _scan_azure_source(
     org_id: int,
     *,
     idle_days: int,
+    max_age_days: int = 0,
     max_results: int = 500,
 ) -> list[dict]:
     """Pull stale Azure DevOps work items via WIQL — query against the
@@ -538,11 +549,16 @@ async def _scan_azure_source(
         "'Cancelled','Canceled','Rejected','Withdrawn','Abandoned',"
         "'Wont Fix','Won''t Fix','WontFix','Duplicate'"
     )
+    wiql_clauses = [
+        "[System.TeamProject] = @project",
+        f"[System.State] NOT IN ({dead_states})",
+        f"[System.ChangedDate] <= @today - {int(idle_days)}",
+    ]
+    if max_age_days and max_age_days > idle_days:
+        wiql_clauses.append(f"[System.ChangedDate] >= @today - {int(max_age_days)}")
     wiql = (
         "SELECT [System.Id] FROM WorkItems "
-        "WHERE [System.TeamProject] = @project "
-        f"AND [System.State] NOT IN ({dead_states}) "
-        f"AND [System.ChangedDate] <= @today - {int(idle_days)} "
+        "WHERE " + " AND ".join(wiql_clauses) + " "
         "ORDER BY [System.ChangedDate] ASC"
     )
     out: list[dict] = []
@@ -664,14 +680,19 @@ async def scan_for_org(
 
     now = now or datetime.utcnow()
     idle_days = settings.triage_idle_days
+    max_age_days = int(getattr(settings, 'triage_max_age_days', 0) or 0)
 
     # Source-side scan: hit Jira / Azure REST directly so we triage the
     # whole project, not just the slice that's been imported into AGENA.
     candidates: list[dict] = []
     if any(s in {'jira'} for s in sources):
-        candidates.extend(await _scan_jira_source(db, org_id, idle_days=idle_days))
+        candidates.extend(await _scan_jira_source(
+            db, org_id, idle_days=idle_days, max_age_days=max_age_days,
+        ))
     if any(s in {'azure', 'azure_devops'} for s in sources):
-        candidates.extend(await _scan_azure_source(db, org_id, idle_days=idle_days))
+        candidates.extend(await _scan_azure_source(
+            db, org_id, idle_days=idle_days, max_age_days=max_age_days,
+        ))
 
     # Resolve any candidate that's already been imported into task_records,
     # so the apply path can flip the local task.status when the user

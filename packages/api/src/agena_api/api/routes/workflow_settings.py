@@ -18,6 +18,7 @@ router = APIRouter(prefix='/workflow-settings', tags=['workflow-settings'])
 class WorkflowSettingsResponse(BaseModel):
     triage_enabled: bool
     triage_idle_days: int
+    triage_max_age_days: int = 365
     triage_schedule_cron: str
     triage_sources: str
     backlog_enabled: bool
@@ -34,6 +35,7 @@ class WorkflowSettingsResponse(BaseModel):
 class WorkflowSettingsUpdate(BaseModel):
     triage_enabled: bool | None = None
     triage_idle_days: int | None = Field(default=None, ge=1, le=365)
+    triage_max_age_days: int | None = Field(default=None, ge=0, le=3650)
     triage_schedule_cron: str | None = None
     triage_sources: str | None = None
     backlog_enabled: bool | None = None
