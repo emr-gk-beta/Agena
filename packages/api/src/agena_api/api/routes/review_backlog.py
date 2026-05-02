@@ -27,6 +27,7 @@ class NudgeResponse(BaseModel):
     pr_title: str | None = None
     pr_author: str | None = None
     pr_provider: str | None = None
+    pr_status: str | None = None  # active / abandoned / completed / open / closed (provider-dependent)
     pr_url: str | None = None  # human-friendly link rendered on the row title
     repo_mapping_id: str | None = None
     repo_display_name: str | None = None
@@ -127,7 +128,7 @@ async def list_backlog(
         out.append(NudgeResponse(
             id=n.id, pr_id=n.pr_id,
             pr_external_id=pr.external_id, pr_title=pr.title, pr_author=pr.author,
-            pr_provider=pr.provider, pr_url=pr_url,
+            pr_provider=pr.provider, pr_status=pr.status, pr_url=pr_url,
             repo_mapping_id=n.repo_mapping_id, repo_display_name=repo_display or None,
             age_hours=n.age_hours, severity=n.severity, nudge_count=n.nudge_count,
             last_nudged_at=n.last_nudged_at, last_nudge_channel=n.last_nudge_channel,

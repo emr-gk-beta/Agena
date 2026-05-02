@@ -12,6 +12,7 @@ type Nudge = {
   pr_title: string | null;
   pr_author: string | null;
   pr_provider: string | null;
+  pr_status: string | null;
   pr_url: string | null;
   repo_mapping_id: string | null;
   repo_display_name: string | null;
@@ -329,6 +330,28 @@ export default function ReviewBacklogPage() {
                   <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: `${color}22`, color, fontWeight: 700, textTransform: 'uppercase' }}>
                     {sev} · {n.age_hours}h
                   </span>
+                  {n.pr_status && (() => {
+                    const s = n.pr_status.toLowerCase();
+                    const palette: Record<string, { bg: string; fg: string }> = {
+                      active:    { bg: 'rgba(34,197,94,0.15)',   fg: '#22c55e' },
+                      open:      { bg: 'rgba(34,197,94,0.15)',   fg: '#22c55e' },
+                      opened:    { bg: 'rgba(34,197,94,0.15)',   fg: '#22c55e' },
+                      pending:   { bg: 'rgba(245,158,11,0.15)',  fg: '#f59e0b' },
+                      in_review: { bg: 'rgba(168,85,247,0.15)',  fg: '#a855f7' },
+                      review_required: { bg: 'rgba(168,85,247,0.15)', fg: '#a855f7' },
+                      abandoned: { bg: 'rgba(148,163,184,0.18)', fg: '#94a3b8' },
+                      declined:  { bg: 'rgba(148,163,184,0.18)', fg: '#94a3b8' },
+                      closed:    { bg: 'rgba(148,163,184,0.18)', fg: '#94a3b8' },
+                      completed: { bg: 'rgba(96,165,250,0.18)',  fg: '#60a5fa' },
+                      merged:    { bg: 'rgba(96,165,250,0.18)',  fg: '#60a5fa' },
+                    };
+                    const c = palette[s] || { bg: 'rgba(148,163,184,0.18)', fg: '#94a3b8' };
+                    return (
+                      <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: c.bg, color: c.fg, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                        {n.pr_status}
+                      </span>
+                    );
+                  })()}
                   {n.nudge_count > 0 && (
                     <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: 'rgba(99,102,241,0.12)', color: '#818cf8', fontWeight: 700 }}>
                       🔔 {n.nudge_count}
