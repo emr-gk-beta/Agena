@@ -307,18 +307,52 @@ export default function ReviewBacklogPage() {
             />
           </SettingsField>
           <SettingsField label={t('backlog.set.channel')} hint={t('backlog.set.channelHint')}>
-            <ChipSelect<string>
-              value={settings.backlog_channel}
-              onChange={(v) => void saveSettings({ backlog_channel: v })}
-              accent='#6366f1'
-              options={[
+            {(() => {
+              // Multi-select: backlog_channel is a comma-separated list.
+              // Each chip toggles independently. At least one must stay
+              // selected — empty list falls back to 'manual'.
+              const selected = new Set(
+                (settings.backlog_channel || '').split(',').map((s) => s.trim()).filter(Boolean),
+              );
+              const channels: Array<{ value: string; label: string }> = [
                 { value: 'pr_comment', label: t('backlog.set.channel.prComment') },
                 { value: 'slack_dm', label: '💬 Slack DM' },
                 { value: 'slack_channel', label: '#️⃣ Slack Channel' },
                 { value: 'email', label: '📧 Email' },
+                { value: 'whatsapp', label: '🟢 WhatsApp' },
+                { value: 'telegram', label: '✈️ Telegram' },
                 { value: 'manual', label: '✋ ' + t('backlog.set.manual') },
-              ]}
-            />
+              ];
+              const toggle = (v: string) => {
+                const next = new Set(selected);
+                if (next.has(v)) next.delete(v); else next.add(v);
+                if (next.size === 0) next.add('manual');
+                void saveSettings({ backlog_channel: Array.from(next).join(',') });
+              };
+              return (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {channels.map((c) => {
+                    const on = selected.has(c.value);
+                    return (
+                      <button
+                        key={c.value}
+                        type='button'
+                        onClick={() => toggle(c.value)}
+                        style={{
+                          padding: '6px 10px', borderRadius: 8,
+                          border: '1px solid ' + (on ? 'rgba(99,102,241,0.55)' : 'var(--panel-border)'),
+                          background: on ? 'rgba(99,102,241,0.16)' : 'var(--panel)',
+                          color: on ? '#818cf8' : 'var(--ink-78)',
+                          fontSize: 12, fontWeight: 700, cursor: 'pointer',
+                        }}
+                      >
+                        {on ? '✓ ' : ''}{c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              );
+            })()}
           </SettingsField>
           <SettingsField label={t('backlog.set.exemptRepos')} hint={t('backlog.set.exemptHint')}>
             <input

@@ -320,14 +320,18 @@ async def _generate_ai_nudge_body(
     the org's integration_configs credentials when the user has API
     agents instead. Tight 60s timeout keeps the button click responsive."""
     from sqlalchemy import select as _sel
+    from agena_models.models.organization_member import OrganizationMember
     from agena_models.models.user_preference import UserPreference
 
-    # Pick the org's first enabled CLI agent, then any API agent.
+    # Pick any user-pref row attached to a member of this org that has
+    # at least one agent configured. The agent config drives provider,
+    # not the user identity — so first match is fine.
     pref = (await db.execute(
-        _sel(UserPreference).join(
-            # any user in the org will do for resolving an agent — the
-            # agent config drives provider, not the user identity
-        )
+        _sel(UserPreference)
+        .join(OrganizationMember, OrganizationMember.user_id == UserPreference.user_id)
+        .where(OrganizationMember.organization_id == organization_id)
+        .where(UserPreference.agents_json.is_not(None))
+        .limit(1)
     )).scalars().first()
     cli_provider = ''
     cli_model = ''
@@ -773,15 +777,38 @@ async def record_nudge(
         )
         return n, 'rate_limited'
 
-    comment_ok = True
-    if channel == 'pr_comment':
-        comment_ok = await _post_pr_comment(db, n)
+    # Channel can be a single value ('pr_comment') or a comma-separated
+    # list ('pr_comment,slack_dm,whatsapp'). We dispatch each, collect
+    # per-channel results, and report 'comment_failed' if at least one
+    # actually-deliverable channel (pr_comment for now) couldn't post.
+    channels = [c.strip() for c in (channel or '').split(',') if c.strip()]
+    if not channels:
+        channels = ['manual']
 
+    delivered: list[str] = []
+    failed: list[str] = []
+    for ch in channels:
+        if ch == 'pr_comment':
+            ok = await _post_pr_comment(db, n)
+            (delivered if ok else failed).append(ch)
+        else:
+            # Slack / email / WhatsApp / Telegram / manual all just
+            # record intent for now — actual delivery is opt-in and
+            # lives behind separate notification plumbing.
+            delivered.append(ch)
+
+    # Only stamp last_nudged_at when at least one channel actually
+    # delivered. Without this, a failed PR-comment post (Azure 400, no
+    # repo mapping, etc.) would still flip the row to "nudged Xh ago"
+    # even though nothing landed anywhere — exactly the "Azure'da
+    # yorum yok ama 21 saat sonra dürt diyor" bug.
+    if not delivered:
+        return n, 'comment_failed'
     n.last_nudged_at = datetime.utcnow()
     n.nudge_count = (n.nudge_count or 0) + 1
-    n.last_nudge_channel = channel
+    n.last_nudge_channel = ','.join(delivered)
     if n.severity == 'critical' and n.escalated_at is None:
         n.escalated_at = datetime.utcnow()
     await db.commit()
     await db.refresh(n)
-    return n, ('sent' if comment_ok else 'comment_failed')
+    return n, ('comment_failed' if failed else 'sent')
