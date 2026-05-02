@@ -471,53 +471,12 @@ export default function ReviewBacklogPage() {
             })()}
           </SettingsField>
           <SettingsField label={t('backlog.set.exemptRepos')} hint={t('backlog.set.exemptHint')}>
-            {(() => {
-              // Multi-toggle from real repo_mappings — user clicks the
-              // chip instead of looking up numeric IDs.
-              const selected = new Set(
-                (settings.backlog_exempt_repos || '')
-                  .split(',').map((s) => s.trim()).filter(Boolean),
-              );
-              const toggle = (id: string) => {
-                const next = new Set(selected);
-                if (next.has(id)) next.delete(id); else next.add(id);
-                void saveSettings({
-                  backlog_exempt_repos: Array.from(next).join(','),
-                } as Partial<Settings>);
-              };
-              if (allMappings.length === 0) {
-                return (
-                  <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>
-                    {t('backlog.set.exempt.empty' as TranslationKey)}
-                  </div>
-                );
-              }
-              return (
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, maxWidth: 600 }}>
-                  {allMappings.map((m) => {
-                    const id = String(m.id);
-                    const on = selected.has(id);
-                    const icon = (m.provider || '').toLowerCase() === 'github' ? '🐙' : '☁️';
-                    return (
-                      <button
-                        key={id}
-                        type='button'
-                        onClick={() => toggle(id)}
-                        style={{
-                          padding: '6px 10px', borderRadius: 8,
-                          border: '1px solid ' + (on ? 'rgba(245,158,11,0.55)' : 'var(--panel-border)'),
-                          background: on ? 'rgba(245,158,11,0.16)' : 'var(--panel)',
-                          color: on ? '#f59e0b' : 'var(--ink-78)',
-                          fontSize: 12, fontWeight: 700, cursor: 'pointer',
-                        }}
-                      >
-                        {on ? '✓ ' : ''}{icon} {m.provider}:{m.owner}/{m.repo_name}
-                      </button>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+            <ExemptRepoPicker
+              value={settings.backlog_exempt_repos || ''}
+              mappings={allMappings}
+              onChange={(v) => void saveSettings({ backlog_exempt_repos: v } as Partial<Settings>)}
+              t={t}
+            />
           </SettingsField>
           <SettingsField
             label={t('backlog.set.commentLanguage' as TranslationKey)}
@@ -717,6 +676,128 @@ export default function ReviewBacklogPage() {
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function ExemptRepoPicker({
+  value, mappings, onChange, t,
+}: {
+  value: string;
+  mappings: Array<{ id: number; provider: string; owner: string; repo_name: string }>;
+  onChange: (next: string) => void;
+  t: (key: TranslationKey, vars?: Record<string, string | number>) => string;
+}) {
+  const [draft, setDraft] = useState('');
+  const selectedIds = (value || '').split(',').map((s) => s.trim()).filter(Boolean);
+  const labelOf = (m: { id: number; provider: string; owner: string; repo_name: string }) =>
+    `${(m.provider || '').toLowerCase()}:${m.owner}/${m.repo_name}`;
+  const idToLabel: Record<string, string> = {};
+  mappings.forEach((m) => { idToLabel[String(m.id)] = labelOf(m); });
+
+  if (mappings.length === 0) {
+    return (
+      <div style={{ fontSize: 11, color: 'var(--ink-35)' }}>
+        {t('backlog.set.exempt.empty' as TranslationKey)}
+      </div>
+    );
+  }
+
+  // Filter remaining repos by the search draft. When the user clicks a
+  // suggestion or presses Enter on a single match, that repo's id moves
+  // into the comma-separated value.
+  const remaining = mappings.filter((m) => !selectedIds.includes(String(m.id)));
+  const q = draft.trim().toLowerCase();
+  const filtered = q
+    ? remaining.filter((m) => labelOf(m).toLowerCase().includes(q))
+    : remaining;
+
+  const add = (id: string) => {
+    if (selectedIds.includes(id)) return;
+    onChange([...selectedIds, id].join(','));
+    setDraft('');
+  };
+  const remove = (id: string) => {
+    onChange(selectedIds.filter((x) => x !== id).join(','));
+  };
+
+  return (
+    <div style={{ display: 'grid', gap: 8, maxWidth: 600 }}>
+      {/* Selected chips inline */}
+      {selectedIds.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {selectedIds.map((id) => (
+            <span key={id} style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              padding: '4px 8px', borderRadius: 8,
+              background: 'rgba(245,158,11,0.16)', border: '1px solid rgba(245,158,11,0.45)',
+              color: '#f59e0b', fontSize: 12, fontWeight: 700,
+            }}>
+              ✓ {idToLabel[id] || `#${id}`}
+              <button
+                type='button'
+                onClick={() => remove(id)}
+                style={{ background: 'transparent', border: 'none', color: '#f59e0b', cursor: 'pointer', fontSize: 14, padding: 0, lineHeight: 1, opacity: 0.75 }}
+              >×</button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Search box + autocomplete dropdown */}
+      <div style={{ position: 'relative' }}>
+        <input
+          type='text'
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && filtered.length === 1) {
+              e.preventDefault();
+              add(String(filtered[0].id));
+            } else if (e.key === 'Escape') {
+              setDraft('');
+            }
+          }}
+          placeholder={t('backlog.set.exempt.search' as TranslationKey)}
+          style={{
+            padding: '8px 12px', borderRadius: 8,
+            border: '1px solid var(--panel-border)',
+            background: 'var(--surface)', color: 'var(--ink)',
+            fontSize: 13, width: '100%',
+          }}
+        />
+        {draft && filtered.length > 0 && (
+          <div style={{
+            position: 'absolute', top: 'calc(100% + 4px)', left: 0, right: 0,
+            background: 'var(--surface)', border: '1px solid var(--panel-border)',
+            borderRadius: 8, boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+            maxHeight: 240, overflowY: 'auto', zIndex: 10,
+          }}>
+            {filtered.slice(0, 20).map((m) => {
+              const icon = (m.provider || '').toLowerCase() === 'github' ? '🐙' : '☁️';
+              return (
+                <button
+                  key={m.id}
+                  type='button'
+                  onClick={() => add(String(m.id))}
+                  style={{
+                    width: '100%', textAlign: 'left',
+                    padding: '8px 12px', border: 'none',
+                    background: 'transparent', color: 'var(--ink)',
+                    fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: 8,
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'var(--panel)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent'; }}
+                >
+                  <span>{icon}</span>
+                  <span>{labelOf(m)}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

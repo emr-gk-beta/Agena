@@ -3329,6 +3329,7 @@
   "backlog.set.exemptRepos": "Exempt repo mapping IDs",
   "backlog.set.exemptHint": "Comma-separated repo mapping ids to skip.",
   "backlog.set.exempt.empty": "No repo mappings configured. Add one under /dashboard/mappings first.",
+  "backlog.set.exempt.search": "Search a repo to exempt…",
   "backlog.loading": "Loading backlog…",
   "backlog.empty.title": "No PRs in the backlog",
   "backlog.empty.body": "Every open PR is within the review window. AGENA polls every 30 minutes — or click Scan now.",

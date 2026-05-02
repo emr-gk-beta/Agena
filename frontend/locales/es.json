@@ -3329,6 +3329,7 @@
   "backlog.set.exemptRepos": "IDs de repos exentos",
   "backlog.set.exemptHint": "IDs de repo mapping separados por coma para omitir.",
   "backlog.set.exempt.empty": "No hay mapeos de repo configurados. Crea uno en /dashboard/mappings primero.",
+  "backlog.set.exempt.search": "Buscar un repo a excluir…",
   "backlog.loading": "Cargando cola…",
   "backlog.empty.title": "Cola vacía",
   "backlog.empty.body": "Todos los PRs abiertos están dentro de la ventana de revisión. AGENA escanea cada 30 minutos.",

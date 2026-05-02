@@ -3329,6 +3329,7 @@
   "backlog.set.exemptRepos": "Ausgenommene Repo-IDs",
   "backlog.set.exemptHint": "Kommagetrennte Repo-Mapping-IDs.",
   "backlog.set.exempt.empty": "Keine Repo-Mappings konfiguriert. Bitte zuerst unter /dashboard/mappings anlegen.",
+  "backlog.set.exempt.search": "Repo zum Ausschließen suchen…",
   "backlog.loading": "Backlog lädt…",
   "backlog.empty.title": "Keine PRs im Backlog",
   "backlog.empty.body": "Alle offenen PRs sind im Review-Fenster. AGENA scannt alle 30 Minuten.",

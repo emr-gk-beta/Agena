@@ -3329,6 +3329,7 @@
   "backlog.set.exemptRepos": "除外リポジトリ ID",
   "backlog.set.exemptHint": "スキップするカンマ区切り repo mapping ID。",
   "backlog.set.exempt.empty": "リポマッピングがありません。まず /dashboard/mappings で追加してください。",
+  "backlog.set.exempt.search": "除外する repo を検索…",
   "backlog.loading": "バックログ読み込み中…",
   "backlog.empty.title": "バックログは空",
   "backlog.empty.body": "すべてのオープン PR がレビューウィンドウ内。AGENA は 30 分ごとにスキャン。",

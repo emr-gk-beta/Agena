@@ -3329,6 +3329,7 @@
   "backlog.set.exemptRepos": "ID repo esclusi",
   "backlog.set.exemptHint": "ID repo mapping separati da virgola da saltare.",
   "backlog.set.exempt.empty": "Nessun repo mapping configurato. Aggiungine uno in /dashboard/mappings.",
+  "backlog.set.exempt.search": "Cerca un repo da escludere…",
   "backlog.loading": "Caricamento coda…",
   "backlog.empty.title": "Coda vuota",
   "backlog.empty.body": "Tutti i PR aperti sono nella finestra di review. AGENA scansiona ogni 30 minuti.",
