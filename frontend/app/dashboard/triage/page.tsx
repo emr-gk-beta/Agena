@@ -89,49 +89,95 @@ export default function TriagePage() {
   useEffect(() => { void load(); void loadSettings(); }, []);
   useEffect(() => { void load(statusFilter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [statusFilter]);
 
+  // Source-side scans walk hundreds of tickets through the LLM, so we
+  // run them in the background. POST returns immediately with
+  // status='running'; a polling effect tracks progress until 'done'
+  // / 'failed' so the user can keep navigating.
+  const [scanProgress, setScanProgress] = useState<{
+    status: 'idle' | 'running' | 'done' | 'failed' | 'disabled' | 'no_sources' | 'already_running';
+    considered?: number;
+    decided?: number;
+    reason?: string;
+    error?: string;
+  } | null>(null);
+
   async function scanNow() {
     setScanning(true);
     setError(null);
     try {
       const res = await apiFetch<{
-        new_or_refreshed?: number;
+        status: string;
         considered?: number;
+        decided?: number;
         threshold_days?: number;
-        sources?: string[];
         reason?: string;
       }>('/triage/scan', { method: 'POST' });
-      await load();
-      // Surface a clear note when the scan was a no-op so the user knows
-      // why the queue didn't change. Localised through t() — keys live in
-      // every locale file under triage.scan.*.
-      if (res && (res.new_or_refreshed ?? 0) === 0) {
-        const days = String(res.threshold_days ?? 30);
-        const srcs = (res.sources && res.sources.length > 0)
-          ? res.sources.join(', ')
-          : 'jira/azure';
-        let note = '';
-        switch (res.reason) {
-          case 'triage_disabled':
-            note = t('triage.scan.disabled' as TranslationKey);
-            break;
-          case 'no_sources_configured':
-            note = t('triage.scan.noSources' as TranslationKey);
-            break;
-          case 'all_candidates_have_pending_decisions':
-            note = t('triage.scan.allPending' as TranslationKey);
-            break;
-          case 'no_stale_candidates':
-          default:
-            note = t('triage.scan.noStale' as TranslationKey, { days, sources: srcs });
-        }
-        setError(note);
+      setScanProgress({
+        status: (res.status as 'running' | 'already_running' | 'disabled' | 'no_sources') || 'running',
+        considered: res.considered, decided: res.decided, reason: res.reason,
+      });
+      if (res.status === 'disabled') {
+        setError(t('triage.scan.disabled' as TranslationKey));
+        setScanning(false);
+      } else if (res.status === 'no_sources') {
+        setError(t('triage.scan.noSources' as TranslationKey));
+        setScanning(false);
       }
+      // 'running' / 'already_running' → poller below takes over.
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
-    } finally {
       setScanning(false);
     }
   }
+
+  // Poll the scan progress endpoint while a scan is in flight. Updates
+  // the button label ('Taranıyor… 47/120') and reloads the decisions
+  // list every poll so new rows appear as the LLM verdict trickles in.
+  useEffect(() => {
+    if (scanProgress?.status !== 'running' && scanProgress?.status !== 'already_running') return;
+    let alive = true;
+    const tick = async () => {
+      while (alive) {
+        try {
+          const p = await apiFetch<{
+            status: string;
+            considered?: number;
+            decided?: number;
+            reason?: string;
+            error?: string;
+          }>('/triage/scan/status');
+          if (!alive) return;
+          setScanProgress({
+            status: (p.status as 'running' | 'done' | 'failed' | 'idle') || 'idle',
+            considered: p.considered, decided: p.decided,
+            reason: p.reason, error: p.error,
+          });
+          await load();
+          if (p.status === 'done' || p.status === 'failed' || p.status === 'idle') {
+            setScanning(false);
+            if (p.status === 'failed' && p.error) setError(p.error);
+            if (p.status === 'done' && (p.decided ?? 0) === 0 && p.reason === 'no_stale_candidates') {
+              setError(t('triage.scan.noStale' as TranslationKey, {
+                days: String(settings?.triage_idle_days ?? 30),
+                sources: 'jira/azure',
+              }));
+            }
+            return;
+          }
+        } catch (e) {
+          if (alive) {
+            setError(e instanceof Error ? e.message : String(e));
+            setScanning(false);
+          }
+          return;
+        }
+        await new Promise((r) => setTimeout(r, 2000));
+      }
+    };
+    void tick();
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [scanProgress?.status]);
 
   // Confirm-before-apply: clicking a verdict button opens a modal so
   // the user has one last chance to back out before AGENA flips the
@@ -258,7 +304,13 @@ export default function TriagePage() {
               fontSize: 12, fontWeight: 700, cursor: scanning ? 'wait' : 'pointer',
             }}
           >
-            {scanning ? t('triage.scanning') : t('triage.scanNow')}
+            {scanning
+              ? `${t('triage.scanning')}${
+                  scanProgress && (scanProgress.considered ?? 0) > 0
+                    ? ` ${scanProgress.decided ?? 0}/${scanProgress.considered}`
+                    : ''
+                }`
+              : t('triage.scanNow')}
           </button>
           {decisions && decisions.length > 0 && (
             <button

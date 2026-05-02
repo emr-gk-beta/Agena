@@ -235,6 +235,81 @@ async def _evaluate(
     return verdict, confidence, reason
 
 
+# Per-org scan task tracker. asyncio.create_task only weak-refs Tasks,
+# so without this set GC could cancel a long scan mid-flight (the
+# "asyncio.create_task: hold a strong reference" pitfall). Each task
+# pops itself in done_callback so we never grow unbounded.
+_SCAN_BG_TASKS: dict[int, "asyncio.Task"] = {}
+# Lightweight progress dict so the UI can poll "Taranıyor…" status.
+_SCAN_PROGRESS: dict[int, dict] = {}
+
+
+import asyncio  # noqa: E402 — module-level import below the docstring
+
+
+def get_scan_progress(org_id: int) -> dict:
+    """Returns the current/last scan state for one org.
+    Shape: {status: idle|running|done|failed, considered, decided,
+    started_at, finished_at, error}."""
+    p = _SCAN_PROGRESS.get(int(org_id))
+    if not p:
+        return {'status': 'idle'}
+    return dict(p)
+
+
+async def start_scan_for_org(db: AsyncSession, org_id: int) -> dict:
+    """Schedule scan_for_org() as a background asyncio task and return
+    immediately. Idempotent: a second call while a scan is in flight
+    returns status='already_running' instead of spawning a duplicate."""
+    settings = await _settings_for(db, org_id)
+    if not settings.triage_enabled:
+        return {'status': 'disabled', 'reason': 'triage_disabled'}
+    if not (settings.triage_sources or '').strip():
+        return {'status': 'no_sources', 'reason': 'no_sources_configured'}
+
+    if org_id in _SCAN_BG_TASKS and not _SCAN_BG_TASKS[org_id].done():
+        return {'status': 'already_running', **_SCAN_PROGRESS.get(org_id, {})}
+
+    _SCAN_PROGRESS[org_id] = {
+        'status': 'running',
+        'considered': 0,
+        'decided': 0,
+        'started_at': datetime.utcnow().isoformat(),
+        'finished_at': None,
+        'error': None,
+        'threshold_days': settings.triage_idle_days,
+    }
+
+    async def _run() -> None:
+        from agena_core.database import SessionLocal
+        try:
+            async with SessionLocal() as bg_db:
+                result = await scan_for_org(bg_db, org_id)
+            prev = _SCAN_PROGRESS.get(org_id, {})
+            _SCAN_PROGRESS[org_id] = {
+                **prev,
+                'status': 'done',
+                'considered': result.get('considered', 0),
+                'decided': result.get('new_or_refreshed', 0),
+                'reason': result.get('reason', ''),
+                'finished_at': datetime.utcnow().isoformat(),
+            }
+        except Exception as exc:
+            logger.exception('Background triage scan failed for org=%s', org_id)
+            prev = _SCAN_PROGRESS.get(org_id, {})
+            _SCAN_PROGRESS[org_id] = {
+                **prev,
+                'status': 'failed',
+                'error': str(exc)[:300],
+                'finished_at': datetime.utcnow().isoformat(),
+            }
+
+    task = asyncio.create_task(_run())
+    _SCAN_BG_TASKS[org_id] = task
+    task.add_done_callback(lambda _t: _SCAN_BG_TASKS.pop(org_id, None))
+    return {'status': 'running', **_SCAN_PROGRESS[org_id]}
+
+
 _SOURCE_ALIASES = {
     # The seeded default settings row uses 'azure_devops' but the import
     # path writes TaskRecord.source = 'azure'. Treat both as equivalent
@@ -540,6 +615,15 @@ async def scan_for_org(
             if key in by_external:
                 by_external[key]['_local_task_id'] = t.id
 
+    # Seed progress dict so the UI polling endpoint shows 'considered'
+    # right away instead of jumping from 0 to total at the end.
+    if org_id in _SCAN_PROGRESS:
+        _SCAN_PROGRESS[org_id] = {
+            **_SCAN_PROGRESS[org_id],
+            'considered': len(candidates),
+            'decided': 0,
+        }
+
     new_decisions = 0
     for cand in candidates:
         existing = (await db.execute(
@@ -592,9 +676,25 @@ async def scan_for_org(
                 status='pending',
             ))
         new_decisions += 1
+        # Commit per-row so the UI sees decisions trickle in and the
+        # /triage/decisions poll picks them up while the scan keeps
+        # running. Without this users wait for the entire batch.
+        try:
+            await db.commit()
+        except Exception:
+            pass
+        if org_id in _SCAN_PROGRESS:
+            _SCAN_PROGRESS[org_id] = {
+                **_SCAN_PROGRESS[org_id],
+                'decided': new_decisions,
+            }
 
-    if new_decisions:
+    # Per-row commits already happened; flush any trailing state.
+    try:
         await db.commit()
+    except Exception:
+        pass
+    if new_decisions:
         logger.info('Triage source-side scan: org=%s decisions=%s candidates=%s',
                     org_id, new_decisions, len(candidates))
 

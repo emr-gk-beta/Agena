@@ -66,17 +66,31 @@ async def scan_now(
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
-    """Returns a diagnostic dict so the UI can explain a 0-result scan
-    instead of just blinking the toast off:
-        new_or_refreshed: int   — decisions newly created or re-evaluated
-        considered:       int   — candidate task rows that met the filters
-        threshold_days:   int   — current settings.triage_idle_days
-        sources:          list  — normalised TaskRecord.source values
-        reason:           str   — empty when result>0; otherwise one of
-                                  triage_disabled / no_sources_configured /
-                                  no_stale_candidates / all_candidates_have_pending_decisions
+    """Kick off the source-side scan as a background task and return
+    immediately so the UI doesn't lock up while we walk every stale
+    Jira / Azure ticket through the LLM. The scan's progress is
+    visible to the user as new TriageDecision rows land — the page
+    already polls /triage/decisions, so they appear gradually.
+
+    Returns:
+      status='running'     — a fresh background task was scheduled
+      status='already_running' — a previous scan for this org is still
+                                 in flight; the second click is a no-op
+      status='disabled' / 'no_sources' — same diagnostic semantics as
+                                         before, surfaced before we
+                                         spawn anything.
     """
-    return await triage_service.scan_for_org(db, tenant.organization_id)
+    return await triage_service.start_scan_for_org(db, tenant.organization_id)
+
+
+@router.get('/scan/status')
+async def scan_status(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+) -> dict[str, Any]:
+    """Polled by the UI to show 'Taranıyor…' progress while the
+    background scan is in flight. Returns idle/running + a rough
+    counter so we can render 'Taranıyor… 47 değerlendirildi'."""
+    return triage_service.get_scan_progress(tenant.organization_id)
 
 
 @router.post('/decisions/{decision_id}/apply')
