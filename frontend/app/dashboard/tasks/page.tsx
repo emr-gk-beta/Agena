@@ -1929,7 +1929,7 @@ export default function DashboardTasksPage() {
                 </button>
                 <button onClick={() => void saveEditTask()}
                   style={{ padding: '8px 16px', borderRadius: 10, fontSize: 12, fontWeight: 700, cursor: 'pointer', background: 'linear-gradient(135deg, #0d9488, #22c55e)', border: 'none', color: '#fff' }}>
-                  Save
+                  {t('common.save')}
                 </button>
                 <button onClick={() => setEditTask(null)} style={{ width: 28, height: 28, borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'transparent', color: 'var(--ink-45)', cursor: 'pointer', fontSize: 14 }}>×</button>
               </div>
@@ -2200,7 +2200,7 @@ export default function DashboardTasksPage() {
               <button onClick={() => setConflictModal(null)} style={{
                 padding: '8px 20px', borderRadius: 8, border: '1px solid var(--panel-border)',
                 background: 'transparent', color: 'var(--ink-50)', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              }}>Cancel</button>
+              }}>{t('common.cancel')}</button>
               <button onClick={() => void _forceQueueConflict()} style={{
                 padding: '8px 20px', borderRadius: 8, border: 'none',
                 background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
@@ -2259,7 +2259,7 @@ function McpModelSelect({ taskId, agents, hasRepo, repoSel, mappingIds, createPr
 
       {/* Model selector */}
       <div>
-        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>Model</div>
+        <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 6 }}>{t('common.model')}</div>
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4 }}>
           {MCP_MODELS.map((m, i) => {
             const active = i === selectedIdx;

@@ -1,5 +1,13 @@
 [
   {
+    "hash": "7f8e2cc",
+    "short": "7f8e2cc",
+    "message": "i18n: localise the rest of the dashboard chrome",
+    "date": "2026-05-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "f5b93a3",
     "short": "f5b93a3",
     "message": "i18n: stop the most visible English leaks across the panel",

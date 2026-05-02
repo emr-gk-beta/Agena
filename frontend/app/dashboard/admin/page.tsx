@@ -226,13 +226,13 @@ export default function AdminPanel() {
             <thead>
               <tr>
                 <th style={thStyle}>ID</th>
-                <th style={thStyle}>Name</th>
-                <th style={thStyle}>Slug</th>
-                <th style={thStyle}>Members</th>
+                <th style={thStyle}>{t('common.name')}</th>
+                <th style={thStyle}>{t('common.slug')}</th>
+                <th style={thStyle}>{t('common.members')}</th>
                 <th style={thStyle}>Tasks</th>
-                <th style={thStyle}>Plan</th>
-                <th style={thStyle}>Created</th>
-                <th style={thStyle}>Actions</th>
+                <th style={thStyle}>{t('common.plan')}</th>
+                <th style={thStyle}>{t('common.created')}</th>
+                <th style={thStyle}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -255,7 +255,7 @@ export default function AdminPanel() {
                       onChange={(e) => changePlan(o.id, e.target.value)}
                       style={{ ...btnSmall, background: 'rgba(7,15,26,0.5)', color: 'var(--ink-72)' }}
                     >
-                      <option value='free'>Free</option>
+                      <option value='free'>{t('pricing.free')}</option>
                       <option value='pro'>Pro</option>
                       <option value='enterprise'>Enterprise</option>
                     </select>
@@ -275,12 +275,12 @@ export default function AdminPanel() {
               <tr>
                 <th style={thStyle}>ID</th>
                 <th style={thStyle}>Email</th>
-                <th style={thStyle}>Name</th>
+                <th style={thStyle}>{t('common.name')}</th>
                 <th style={thStyle}>Org(s)</th>
                 <th style={thStyle}>Active</th>
                 <th style={thStyle}>Admin</th>
-                <th style={thStyle}>Created</th>
-                <th style={thStyle}>Actions</th>
+                <th style={thStyle}>{t('common.created')}</th>
+                <th style={thStyle}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>
@@ -349,7 +349,7 @@ export default function AdminPanel() {
                 <th style={thStyle}>Email</th>
                 <th style={thStyle}>Active</th>
                 <th style={thStyle}>Subscribed</th>
-                <th style={thStyle}>Actions</th>
+                <th style={thStyle}>{t('common.actions')}</th>
               </tr>
             </thead>
             <tbody>

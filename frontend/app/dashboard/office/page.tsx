@@ -503,7 +503,7 @@ function AssignTaskModal({
 
         {/* Mode switcher: AI / MCP / Flow */}
         <div style={{ marginBottom: 12 }}>
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 6 }}>Mode</div>
+          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-35)', marginBottom: 6 }}>{t('common.mode')}</div>
           <div style={{ display: 'flex', gap: 4, width: '100%' }}>
             {([
               { key: 'ai' as const, label: 'AI Agent', color: agent.color },
@@ -672,7 +672,7 @@ function AssignTaskModal({
                     {repoMappings.length > 0 && (
                       <button onClick={() => setRepoMode('mapping')}
                         style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: repoMode === 'mapping' ? `1px solid ${agent.color}60` : '1px solid var(--panel-border-2)', background: repoMode === 'mapping' ? `${agent.color}15` : 'transparent', color: repoMode === 'mapping' ? agent.color : 'var(--ink-45)' }}>
-                        Mapping
+                        {t('common.mapping')}
                       </button>
                     )}
                     <button onClick={() => setRepoMode('remote')}

@@ -1460,7 +1460,7 @@ function VariablePicker({ targetRef, onInsert }: { targetRef: React.RefObject<HT
       </button>
       {open && (
         <div style={{ position: 'absolute', right: 0, top: 28, zIndex: 80, minWidth: 200, borderRadius: 10, border: '1px solid var(--border)', background: 'var(--surface)', boxShadow: '0 8px 24px rgba(0,0,0,0.18)', padding: 6 }}>
-          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-25)', padding: '4px 8px' }}>Variables</div>
+          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1, textTransform: 'uppercase', color: 'var(--ink-25)', padding: '4px 8px' }}>{t('common.variables')}</div>
           {VARIABLE_OPTIONS.map((v) => (
             <button key={v.value} onClick={() => { onInsert(v.value); setOpen(false); }}
               style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: 1, padding: '6px 8px', borderRadius: 6, border: 'none', background: 'transparent', cursor: 'pointer', textAlign: 'left' }}
@@ -1680,7 +1680,7 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
           {/* Agent Selection */}
           {agentConfigs.length > 0 && (
             <div>
-              <label style={pLbl}>Agent</label>
+              <label style={pLbl}>{t('common.agent')}</label>
               <select
                 value={(() => {
                   const byRole = agentConfigs.find((a) => a.role === node.role);
@@ -1723,10 +1723,10 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
           {/* Manual Model & Provider override */}
           <CollapsibleSection title="Model & Provider Override" defaultOpen={false}>
             <div>
-              <label style={pLbl}>Model</label>
+              <label style={pLbl}>{t('common.model')}</label>
               <select value={node.model ?? ''} onChange={(e) => onChange({ model: e.target.value })}
                 style={{ ...pInp, cursor: 'pointer' }}>
-                <option value="">Default</option>
+                <option value="">{t('common.default')}</option>
                 {MODEL_OPTIONS.map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
               </select>
             </div>

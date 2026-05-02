@@ -598,7 +598,7 @@ export default function DoraOverviewPage() {
 
             <div style={{ display: 'grid', gap: 12 }}>
               <div>
-                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>Provider</div>
+                <div style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, marginBottom: 6 }}>{t('common.provider')}</div>
                 <div style={{ display: 'inline-flex', padding: 3, borderRadius: 999, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)' }}>
                   {(['azure', 'github'] as const).map((p) => {
                     const active = addRepoForm.provider === p;
@@ -655,7 +655,7 @@ export default function DoraOverviewPage() {
                 </>
               ) : (
                 <label style={{ display: 'grid', gap: 4 }}>
-                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>GitHub repo</span>
+                  <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t('dora.githubRepo')}</span>
                   <select
                     value={`${addRepoForm.owner}/${addRepoForm.repo_name}`}
                     onChange={(e) => {

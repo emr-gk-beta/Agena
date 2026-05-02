@@ -1193,11 +1193,11 @@ export default function IntegrationsPage() {
             </select>
           </FieldGroup>
           <button className='button button-primary' onClick={() => void saveDatadog()} style={{ width: '100%', justifyContent: 'center', marginTop: 2 }}>
-            Save Datadog Config
+            {t('integrations.saveDatadogConfig')}
           </button>
           {configs.find(c => c.provider === 'datadog')?.has_secret && (
             <button onClick={() => void deleteIntegration('datadog')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
-              Delete Datadog Connection
+              {t('integrations.deleteDatadogConnection')}
             </button>
           )}
         </IntegrationCard>}
@@ -1369,7 +1369,7 @@ export default function IntegrationsPage() {
             />
           </FieldGroup>
           <button className='button button-primary' onClick={() => void saveTelegram()} style={{ width: '100%', justifyContent: 'center', marginTop: 2 }}>
-            Save Telegram
+            {t('integrations.saveTelegram')}
           </button>
           {telegramSetupMsg && <div style={{ fontSize: 11, color: '#5eead4', marginTop: 6 }}>{telegramSetupMsg}</div>}
           <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: 8, lineHeight: 1.5 }}>

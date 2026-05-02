@@ -178,10 +178,10 @@ function SymptomCard({ symptom, t, repos }: { symptom: Symptom; t: ReturnType<ty
             <thead>
               <tr style={{ borderBottom: `1px solid ${sev.border}` }}>
                 <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>PR</th>
-                <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>Author</th>
-                <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>Repo</th>
+                <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>{t('common.author')}</th>
+                <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>{t('common.repo')}</th>
                 <th style={{ textAlign: 'right', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>{t('dora.reviewTime')}</th>
-                <th style={{ textAlign: 'right', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>Size</th>
+                <th style={{ textAlign: 'right', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>{t('common.size')}</th>
               </tr>
             </thead>
             <tbody>
@@ -211,7 +211,7 @@ function SymptomCard({ symptom, t, repos }: { symptom: Symptom; t: ReturnType<ty
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 10 }}>
             <thead>
               <tr style={{ borderBottom: `1px solid ${sev.border}` }}>
-                <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>Author</th>
+                <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>{t('common.author')}</th>
                 <th style={{ textAlign: 'right', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>{t('dora.weekendCommits')}</th>
               </tr>
             </thead>

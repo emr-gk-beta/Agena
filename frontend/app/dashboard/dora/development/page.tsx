@@ -1016,16 +1016,16 @@ function DeploymentsTab({ data, t }: { data: DeploymentsAnalyticsResponse; t: TF
       {/* Deployment list */}
       {data.deployments.length > 0 && (
         <div style={box}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 12 }}>Deployments</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)', marginBottom: 12 }}>{t('common.deployments')}</div>
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
               <thead>
                 <tr style={{ borderBottom: '1px solid var(--panel-border)' }}>
-                  <th style={thStyle}>Environment</th>
-                  <th style={thStyle}>Status</th>
+                  <th style={thStyle}>{t('common.environment')}</th>
+                  <th style={thStyle}>{t('common.status')}</th>
                   <th style={thStyle}>SHA</th>
                   <th style={thStyle}>{t('dora.deployedAt')}</th>
-                  <th style={thStyle}>Duration</th>
+                  <th style={thStyle}>{t('common.duration')}</th>
                 </tr>
               </thead>
               <tbody>

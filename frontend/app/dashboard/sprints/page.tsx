@@ -1634,7 +1634,7 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
               {repoMappings.length > 0 && (
                 <button onClick={() => setRepoSource('mapping')}
                   style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: repoSource === 'mapping' ? '1px solid rgba(56,189,248,0.5)' : '1px solid var(--panel-border-2)', background: repoSource === 'mapping' ? 'rgba(56,189,248,0.12)' : 'transparent', color: repoSource === 'mapping' ? '#7dd3fc' : 'var(--ink-45)' }}>
-                  Mapping
+                  {t('common.mapping')}
                 </button>
               )}
               <button onClick={() => setRepoSource('remote')}
