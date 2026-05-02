@@ -1,5 +1,13 @@
 [
   {
+    "hash": "f55952b",
+    "short": "f55952b",
+    "message": "Landing i18n: read agena_lang cookie so the navbar toggle wins",
+    "date": "2026-05-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "f7db73e",
     "short": "f7db73e",
     "message": "SEO: localise the 3 workflow landings to 7 languages",

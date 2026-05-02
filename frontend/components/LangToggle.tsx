@@ -1,14 +1,25 @@
 'use client';
 
+import { useRouter } from 'next/navigation';
 import { useLocale } from '@/lib/i18n';
 
 export default function LangToggle({ style }: { style?: React.CSSProperties }) {
   const { lang, setLang, t } = useLocale();
+  const router = useRouter();
+
+  function onChangeLang(next: 'tr' | 'en' | 'es' | 'zh' | 'it' | 'de' | 'ja') {
+    setLang(next);
+    // Server-rendered pages (landings, OG metadata) cache the locale at
+    // render time, so picking a new language has to re-fetch the route.
+    // router.refresh() tells Next.js to rerun the server component for
+    // the current path with the freshly-written cookie.
+    router.refresh();
+  }
 
   return (
     <select
       value={lang}
-      onChange={(e) => setLang(e.target.value as 'tr' | 'en' | 'es' | 'zh' | 'it' | 'de' | 'ja')}
+      onChange={(e) => onChangeLang(e.target.value as 'tr' | 'en' | 'es' | 'zh' | 'it' | 'de' | 'ja')}
       title={t('tooltip.action.language')}
       suppressHydrationWarning
       style={{
