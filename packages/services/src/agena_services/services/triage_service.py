@@ -426,10 +426,13 @@ async def _scan_jira_source(
                 priority = ((fields.get('priority') or {}).get('name')) if isinstance(fields.get('priority'), dict) else None
                 assignee = ((fields.get('assignee') or {}).get('displayName')) if isinstance(fields.get('assignee'), dict) else None
                 status_name = ((fields.get('status') or {}).get('name')) if isinstance(fields.get('status'), dict) else ''
+                # Jira project key is the prefix before '-' (SCRUM-6 → SCRUM).
+                project_key = key.split('-', 1)[0] if '-' in key else ''
                 out.append({
                     'organization_id': org_id,
                     'source': 'jira',
                     'external_id': key,
+                    'project_key': project_key,
                     'title': str(fields.get('summary') or '')[:512],
                     'description': '',
                     'status': str(status_name) or 'open',
@@ -611,6 +614,7 @@ async def _scan_azure_source(
                     'organization_id': org_id,
                     'source': 'azure',
                     'external_id': str(wid),
+                    'project_key': proj,
                     'title': str(fields.get('System.Title') or '')[:512],
                     'description': '',
                     'status': str(fields.get('System.State') or 'open'),
@@ -739,6 +743,7 @@ async def scan_for_org(
             existing.ai_reasoning = reasoning
             existing.ticket_title = cand['title']
             existing.ticket_url = cand.get('url')
+            existing.project_key = cand.get('project_key') or None
             existing.source_updated_at = cand_updated_at or None
             existing.status = 'pending'
             existing.applied_verdict = None
@@ -750,6 +755,7 @@ async def scan_for_org(
                 task_id=cand.get('_local_task_id'),
                 source=cand['source'],
                 external_id=cand['external_id'],
+                project_key=cand.get('project_key') or None,
                 ticket_title=cand['title'],
                 ticket_url=cand.get('url'),
                 source_updated_at=cand_updated_at or None,

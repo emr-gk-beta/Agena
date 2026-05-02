@@ -11,6 +11,7 @@ type Decision = {
   task_id: number | null;
   source: string;
   external_id: string;
+  project_key: string | null;
   ticket_title: string | null;
   ticket_url: string | null;
   idle_days: number;
@@ -69,20 +70,34 @@ export default function TriagePage() {
   // Source tab — separates Jira / Azure queues so the user can triage
   // one platform at a time.
   const [sourceFilter, setSourceFilter] = useState<'all' | 'jira' | 'azure'>('all');
+  // Project / board filter (Jira project key or Azure project name).
+  // Populated from /triage/projects so the dropdown only shows what
+  // exists in the queue.
+  const [projectFilter, setProjectFilter] = useState<string>('all');
+  const [projectsList, setProjectsList] = useState<Array<{ source: string; project_key: string; count: number }>>([]);
 
   async function load(
     filter: typeof statusFilter = statusFilter,
     src: typeof sourceFilter = sourceFilter,
+    proj: string = projectFilter,
   ) {
     try {
       const params = new URLSearchParams({ status: filter, limit: '200' });
       if (src && src !== 'all') params.set('source', src);
+      if (proj && proj !== 'all') params.set('project', proj);
       const rows = await apiFetch<Decision[]>(`/triage/decisions?${params.toString()}`);
       setDecisions(rows);
       setError(null);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
+  }
+
+  async function loadProjects() {
+    try {
+      const rows = await apiFetch<Array<{ source: string; project_key: string; count: number }>>('/triage/projects');
+      setProjectsList(rows);
+    } catch { /* non-fatal */ }
   }
 
   async function loadSettings() {
@@ -94,8 +109,11 @@ export default function TriagePage() {
     }
   }
 
-  useEffect(() => { void load(); void loadSettings(); }, []);
-  useEffect(() => { void load(statusFilter, sourceFilter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [statusFilter, sourceFilter]);
+  useEffect(() => { void load(); void loadSettings(); void loadProjects(); }, []);
+  useEffect(() => { void load(statusFilter, sourceFilter, projectFilter); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [statusFilter, sourceFilter, projectFilter]);
+  // Reset project pick when source tab changes — the previous project
+  // probably doesn't belong to the new source.
+  useEffect(() => { setProjectFilter('all'); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [sourceFilter]);
 
   // Source-side scans walk hundreds of tickets through the LLM, so we
   // run them in the background. POST returns immediately with
@@ -161,6 +179,7 @@ export default function TriagePage() {
             reason: p.reason, error: p.error,
           });
           await load();
+          await loadProjects();
           if (p.status === 'done' || p.status === 'failed' || p.status === 'idle') {
             setScanning(false);
             if (p.status === 'failed' && p.error) setError(p.error);
@@ -362,6 +381,52 @@ export default function TriagePage() {
             ))}
           </div>
         </div>
+
+        {/* Project chips — visible only when there are projects to
+            pick from in the current source filter. Filters the queue
+            down to one Jira project (SCRUM) or one Azure project
+            (EcomBackend). 'All' means cross-project queue. */}
+        {(() => {
+          const visible = projectsList.filter((p) => {
+            if (sourceFilter === 'all') return true;
+            if (sourceFilter === 'jira') return p.source === 'jira';
+            return p.source === 'azure' || p.source === 'azure_devops';
+          });
+          if (visible.length === 0) return null;
+          return (
+            <div style={{ display: 'flex', gap: 4, padding: 4, background: 'var(--panel)', border: '1px solid var(--panel-border)', borderRadius: 10, alignSelf: 'flex-start', flexWrap: 'wrap' }}>
+              <button
+                onClick={() => setProjectFilter('all')}
+                style={{
+                  padding: '6px 10px', borderRadius: 7, border: 'none',
+                  background: projectFilter === 'all' ? 'rgba(94,234,212,0.16)' : 'transparent',
+                  color: projectFilter === 'all' ? '#5eead4' : 'var(--ink-58)',
+                  fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                }}
+              >
+                {t('triage.source.all' as TranslationKey)}
+              </button>
+              {visible.map((p) => {
+                const isActive = projectFilter === p.project_key;
+                return (
+                  <button
+                    key={`${p.source}:${p.project_key}`}
+                    onClick={() => setProjectFilter(p.project_key)}
+                    style={{
+                      padding: '6px 10px', borderRadius: 7, border: 'none',
+                      background: isActive ? 'rgba(94,234,212,0.16)' : 'transparent',
+                      color: isActive ? '#5eead4' : 'var(--ink-58)',
+                      fontSize: 11, fontWeight: 700, cursor: 'pointer',
+                    }}
+                  >
+                    {p.source === 'jira' ? '📋' : '☁️'} {p.project_key}
+                    <span style={{ opacity: 0.6, marginLeft: 4 }}>({p.count})</span>
+                  </button>
+                );
+              })}
+            </div>
+          );
+        })()}
 
         {/* Source tabs — All / Jira / Azure. The decision counts come
             from the loaded `decisions` slice (filtered by the active

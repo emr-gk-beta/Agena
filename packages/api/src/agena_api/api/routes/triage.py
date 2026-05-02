@@ -22,6 +22,7 @@ class DecisionResponse(BaseModel):
     task_id: int | None = None  # nullable for source-side decisions (no local TaskRecord)
     source: str
     external_id: str
+    project_key: str | None = None
     ticket_title: str | None = None
     ticket_url: str | None = None
     idle_days: int
@@ -48,6 +49,7 @@ async def list_decisions(
     db: AsyncSession = Depends(get_db_session),
     status: str = 'pending',
     source: str | None = None,
+    project: str | None = None,
     limit: int = 100,
 ) -> list[DecisionResponse]:
     stmt = (
@@ -56,16 +58,42 @@ async def list_decisions(
         .where(TriageDecision.status == status)
     )
     if source and source not in ('all', ''):
-        # Treat 'azure' and 'azure_devops' as the same bucket so the
-        # tab matches the user's mental model regardless of which
-        # spelling lands in the row.
         if source.lower() in ('azure', 'azure_devops'):
             stmt = stmt.where(TriageDecision.source.in_(['azure', 'azure_devops']))
         else:
             stmt = stmt.where(TriageDecision.source == source.lower())
+    if project and project not in ('all', ''):
+        stmt = stmt.where(TriageDecision.project_key == project)
     stmt = stmt.order_by(desc(TriageDecision.idle_days)).limit(min(limit, 500))
     rows = (await db.execute(stmt)).scalars().all()
     return [DecisionResponse.model_validate(r, from_attributes=True) for r in rows]
+
+
+@router.get('/projects')
+async def list_projects(
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> list[dict[str, Any]]:
+    """Distinct (source, project_key) pairs across the org's triage
+    decisions, with a count. Drives the project dropdown / chip group
+    on /dashboard/triage so the user can scope the queue to one
+    Jira project key (SCRUM) or one Azure project (EcomBackend)."""
+    from sqlalchemy import func
+    rows = (await db.execute(
+        select(
+            TriageDecision.source,
+            TriageDecision.project_key,
+            func.count(TriageDecision.id).label('n'),
+        )
+        .where(TriageDecision.organization_id == tenant.organization_id)
+        .where(TriageDecision.project_key.is_not(None))
+        .group_by(TriageDecision.source, TriageDecision.project_key)
+        .order_by(TriageDecision.source, TriageDecision.project_key)
+    )).all()
+    return [
+        {'source': r[0], 'project_key': r[1], 'count': int(r[2] or 0)}
+        for r in rows
+    ]
 
 
 @router.post('/scan')

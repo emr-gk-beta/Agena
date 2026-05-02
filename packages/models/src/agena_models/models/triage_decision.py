@@ -24,6 +24,9 @@ class TriageDecision(Base):
     )
     source: Mapped[str] = mapped_column(String(32), nullable=False)
     external_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    # Jira project key ('SCRUM') or Azure project name ('EcomBackend').
+    # Populated on scan so the UI can group / filter without rescanning.
+    project_key: Mapped[Optional[str]] = mapped_column(String(128), nullable=True, index=True)
     ticket_title: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     ticket_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     # ISO timestamp from the source platform's "updated" field at the
