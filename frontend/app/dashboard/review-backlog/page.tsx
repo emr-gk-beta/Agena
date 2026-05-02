@@ -71,7 +71,9 @@ export default function ReviewBacklogPage() {
 
   async function load(repo: string = repoFilter) {
     try {
-      const params = new URLSearchParams({ limit: '200' });
+      // 500 = backend's hard cap on the list endpoint. Scan itself
+      // walks every open PR; this just bounds the render slice.
+      const params = new URLSearchParams({ limit: '500' });
       if (repo && repo !== 'all') params.set('repo_mapping_id', repo);
       const rows = await apiFetch<Nudge[]>(`/review-backlog?${params.toString()}`);
       setItems(rows);
@@ -203,6 +205,33 @@ export default function ReviewBacklogPage() {
             {t('backlog.longSubtitle')}
           </p>
         </div>
+
+        {/* Inline explanation card — mirrors the one on /dashboard/triage.
+            Localised in all 7 languages so first-time users on any
+            locale know what scope = which repos, what 'Nudge' does,
+            and where the auto-comment lands. */}
+        <details
+          style={{
+            border: '1px solid var(--panel-border)',
+            background: 'var(--panel)',
+            borderRadius: 12,
+            padding: '10px 14px',
+            fontSize: 12,
+            color: 'var(--ink-78)',
+          }}
+        >
+          <summary style={{ cursor: 'pointer', fontWeight: 700, color: 'var(--ink-90)' }}>
+            💡 {t('backlog.help.title' as TranslationKey)}
+          </summary>
+          <div style={{ marginTop: 8, lineHeight: 1.55, display: 'grid', gap: 4 }}>
+            <div>{t('backlog.help.body' as TranslationKey)}</div>
+            <div style={{ marginTop: 6 }}>{t('backlog.help.scope' as TranslationKey)}</div>
+            <div>{t('backlog.help.scan' as TranslationKey)}</div>
+            <div>{t('backlog.help.nudge' as TranslationKey)}</div>
+            <div>{t('backlog.help.cooldown' as TranslationKey)}</div>
+            <div>{t('backlog.help.deletion' as TranslationKey)}</div>
+          </div>
+        </details>
 
         {/* Repo filter chips — show ONLY repos that currently carry
             a tracked PR. Makes "what's actually in scope" obvious;
