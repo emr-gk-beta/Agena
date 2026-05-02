@@ -1,5 +1,13 @@
 [
   {
+    "hash": "cf73714",
+    "short": "cf73714",
+    "message": "Modules page: localise the entire chrome (page title, group labels, badges, toasts)",
+    "date": "2026-05-02",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "ef0fbe0",
     "short": "ef0fbe0",
     "message": "Triage / Backlog: corporate redesign + chip-based settings + PR comment",

@@ -3351,5 +3351,12 @@
   "modules.group.issues": "Tracciamento Ticket",
   "modules.group.analytics": "Analisi & Metriche",
   "modules.group.notifications": "Notifiche",
-  "modules.group.other": "Altri"
+  "modules.group.other": "Altri",
+  "nav.platformAdmin": "Amministratore Piattaforma",
+  "error.title": "Qualcosa è andato storto",
+  "error.body": "Si è verificato un errore durante il caricamento. I tuoi dati sono al sicuro.",
+  "error.retry": "Riprova",
+  "error.backToOffice": "Torna all'ufficio",
+  "promptStudio.title": "Prompt Studio",
+  "promptStudio.subtitle": "Modalità semplice: scegli un prompt, modifica, salva."
 }

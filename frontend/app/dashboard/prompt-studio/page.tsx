@@ -63,7 +63,7 @@ const PROMPT_LABELS: Record<'tr' | 'en', Record<string, PromptMeta>> = {
 };
 
 export default function PromptStudioPage() {
-  const { lang } = useLocale();
+  const { lang, t } = useLocale();
   const [catalog, setCatalog] = useState<PromptCatalog | null>(null);
   const [draft, setDraft] = useState<Record<string, string>>({});
   const [activeKey, setActiveKey] = useState('');
@@ -181,11 +181,9 @@ export default function PromptStudioPage() {
     <div style={{ display: 'grid', gap: 12 }}>
       <div style={topBarStyle}>
         <div>
-          <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--ink-90)' }}>Prompt Studio</div>
+          <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--ink-90)' }}>{t('promptStudio.title')}</div>
           <div style={{ fontSize: 12, color: 'var(--ink-58)' }}>
-            {lang === 'tr'
-              ? 'Sade görünüm: prompt seç, düzenle, kaydet.'
-              : 'Simple mode: select prompt, edit, save.'}
+            {t('promptStudio.subtitle')}
           </div>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>

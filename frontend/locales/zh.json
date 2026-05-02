@@ -3351,5 +3351,12 @@
   "modules.group.issues": "工单追踪",
   "modules.group.analytics": "分析与指标",
   "modules.group.notifications": "通知",
-  "modules.group.other": "其他"
+  "modules.group.other": "其他",
+  "nav.platformAdmin": "平台管理员",
+  "error.title": "出错了",
+  "error.body": "加载此页面时出错。您的数据是安全的。",
+  "error.retry": "重试",
+  "error.backToOffice": "返回办公室",
+  "promptStudio.title": "Prompt Studio",
+  "promptStudio.subtitle": "简单模式：选择 Prompt、编辑、保存。"
 }

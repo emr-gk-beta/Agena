@@ -3351,5 +3351,12 @@
   "modules.group.issues": "Sorun Takibi",
   "modules.group.analytics": "Analitik & Metrikler",
   "modules.group.notifications": "Bildirimler",
-  "modules.group.other": "Diğer"
+  "modules.group.other": "Diğer",
+  "nav.platformAdmin": "Platform Yöneticisi",
+  "error.title": "Bir şeyler ters gitti",
+  "error.body": "Sayfa yüklenirken bir hata oluştu. Verileriniz güvende.",
+  "error.retry": "Tekrar dene",
+  "error.backToOffice": "Ofise dön",
+  "promptStudio.title": "Prompt Stüdyosu",
+  "promptStudio.subtitle": "Sade mod: prompt seç, düzenle, kaydet."
 }

@@ -3351,5 +3351,12 @@
   "modules.group.issues": "Issue Tracking",
   "modules.group.analytics": "Analytics & Metrics",
   "modules.group.notifications": "Notifications",
-  "modules.group.other": "Other"
+  "modules.group.other": "Other",
+  "nav.platformAdmin": "Platform Admin",
+  "error.title": "Something went wrong",
+  "error.body": "An error occurred while loading this page. Your data is safe.",
+  "error.retry": "Retry",
+  "error.backToOffice": "Back to Office",
+  "promptStudio.title": "Prompt Studio",
+  "promptStudio.subtitle": "Simple mode: pick a prompt, edit, save."
 }

@@ -3351,5 +3351,12 @@
   "modules.group.issues": "Seguimiento de Issues",
   "modules.group.analytics": "Análisis y Métricas",
   "modules.group.notifications": "Notificaciones",
-  "modules.group.other": "Otros"
+  "modules.group.other": "Otros",
+  "nav.platformAdmin": "Administrador de Plataforma",
+  "error.title": "Algo salió mal",
+  "error.body": "Ocurrió un error al cargar esta página. Tus datos están seguros.",
+  "error.retry": "Reintentar",
+  "error.backToOffice": "Volver a la oficina",
+  "promptStudio.title": "Prompt Studio",
+  "promptStudio.subtitle": "Modo simple: elige un prompt, edita, guarda."
 }

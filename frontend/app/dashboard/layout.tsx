@@ -565,7 +565,7 @@ function DashboardInner({ children }: { children: ReactNode }) {
               <div style={{ marginBottom: 8 }}>
                 {!sidebarCollapsed && (
                   <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.2, color: '#f87171', textTransform: 'uppercase', padding: '5px 12px', marginBottom: 4 }}>
-                    Platform Admin
+                    {t('nav.platformAdmin')}
                   </div>
                 )}
                 {adminItems.map((item) => {

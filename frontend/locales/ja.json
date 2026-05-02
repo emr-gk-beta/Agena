@@ -3351,5 +3351,12 @@
   "modules.group.issues": "チケット追跡",
   "modules.group.analytics": "分析 & メトリクス",
   "modules.group.notifications": "通知",
-  "modules.group.other": "その他"
+  "modules.group.other": "その他",
+  "nav.platformAdmin": "プラットフォーム管理者",
+  "error.title": "問題が発生しました",
+  "error.body": "このページの読み込み中にエラーが発生しました。データは安全です。",
+  "error.retry": "再試行",
+  "error.backToOffice": "オフィスに戻る",
+  "promptStudio.title": "プロンプトスタジオ",
+  "promptStudio.subtitle": "シンプルモード: プロンプトを選んで編集・保存。"
 }

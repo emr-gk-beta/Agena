@@ -3351,5 +3351,12 @@
   "modules.group.issues": "Issue-Tracking",
   "modules.group.analytics": "Analytics & Metriken",
   "modules.group.notifications": "Benachrichtigungen",
-  "modules.group.other": "Andere"
+  "modules.group.other": "Andere",
+  "nav.platformAdmin": "Plattform-Admin",
+  "error.title": "Etwas ist schief gelaufen",
+  "error.body": "Beim Laden der Seite ist ein Fehler aufgetreten. Eure Daten sind sicher.",
+  "error.retry": "Erneut versuchen",
+  "error.backToOffice": "Zurück zum Büro",
+  "promptStudio.title": "Prompt Studio",
+  "promptStudio.subtitle": "Einfacher Modus: Prompt wählen, bearbeiten, speichern."
 }
