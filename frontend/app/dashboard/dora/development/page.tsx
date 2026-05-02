@@ -1024,7 +1024,7 @@ function DeploymentsTab({ data, t }: { data: DeploymentsAnalyticsResponse; t: TF
                   <th style={thStyle}>Environment</th>
                   <th style={thStyle}>Status</th>
                   <th style={thStyle}>SHA</th>
-                  <th style={thStyle}>Deployed At</th>
+                  <th style={thStyle}>{t('dora.deployedAt')}</th>
                   <th style={thStyle}>Duration</th>
                 </tr>
               </thead>

@@ -2185,7 +2185,7 @@ export default function DashboardTasksPage() {
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
               <div style={{ width: 36, height: 36, borderRadius: 10, background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>&#9888;</div>
-              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>Repo Busy</div>
+              <div style={{ fontSize: 16, fontWeight: 700, color: 'var(--ink)' }}>{t('tasks.repoBusy')}</div>
             </div>
             <p style={{ fontSize: 13, color: 'var(--ink-58)', lineHeight: 1.6, margin: '0 0 8px' }}>
               This repo already has an active task:
@@ -2204,7 +2204,7 @@ export default function DashboardTasksPage() {
               <button onClick={() => void _forceQueueConflict()} style={{
                 padding: '8px 20px', borderRadius: 8, border: 'none',
                 background: 'var(--accent)', color: '#fff', fontSize: 13, fontWeight: 600, cursor: 'pointer',
-              }}>Queue Anyway</button>
+              }}>{t('tasks.queueAnyway')}</button>
             </div>
           </div>
         </div>,
@@ -2507,7 +2507,7 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, defaultCreatePr: init
           <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '8px 12px', borderRadius: 10, border: createPr ? '1px solid rgba(34,197,94,0.35)' : '1px solid var(--panel-border-2)', background: createPr ? 'rgba(34,197,94,0.06)' : 'var(--panel)' }}>
             <input type='checkbox' checked={createPr} onChange={(e) => setCreatePr(e.target.checked)} style={{ accentColor: '#22c55e', width: 16, height: 16 }} />
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: createPr ? '#22c55e' : 'var(--ink-58)' }}>Create PR</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: createPr ? '#22c55e' : 'var(--ink-58)' }}>{t('tasks.createPr')}</div>
               <div style={{ fontSize: 10, color: 'var(--ink-35)' }}>{createPr ? t('tasks.prEnabled' as TranslationKey) : t('tasks.prDisabled' as TranslationKey)}</div>
             </div>
           </label>
@@ -2602,7 +2602,7 @@ function AssignPopup({ taskId, mode, tasks, agents, flows, defaultCreatePr: init
                 border: selected ? 'none' : '1px solid var(--panel-border)',
                 color: selected ? '#fff' : 'var(--ink-30)',
                 opacity: (!selected || (!hasRepo && !repoSel && selectedMappingIds.length === 0)) ? 0.5 : 1 }}>
-              Run Task
+              {t('tasks.runTaskAction')}
             </button>
           </div>
         </div>

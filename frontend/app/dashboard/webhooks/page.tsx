@@ -121,7 +121,7 @@ export default function WebhookDashboard() {
 
   return (
     <div style={{ padding: '24px 0' }}>
-      <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink-90)', marginBottom: 8 }}>Webhook Tester</h1>
+      <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink-90)', marginBottom: 8 }}>{t('webhooks.tester')}</h1>
       <p style={{ color: 'var(--ink-45)', fontSize: 14, marginBottom: 24 }}>Test AGENA webhook endpoints with custom payloads.</p>
 
       <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
@@ -179,7 +179,7 @@ export default function WebhookDashboard() {
 
           {/* Body */}
           <div>
-            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-50)', marginBottom: 6, display: 'block' }}>Request Body</label>
+            <label style={{ fontSize: 12, fontWeight: 600, color: 'var(--ink-50)', marginBottom: 6, display: 'block' }}>{t('webhooks.requestBody')}</label>
             <textarea
               value={customBody}
               onChange={(e) => setCustomBody(e.target.value)}

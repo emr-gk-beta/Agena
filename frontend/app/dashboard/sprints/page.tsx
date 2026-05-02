@@ -1639,7 +1639,7 @@ function DetailPanel({ item, onClose, project, integrations, aiLoading, aiResult
               )}
               <button onClick={() => setRepoSource('remote')}
                 style={{ padding: '3px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: repoSource === 'remote' ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border-2)', background: repoSource === 'remote' ? 'rgba(94,234,212,0.12)' : 'transparent', color: repoSource === 'remote' ? '#5eead4' : 'var(--ink-45)' }}>
-                Remote Repo
+                {t('common.remoteRepo')}
               </button>
             </div>
             {repoSource === 'mapping' && repoMappings.length > 0 && (

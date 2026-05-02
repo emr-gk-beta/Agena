@@ -1086,11 +1086,11 @@ export default function IntegrationsPage() {
               placeholder={configs.find(c => c.provider === 'gitlab')?.has_secret ? `${gitlabTokenPreview || '****'} (keep existing)` : 'glpat-...'} />
           </FieldGroup>
           <button className='button button-primary' onClick={() => void saveGitlab()} style={{ width: '100%', justifyContent: 'center', marginTop: 2 }}>
-            Save GitLab Config
+            {t('integrations.saveGitlabConfig')}
           </button>
           {configs.find(c => c.provider === 'gitlab')?.has_secret && (
             <button onClick={() => void deleteIntegration('gitlab')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
-              Delete GitLab Connection
+              {t('integrations.deleteGitlabConnection')}
             </button>
           )}
         </IntegrationCard>}
@@ -1111,11 +1111,11 @@ export default function IntegrationsPage() {
               placeholder={configs.find(c => c.provider === 'bitbucket')?.has_secret ? `${bitbucketTokenPreview || '****'} (keep existing)` : 'Your app password'} />
           </FieldGroup>
           <button className='button button-primary' onClick={() => void saveBitbucket()} style={{ width: '100%', justifyContent: 'center', marginTop: 2 }}>
-            Save Bitbucket Config
+            {t('integrations.saveBitbucketConfig')}
           </button>
           {configs.find(c => c.provider === 'bitbucket')?.has_secret && (
             <button onClick={() => void deleteIntegration('bitbucket')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
-              Delete Bitbucket Connection
+              {t('integrations.deleteBitbucketConnection')}
             </button>
           )}
         </IntegrationCard>}
@@ -1153,11 +1153,11 @@ export default function IntegrationsPage() {
             </select>
           </FieldGroup>
           <button className='button button-primary' onClick={() => void saveAppDynamics()} style={{ width: '100%', justifyContent: 'center', marginTop: 2 }}>
-            Save AppDynamics Config
+            {t('integrations.saveAppdynamicsConfig')}
           </button>
           {configs.find(c => c.provider === 'appdynamics')?.has_secret && (
             <button onClick={() => void deleteIntegration('appdynamics')} style={{ width: '100%', marginTop: 4, padding: '7px', borderRadius: 8, border: '1px solid rgba(248,113,113,0.15)', background: 'transparent', color: '#f87171', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>
-              Delete AppDynamics Connection
+              {t('integrations.deleteAppdynamicsConnection')}
             </button>
           )}
         </IntegrationCard>}

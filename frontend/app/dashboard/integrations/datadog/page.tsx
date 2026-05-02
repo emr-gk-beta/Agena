@@ -377,7 +377,7 @@ export default function DatadogPage() {
       {/* Repo mappings info */}
       {repos.length > 0 && (
         <div style={{ borderRadius: 10, border: '1px solid var(--panel-border)', padding: '12px 14px' }}>
-          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ink-35)', marginBottom: 8 }}>Available Repo Mappings</div>
+          <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.5, color: 'var(--ink-35)', marginBottom: 8 }}>{t('integrations.availableRepoMappings')}</div>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
             {repos.map((r) => (
               <span key={r.id} style={{ fontSize: 11, padding: '3px 8px', borderRadius: 6, background: 'var(--panel)', border: '1px solid var(--panel-border)', color: 'var(--ink-50)' }}>

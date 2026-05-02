@@ -689,7 +689,7 @@ export default function FlowsPage() {
             <div style={{ height: 2, background: 'linear-gradient(90deg, transparent, rgba(13,148,136,0.9), transparent)' }} />
             <div style={{ padding: 18, display: 'grid', gap: 14 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>Flow Templates</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>{t('flows.templates')}</div>
                 <button onClick={() => setShowTemplates(false)} style={{ width: 26, height: 26, borderRadius: 8, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-45)', cursor: 'pointer', fontSize: 13 }}>x</button>
               </div>
               <div style={{ fontSize: 12, color: 'var(--ink-45)' }}>Start from a predefined template. A new flow will be created.</div>
@@ -1583,7 +1583,7 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
             <option value="github">{t('flows.nodeTypeGithub')}</option>
             <option value="notify">{t('flows.nodeTypeNotify')}</option>
             <option value="condition">{t('flows.nodeTypeCondition')}</option>
-            <option value="local_apply">Local Apply</option>
+            <option value="local_apply">{t('flows.localApply')}</option>
             <option value="newrelic">New Relic</option>
           </select>
         </div>
@@ -1661,10 +1661,10 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
                 <span style={{ fontSize: 13, color: 'var(--ink-58)' }}>{t('flows.nodeAutoFixPrComments')}</span>
               </label>
               <div>
-                <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>Review Language</label>
+                <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('flows.reviewLanguage')}</label>
                 <select value={node.review_language ?? ''} onChange={(e) => onChange({ review_language: e.target.value })}
                   style={{ width: '100%', padding: '8px 10px', borderRadius: 8, fontSize: 12, border: '1px solid var(--panel-border-2)', background: 'var(--panel)', color: 'var(--ink-78)', cursor: 'pointer' }}>
-                  <option value="">System Default</option>
+                  <option value="">{t('flows.systemDefault')}</option>
                   <option value="tr">Türkçe</option>
                   <option value="en">English</option>
                   <option value="de">Deutsch</option>
@@ -1743,7 +1743,7 @@ function NodeEditPanel({ node, onChange, onClose, flow }: {
           {/* Prompt Studio */}
           <CollapsibleSection title="Prompt Studio" defaultOpen={false}>
             <div>
-              <label style={pLbl}>System Prompt</label>
+              <label style={pLbl}>{t('flows.systemPrompt')}</label>
               <select value={node.prompt_slug ?? ''} onChange={(e) => onChange({ prompt_slug: e.target.value })}
                 style={{ ...pInp, cursor: 'pointer' }}>
                 <option value="">Default (role-based)</option>

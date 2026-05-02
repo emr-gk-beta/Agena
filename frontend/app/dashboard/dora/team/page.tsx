@@ -180,7 +180,7 @@ function SymptomCard({ symptom, t, repos }: { symptom: Symptom; t: ReturnType<ty
                 <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>PR</th>
                 <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>Author</th>
                 <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>Repo</th>
-                <th style={{ textAlign: 'right', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>Review Time</th>
+                <th style={{ textAlign: 'right', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>{t('dora.reviewTime')}</th>
                 <th style={{ textAlign: 'right', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>Size</th>
               </tr>
             </thead>
@@ -212,7 +212,7 @@ function SymptomCard({ symptom, t, repos }: { symptom: Symptom; t: ReturnType<ty
             <thead>
               <tr style={{ borderBottom: `1px solid ${sev.border}` }}>
                 <th style={{ textAlign: 'left', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>Author</th>
-                <th style={{ textAlign: 'right', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>Weekend Commits</th>
+                <th style={{ textAlign: 'right', padding: '4px 6px', color: 'var(--muted)', fontWeight: 600 }}>{t('dora.weekendCommits')}</th>
               </tr>
             </thead>
             <tbody>
@@ -363,7 +363,7 @@ export default function TeamHealthPage() {
 
           {/* Legend */}
           <div style={{ marginTop: 28, padding: '12px 18px', borderRadius: 12, background: 'var(--panel)', border: '1px solid var(--panel-border-2)', display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 11, color: 'var(--muted)', alignItems: 'center' }}>
-            <span style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 12 }}>Symptoms Catalog</span>
+            <span style={{ fontWeight: 700, color: 'var(--ink)', fontSize: 12 }}>{t('dora.symptomsCatalog')}</span>
             {(['healthy', 'info', 'warning', 'critical'] as const).map((s) => (
               <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <span style={{ width: 8, height: 8, borderRadius: '50%', background: sevColors[s].text }} />

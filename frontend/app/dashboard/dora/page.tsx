@@ -539,7 +539,7 @@ export default function DoraOverviewPage() {
               fontSize: 36, fontWeight: 800, lineHeight: 1,
               display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
             }}>+</span>
-            <div style={{ fontSize: 15, fontWeight: 700, color: 'currentColor' }}>Add repo</div>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'currentColor' }}>{t('dora.addRepo')}</div>
             <div style={{ fontSize: 12, lineHeight: 1.5, maxWidth: 260, color: 'var(--muted)' }}>
               Yeni bir Azure / GitHub repo&apos;sunu DORA&apos;ya ekle. Sadece provider + project / owner + repo seç — local checkout gerekmez.
             </div>
@@ -591,7 +591,7 @@ export default function DoraOverviewPage() {
               padding: 20, boxShadow: '0 20px 60px rgba(0,0,0,0.4)',
             }}
           >
-            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>Add repo to DORA</h2>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: 'var(--ink)' }}>{t('dora.addRepoToDora')}</h2>
             <p style={{ marginTop: 6, marginBottom: 14, fontSize: 12, color: 'var(--muted)', lineHeight: 1.5 }}>
               DORA için lokal checkout gerekmez. Sadece provider + sahibi + repo adı yeterli — sync'te commits, PRs, deploys ve reviews API'den gelir.
             </p>
@@ -625,7 +625,7 @@ export default function DoraOverviewPage() {
                 <>
                   <label style={{ display: 'grid', gap: 4 }}>
                     <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>
-                      Azure project
+                      {t('integrations.azureProject')}
                     </span>
                     <select
                       value={addRepoForm.owner}
@@ -639,7 +639,7 @@ export default function DoraOverviewPage() {
                     </select>
                   </label>
                   <label style={{ display: 'grid', gap: 4 }}>
-                    <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Azure repo</span>
+                    <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t('integrations.azureRepo')}</span>
                     <select
                       value={addRepoForm.repo_name}
                       onChange={(e) => setAddRepoForm((f) => ({ ...f, repo_name: e.target.value }))}
@@ -678,7 +678,7 @@ export default function DoraOverviewPage() {
               )}
 
               <label style={{ display: 'grid', gap: 4 }}>
-                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Base branch</span>
+                <span style={{ fontSize: 11, color: 'var(--muted)', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>{t('integrations.baseBranch')}</span>
                 <input
                   type='text'
                   value={addRepoForm.base_branch}

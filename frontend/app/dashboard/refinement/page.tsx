@@ -1671,7 +1671,7 @@ export default function RefinementPage() {
           {agentProvider !== 'hal' && (
             <div style={{ borderRadius: 14, border: '1px solid var(--panel-border)', background: 'var(--panel)', padding: 14 }}>
               <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-35)', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 10 }}>
-                Available Models
+                {t('common.availableModels')}
               </div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                 {availableModels.map((item) => (
@@ -1899,7 +1899,7 @@ export default function RefinementPage() {
 
       <div className="refinement-table-wrap" style={{ borderRadius: 14, border: '1px solid var(--panel-border-2)', background: 'var(--surface)', overflow: 'hidden' }}>
         <div style={{ ...panelHeader, padding: '10px 14px', borderBottom: '1px solid var(--panel-border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-          <span>Sprint Items</span>
+          <span>{t('sprints.items')}</span>
           {(itemsData?.items?.length || 0) > 0 && (
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>

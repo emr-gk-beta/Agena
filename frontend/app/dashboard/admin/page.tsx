@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { apiFetch } from '@/lib/api';
+import { useLocale } from '@/lib/i18n';
 
 interface Stats {
   organizations: number;
@@ -54,6 +55,7 @@ interface Subscriber {
 type Tab = 'overview' | 'orgs' | 'users' | 'contact' | 'newsletter';
 
 export default function AdminPanel() {
+  const { t } = useLocale();
   const searchParams = useSearchParams();
   const router = useRouter();
   const urlTab = searchParams.get('tab') as Tab | null;
@@ -130,7 +132,7 @@ export default function AdminPanel() {
   if (error) {
     return (
       <div style={{ padding: 40, textAlign: 'center' }}>
-        <h2 style={{ color: '#f87171', marginBottom: 12 }}>Access Denied</h2>
+        <h2 style={{ color: '#f87171', marginBottom: 12 }}>{t('admin.accessDenied')}</h2>
         <p style={{ color: 'var(--ink-45)' }}>{error}</p>
       </div>
     );
@@ -184,18 +186,18 @@ export default function AdminPanel() {
   return (
     <div style={{ padding: '24px 32px' }}>
       <h1 style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink-90)', marginBottom: 24 }}>
-        Platform Admin
+        {t('nav.platformAdmin')}
       </h1>
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 32, flexWrap: 'wrap' }}>
-        <button onClick={() => switchTab('overview')} style={tabStyle('overview')}>Overview</button>
-        <button onClick={() => switchTab('orgs')} style={tabStyle('orgs')}>Organizations</button>
-        <button onClick={() => switchTab('users')} style={tabStyle('users')}>Users</button>
+        <button onClick={() => switchTab('overview')} style={tabStyle('overview')}>{t('admin.tab.overview')}</button>
+        <button onClick={() => switchTab('orgs')} style={tabStyle('orgs')}>{t('admin.tab.orgs')}</button>
+        <button onClick={() => switchTab('users')} style={tabStyle('users')}>{t('admin.tab.users')}</button>
         <button onClick={() => switchTab('contact')} style={tabStyle('contact')}>
-          Contact {stats && stats.unread_contacts > 0 && <span style={{ marginLeft: 6, background: '#f87171', color: '#fff', borderRadius: 10, padding: '2px 7px', fontSize: 10 }}>{stats.unread_contacts}</span>}
+          {t('admin.tab.contact')} {stats && stats.unread_contacts > 0 && <span style={{ marginLeft: 6, background: '#f87171', color: '#fff', borderRadius: 10, padding: '2px 7px', fontSize: 10 }}>{stats.unread_contacts}</span>}
         </button>
-        <button onClick={() => switchTab('newsletter')} style={tabStyle('newsletter')}>Newsletter</button>
+        <button onClick={() => switchTab('newsletter')} style={tabStyle('newsletter')}>{t('admin.tab.newsletter')}</button>
       </div>
 
       {/* Overview */}
@@ -329,7 +331,7 @@ export default function AdminPanel() {
               </div>
               <p style={{ color: 'var(--ink-72)', fontSize: 13, lineHeight: 1.6, marginBottom: 12 }}>{c.message}</p>
               <div style={{ display: 'flex', gap: 8 }}>
-                {!c.is_read && <button onClick={() => markRead(c.id)} style={btnSmall}>Mark Read</button>}
+                {!c.is_read && <button onClick={() => markRead(c.id)} style={btnSmall}>{t('admin.markRead')}</button>}
                 <button onClick={() => deleteContact(c.id)} style={{ ...btnSmall, color: '#f87171', borderColor: 'rgba(248,113,113,0.3)' }}>Delete</button>
               </div>
             </div>

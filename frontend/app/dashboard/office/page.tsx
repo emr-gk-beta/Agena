@@ -677,7 +677,7 @@ function AssignTaskModal({
                     )}
                     <button onClick={() => setRepoMode('remote')}
                       style={{ padding: '4px 10px', borderRadius: 8, fontSize: 10, fontWeight: 700, cursor: 'pointer', border: repoMode === 'remote' ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border-2)', background: repoMode === 'remote' ? 'rgba(94,234,212,0.12)' : 'transparent', color: repoMode === 'remote' ? '#5eead4' : 'var(--ink-45)' }}>
-                      Remote Repo
+                      {t('common.remoteRepo')}
                     </button>
                   </div>
                   {repoMode === 'mapping' && repoMappings.length > 0 && (
