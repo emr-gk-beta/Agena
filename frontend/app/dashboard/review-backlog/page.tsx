@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
-import { useLocale } from '@/lib/i18n';
+import { useLocale, type TranslationKey } from '@/lib/i18n';
 import { ChipSelect, SwitchToggle, SettingsField, SettingsCard } from '@/components/SettingsControls';
 
 type Nudge = {
@@ -12,7 +12,9 @@ type Nudge = {
   pr_title: string | null;
   pr_author: string | null;
   pr_provider: string | null;
+  pr_url: string | null;
   repo_mapping_id: string | null;
+  repo_display_name: string | null;
   age_hours: number;
   severity: string | null;
   nudge_count: number;
@@ -81,9 +83,25 @@ export default function ReviewBacklogPage() {
 
   async function scanNow() {
     setScanning(true);
+    setError(null);
     try {
-      await apiFetch('/review-backlog/scan', { method: 'POST' });
+      const res = await apiFetch<{
+        open_prs?: number;
+        tracked?: number;
+        resolved?: number;
+      }>('/review-backlog/scan', { method: 'POST' });
       await load();
+      // Surface a no-op scan so the user knows why the list is empty
+      // (no open PRs over the warn threshold, vs the feature being
+      // broken). Localised through t() — keys are backlog.scan.*.
+      if (res && (res.tracked ?? 0) === 0) {
+        const open = res.open_prs ?? 0;
+        if (open === 0) {
+          setError(t('backlog.scan.empty' as TranslationKey));
+        } else {
+          setError(t('backlog.scan.belowThreshold' as TranslationKey, { open: String(open) }));
+        }
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -323,11 +341,22 @@ export default function ReviewBacklogPage() {
                   )}
                 </header>
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-90)' }}>
-                  {n.pr_title || '(no title)'}
+                  {n.pr_url ? (
+                    <a
+                      href={n.pr_url}
+                      target='_blank'
+                      rel='noopener noreferrer'
+                      style={{ color: 'var(--ink-90)', textDecoration: 'underline', textUnderlineOffset: 3 }}
+                    >
+                      {n.pr_title || '(no title)'} ↗
+                    </a>
+                  ) : (
+                    n.pr_title || '(no title)'
+                  )}
                 </div>
                 <div style={{ fontSize: 12, color: 'var(--ink-58)' }}>
                   {n.pr_author && <>👤 {n.pr_author}</>}
-                  {n.repo_mapping_id && <> · 📦 repo #{n.repo_mapping_id}</>}
+                  {n.repo_display_name && <> · 📦 {n.repo_display_name}</>}
                   {n.last_nudged_at && <> · {t('backlog.lastNudged')}: {new Date(n.last_nudged_at).toLocaleString()} ({n.last_nudge_channel})</>}
                 </div>
                 <footer style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>

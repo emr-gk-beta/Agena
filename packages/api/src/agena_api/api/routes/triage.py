@@ -65,8 +65,17 @@ async def scan_now(
     tenant: CurrentTenant = Depends(get_current_tenant),
     db: AsyncSession = Depends(get_db_session),
 ) -> dict[str, Any]:
-    n = await triage_service.scan_for_org(db, tenant.organization_id)
-    return {'new_or_refreshed': n}
+    """Returns a diagnostic dict so the UI can explain a 0-result scan
+    instead of just blinking the toast off:
+        new_or_refreshed: int   — decisions newly created or re-evaluated
+        considered:       int   — candidate task rows that met the filters
+        threshold_days:   int   — current settings.triage_idle_days
+        sources:          list  — normalised TaskRecord.source values
+        reason:           str   — empty when result>0; otherwise one of
+                                  triage_disabled / no_sources_configured /
+                                  no_stale_candidates / all_candidates_have_pending_decisions
+    """
+    return await triage_service.scan_for_org(db, tenant.organization_id)
 
 
 @router.post('/decisions/{decision_id}/apply')

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
-import { useLocale } from '@/lib/i18n';
+import { useLocale, type TranslationKey } from '@/lib/i18n';
 import { ChipSelect, MultiChipSelect, SwitchToggle, SettingsField, SettingsCard } from '@/components/SettingsControls';
 
 type Decision = {
@@ -84,9 +84,41 @@ export default function TriagePage() {
 
   async function scanNow() {
     setScanning(true);
+    setError(null);
     try {
-      await apiFetch('/triage/scan', { method: 'POST' });
+      const res = await apiFetch<{
+        new_or_refreshed?: number;
+        considered?: number;
+        threshold_days?: number;
+        sources?: string[];
+        reason?: string;
+      }>('/triage/scan', { method: 'POST' });
       await load();
+      // Surface a clear note when the scan was a no-op so the user knows
+      // why the queue didn't change. Localised through t() — keys live in
+      // every locale file under triage.scan.*.
+      if (res && (res.new_or_refreshed ?? 0) === 0) {
+        const days = String(res.threshold_days ?? 30);
+        const srcs = (res.sources && res.sources.length > 0)
+          ? res.sources.join(', ')
+          : 'jira/azure';
+        let note = '';
+        switch (res.reason) {
+          case 'triage_disabled':
+            note = t('triage.scan.disabled' as TranslationKey);
+            break;
+          case 'no_sources_configured':
+            note = t('triage.scan.noSources' as TranslationKey);
+            break;
+          case 'all_candidates_have_pending_decisions':
+            note = t('triage.scan.allPending' as TranslationKey);
+            break;
+          case 'no_stale_candidates':
+          default:
+            note = t('triage.scan.noStale' as TranslationKey, { days, sources: srcs });
+        }
+        setError(note);
+      }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {

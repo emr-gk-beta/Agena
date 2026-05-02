@@ -127,22 +127,59 @@ async def _evaluate(task: TaskRecord, idle_days: int) -> tuple[str, int, str]:
     return verdict, confidence, reason
 
 
+_SOURCE_ALIASES = {
+    # The seeded default settings row uses 'azure_devops' but the import
+    # path writes TaskRecord.source = 'azure'. Treat both as equivalent
+    # so an admin doesn't have to know which spelling matches the DB.
+    'azure_devops': ['azure', 'azure_devops'],
+    'azure': ['azure', 'azure_devops'],
+    'jira': ['jira'],
+}
+
+
+def _expand_sources(sources: list[str]) -> list[str]:
+    out: list[str] = []
+    for s in sources:
+        for expanded in _SOURCE_ALIASES.get(s, [s]):
+            if expanded not in out:
+                out.append(expanded)
+    return out
+
+
 async def scan_for_org(
     db: AsyncSession,
     org_id: int,
     *,
     now: datetime | None = None,
-) -> int:
-    """Run a triage pass for one org. Returns number of NEW decisions
-    persisted. Re-uses pending decisions; skips applied/overridden ones
-    unless the ticket has gone stale again since."""
+) -> dict:
+    """Run a triage pass for one org. Returns a diagnostic dict so the
+    caller (UI / cron) can explain why nothing was created when scan
+    looks like a no-op:
+
+        {
+          'new_or_refreshed': N,
+          'considered': total candidate task rows in the cutoff,
+          'threshold_days': configured idle threshold,
+          'sources': normalised source list,
+          'reason': human string when N == 0,
+        }
+    """
     settings = await _settings_for(db, org_id)
     if not settings.triage_enabled:
-        return 0
+        return {
+            'new_or_refreshed': 0, 'considered': 0,
+            'threshold_days': settings.triage_idle_days,
+            'sources': [], 'reason': 'triage_disabled',
+        }
 
-    sources = [s.strip() for s in (settings.triage_sources or '').split(',') if s.strip()]
+    raw_sources = [s.strip() for s in (settings.triage_sources or '').split(',') if s.strip()]
+    sources = _expand_sources(raw_sources)
     if not sources:
-        return 0
+        return {
+            'new_or_refreshed': 0, 'considered': 0,
+            'threshold_days': settings.triage_idle_days,
+            'sources': [], 'reason': 'no_sources_configured',
+        }
 
     now = now or datetime.utcnow()
     cutoff = now - timedelta(days=settings.triage_idle_days)
@@ -208,7 +245,22 @@ async def scan_for_org(
     if new_decisions:
         await db.commit()
         logger.info('Triage scan: org=%s new/refreshed decisions=%s', org_id, new_decisions)
-    return new_decisions
+
+    reason = ''
+    if new_decisions == 0:
+        if not rows:
+            reason = (
+                f'no_stale_candidates'  # nothing met the {idle_days}-day cutoff
+            )
+        else:
+            reason = 'all_candidates_have_pending_decisions'
+    return {
+        'new_or_refreshed': new_decisions,
+        'considered': len(rows),
+        'threshold_days': settings.triage_idle_days,
+        'sources': sources,
+        'reason': reason,
+    }
 
 
 async def scan_all_orgs(db: AsyncSession) -> int:
@@ -218,7 +270,8 @@ async def scan_all_orgs(db: AsyncSession) -> int:
     total = 0
     for oid in org_ids:
         try:
-            total += await scan_for_org(db, oid)
+            r = await scan_for_org(db, oid)
+            total += int(r.get('new_or_refreshed', 0)) if isinstance(r, dict) else 0
         except Exception:
             logger.exception('Triage scan failed for org=%s', oid)
     return total

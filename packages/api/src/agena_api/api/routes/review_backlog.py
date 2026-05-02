@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from agena_api.api.dependencies import CurrentTenant, get_current_tenant
 from agena_core.database import get_db_session
 from agena_models.models.git_pull_request import GitPullRequest
+from agena_models.models.integration_config import IntegrationConfig
+from agena_models.models.repo_mapping import RepoMapping
 from agena_models.models.review_backlog_nudge import ReviewBacklogNudge
 from agena_services.services import review_backlog_service
 
@@ -25,7 +27,9 @@ class NudgeResponse(BaseModel):
     pr_title: str | None = None
     pr_author: str | None = None
     pr_provider: str | None = None
+    pr_url: str | None = None  # human-friendly link rendered on the row title
     repo_mapping_id: str | None = None
+    repo_display_name: str | None = None
     age_hours: int
     severity: str | None = None
     nudge_count: int
@@ -37,6 +41,34 @@ class NudgeResponse(BaseModel):
 
 class NudgeRequest(BaseModel):
     channel: str = 'slack_dm'  # slack_dm | email | manual
+
+
+def _build_pr_url(
+    *,
+    provider: str | None,
+    pr_external_id: str | None,
+    mapping: RepoMapping | None,
+    azure_base_url: str | None,
+) -> str | None:
+    """Best-effort web URL for a PR row. GitHub is straightforward; Azure
+    uses the org's integration_configs.base_url for the org host so it
+    works on both dev.azure.com and on-prem TFS."""
+    if not pr_external_id or mapping is None:
+        return None
+    p = (provider or '').strip().lower()
+    owner = (mapping.owner or '').strip()
+    repo = (mapping.repo_name or '').strip()
+    if not owner or not repo:
+        return None
+    if p == 'github':
+        return f'https://github.com/{owner}/{repo}/pull/{pr_external_id}'
+    if p == 'azure':
+        base = (azure_base_url or '').rstrip('/')
+        if not base:
+            return None
+        # base_url shape: https://dev.azure.com/{org}/  → add project/_git/repo/pullrequest/N
+        return f'{base}/{owner}/_git/{repo}/pullrequest/{pr_external_id}'
+    return None
 
 
 @router.get('', response_model=list[NudgeResponse])
@@ -56,17 +88,52 @@ async def list_backlog(
     if not include_resolved:
         stmt = stmt.where(ReviewBacklogNudge.resolved_at.is_(None))
     rows = (await db.execute(stmt)).all()
-    return [
-        NudgeResponse(
+
+    # Resolve repo mappings + the org's azure base URL once for the batch
+    # so we can stamp each row with a clickable PR url.
+    mapping_ids: set[int] = set()
+    for (n, _pr) in rows:
+        mid = (n.repo_mapping_id or '').strip()
+        if mid.isdigit():
+            mapping_ids.add(int(mid))
+    mappings_by_id: dict[int, RepoMapping] = {}
+    if mapping_ids:
+        mrows = (await db.execute(
+            select(RepoMapping).where(
+                RepoMapping.id.in_(list(mapping_ids)),
+                RepoMapping.organization_id == tenant.organization_id,
+            )
+        )).scalars().all()
+        mappings_by_id = {m.id: m for m in mrows}
+    azure_cfg = (await db.execute(
+        select(IntegrationConfig).where(
+            IntegrationConfig.organization_id == tenant.organization_id,
+            IntegrationConfig.provider == 'azure',
+        )
+    )).scalar_one_or_none()
+    azure_base_url = azure_cfg.base_url if azure_cfg else None
+
+    out: list[NudgeResponse] = []
+    for (n, pr) in rows:
+        m_id = (n.repo_mapping_id or '').strip()
+        m = mappings_by_id.get(int(m_id)) if m_id.isdigit() else None
+        pr_url = _build_pr_url(
+            provider=pr.provider, pr_external_id=pr.external_id,
+            mapping=m, azure_base_url=azure_base_url,
+        )
+        repo_display = ''
+        if m:
+            repo_display = f'{(m.provider or "").lower()}:{m.owner}/{m.repo_name}'
+        out.append(NudgeResponse(
             id=n.id, pr_id=n.pr_id,
             pr_external_id=pr.external_id, pr_title=pr.title, pr_author=pr.author,
-            pr_provider=pr.provider, repo_mapping_id=n.repo_mapping_id,
+            pr_provider=pr.provider, pr_url=pr_url,
+            repo_mapping_id=n.repo_mapping_id, repo_display_name=repo_display or None,
             age_hours=n.age_hours, severity=n.severity, nudge_count=n.nudge_count,
             last_nudged_at=n.last_nudged_at, last_nudge_channel=n.last_nudge_channel,
             escalated_at=n.escalated_at, resolved_at=n.resolved_at,
-        )
-        for (n, pr) in rows
-    ]
+        ))
+    return out
 
 
 @router.post('/scan')
