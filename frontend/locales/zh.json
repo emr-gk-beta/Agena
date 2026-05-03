@@ -3512,5 +3512,8 @@
   "integrations.deleteDatadogConnection": "删除 Datadog 连接",
   "integrations.saveTelegram": "保存 Telegram",
   "admin.tab.seo": "SEO",
-  "footer.solutions": "解决方案"
+  "footer.solutions": "解决方案",
+  "skills.tab.team": "团队技能",
+  "skills.tab.public": "公共库",
+  "skills.public.delete": "删除"
 }

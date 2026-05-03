@@ -1,5 +1,13 @@
 [
   {
+    "hash": "ead3772",
+    "short": "ead3772",
+    "message": "Skills: public library + 5 AGENA skills + UI grouping + mobile fix",
+    "date": "2026-05-03",
+    "author": "root",
+    "type": "other"
+  },
+  {
     "hash": "5155d91",
     "short": "5155d91",
     "message": "Landing: tighter mobile pre-wrap on /ai-code-review sample box",

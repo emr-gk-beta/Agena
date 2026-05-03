@@ -192,6 +192,7 @@ export default function SkillsPage() {
         </button>
       </div>
 
+      {view === 'team' && (
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
         <input
           type='search'
@@ -215,6 +216,7 @@ export default function SkillsPage() {
           </span>
         )}
       </div>
+      )}
 
       {error && (
         <div style={{ padding: '10px 14px', borderRadius: 10, border: '1px solid rgba(239,68,68,0.35)', background: 'rgba(239,68,68,0.06)', color: '#fca5a5', fontSize: 13 }}>
@@ -680,27 +682,77 @@ function PublicSkillsLibrary() {
       ) : (
         Object.entries(grouped).map(([publisher, list]) => (
           <div key={publisher}>
-            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: 'var(--ink-35)', textTransform: 'uppercase', marginBottom: 6 }}>
-              {publisher} <span style={{ color: 'var(--ink-25)' }}>· {list.length}</span>
+            <div style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1, color: 'var(--ink-35)', textTransform: 'uppercase', marginBottom: 6, display: 'flex', justifyContent: 'space-between' }}>
+              <span>{publisher}</span>
+              <span style={{ color: 'var(--ink-25)' }}>{list.length}</span>
             </div>
-            <div style={{ display: 'grid', gap: 6 }}>
-              {list.map((s) => (
-                <div key={s.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', borderRadius: 10,
-                  border: `1px solid ${s.is_active ? 'rgba(34,197,94,0.25)' : 'var(--panel-border)'}`,
-                  background: s.is_active ? 'rgba(34,197,94,0.04)' : 'var(--panel)',
-                }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-90)', minWidth: 0, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</span>
-                  <span style={{ fontSize: 11, color: 'var(--ink-50)', flex: 2, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.description}</span>
-                  {s.external_url && (
-                    <a href={s.external_url} target='_blank' rel='noreferrer' style={{ fontSize: 10, color: '#0d9488', textDecoration: 'none' }}>↗</a>
-                  )}
-                  <div onClick={() => void toggle(s.id)}
-                    style={{ width: 36, height: 20, borderRadius: 999, background: s.is_active ? '#22c55e' : 'var(--panel-border-3)', position: 'relative', cursor: 'pointer', transition: 'background 0.18s', flexShrink: 0 }}>
-                    <div style={{ position: 'absolute', top: 2, left: s.is_active ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.18s' }} />
+            <div style={{ display: 'grid', gap: 8 }}>
+              {list.map((s) => {
+                // Mirrors the Team Skills card layout — same border-left
+                // colour-coded by pattern_type, same name + tag chips +
+                // wrap behaviour. Adds a right-aligned active toggle (and
+                // delete for admins) instead of an expand arrow.
+                const color = PATTERN_COLOURS[s.pattern_type] || PATTERN_COLOURS['other'];
+                return (
+                  <div key={s.id} style={{
+                    border: `1px solid ${s.is_active ? color + '55' : 'var(--panel-border-2)'}`,
+                    borderLeft: `3px solid ${color}`,
+                    borderRadius: 12,
+                    background: s.is_active ? `${color}06` : 'var(--panel)',
+                    transition: 'border-color 0.15s, background 0.15s',
+                    opacity: s.is_active ? 1 : 0.7,
+                  }}>
+                    <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                      <span style={{
+                        fontSize: 10, fontWeight: 800, padding: '3px 7px', borderRadius: 6,
+                        background: `${color}1e`, color, textTransform: 'uppercase', letterSpacing: 0.6,
+                        flexShrink: 0,
+                      }}>
+                        {s.pattern_type}
+                      </span>
+                      <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--ink-90)', flex: '1 1 140px', minWidth: 0, overflowWrap: 'anywhere', wordBreak: 'break-word', lineHeight: 1.35 }}>
+                        {s.name}
+                      </span>
+                      {(s.tags || []).slice(0, 3).map((tag) => (
+                        <span key={tag} style={{ fontSize: 11, color: 'var(--ink-58)', padding: '2px 8px', borderRadius: 999, background: 'var(--panel-alt)' }}>
+                          #{tag}
+                        </span>
+                      ))}
+                      {s.external_url && (
+                        <a
+                          href={s.external_url}
+                          target='_blank' rel='noreferrer'
+                          onClick={(e) => e.stopPropagation()}
+                          title='View source SKILL.md'
+                          style={{ fontSize: 11, color: '#7dd3fc', textDecoration: 'none', padding: '2px 7px', borderRadius: 6, background: 'rgba(125,211,252,0.08)' }}
+                        >
+                          ↗ source
+                        </a>
+                      )}
+                      <div
+                        onClick={() => void toggle(s.id)}
+                        title={s.is_active ? 'Aktif — devre dışı bırak' : 'Pasif — aktif et'}
+                        style={{
+                          width: 36, height: 20, borderRadius: 999,
+                          background: s.is_active ? '#22c55e' : 'var(--panel-border-3)',
+                          position: 'relative', cursor: 'pointer', transition: 'background 0.18s', flexShrink: 0,
+                        }}
+                      >
+                        <div style={{ position: 'absolute', top: 2, left: s.is_active ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.18s' }} />
+                      </div>
+                    </div>
+                    {s.description && (
+                      <div style={{
+                        padding: '0 12px 10px',
+                        fontSize: 12, color: 'var(--ink-58)', lineHeight: 1.5,
+                        overflowWrap: 'anywhere', wordBreak: 'break-word',
+                      }}>
+                        {s.description}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         ))

@@ -3512,5 +3512,8 @@
   "integrations.deleteDatadogConnection": "Datadog 接続を削除",
   "integrations.saveTelegram": "Telegram を保存",
   "admin.tab.seo": "SEO",
-  "footer.solutions": "ソリューション"
+  "footer.solutions": "ソリューション",
+  "skills.tab.team": "チームスキル",
+  "skills.tab.public": "パブリックライブラリ",
+  "skills.public.delete": "削除"
 }

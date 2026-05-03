@@ -3512,5 +3512,8 @@
   "integrations.deleteDatadogConnection": "Elimina connessione Datadog",
   "integrations.saveTelegram": "Salva Telegram",
   "admin.tab.seo": "SEO",
-  "footer.solutions": "Soluzioni"
+  "footer.solutions": "Soluzioni",
+  "skills.tab.team": "Skill del team",
+  "skills.tab.public": "Libreria Pubblica",
+  "skills.public.delete": "Elimina"
 }

@@ -3512,5 +3512,8 @@
   "integrations.deleteDatadogConnection": "Datadog bağlantısını sil",
   "integrations.saveTelegram": "Telegram'ı kaydet",
   "admin.tab.seo": "SEO",
-  "footer.solutions": "Çözümler"
+  "footer.solutions": "Çözümler",
+  "skills.tab.team": "Takım Skill'leri",
+  "skills.tab.public": "Genel Kütüphane",
+  "skills.public.delete": "Sil"
 }
