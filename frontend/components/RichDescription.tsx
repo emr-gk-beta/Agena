@@ -41,17 +41,10 @@ export default function RichDescription({
           created.push(url);
           img.setAttribute('src', url);
         })
-        .catch((err) => {
-          // Surface the failure on the broken <img> so the user can
-          // hover the placeholder and see why — most common cause is
-          // being logged into a different org than the one that owns
-          // the integration credentials. Console-log too so devtools
-          // network tab shows the proxy 4xx alongside the message.
-          const msg = err instanceof Error ? err.message : String(err);
-          img.setAttribute('alt', `Image (proxy failed: ${msg})`);
-          img.setAttribute('title', `Image proxy failed: ${msg}. Make sure you're signed into the org that owns the Azure / Jira integration.`);
-          // eslint-disable-next-line no-console
-          console.warn('[RichDescription] image proxy failed for', src, msg);
+        .catch(() => {
+          // Leave the original src — browser shows a broken-image icon
+          // for unauthenticated viewers, which is preferable to silently
+          // hiding context the user uploaded.
         });
     });
     return () => {
