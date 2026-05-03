@@ -2095,6 +2095,22 @@ export default function DashboardTasksPage() {
                     );
                   })()}
                 </div>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  <AiFillButton
+                    title={editTitle}
+                    description={editDesc}
+                    onFilled={(r) => {
+                      if (r.story_context) setEditStoryContext(r.story_context);
+                      if (r.acceptance_criteria) setEditAcceptance(r.acceptance_criteria);
+                      if (r.edge_cases) setEditEdgeCases(r.edge_cases);
+                      setMsg(t('tasks.aiFill.done' as TranslationKey) || 'AI filled the fields below.');
+                    }}
+                    onError={(m) => setError(m)}
+                  />
+                  <span style={{ fontSize: 11, color: 'var(--ink-35)' }}>
+                    {t('tasks.aiFill.hint' as TranslationKey) || 'Auto-fills the three fields below from the title + description.'}
+                  </span>
+                </div>
                 <div>
                   <label style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4, display: 'block' }}>{t('tasks.storyContextPlaceholder')}</label>
                   <textarea value={editStoryContext} onChange={(e) => setEditStoryContext(e.target.value)} rows={2}
