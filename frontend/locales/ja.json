@@ -715,6 +715,8 @@
   "profile.preferredProvider": "優先プロバイダー",
   "profile.preferredProviderPlaceholder": "openai | gemini | codex_cli",
   "profile.preferredModel": "優先モデル",
+  "profile.agentOutputLanguage": "エージェント出力言語",
+  "profile.agentOutputLanguageDesc": "AIレビューレポート、AI自動入力、リファインメントコメントで使用される言語。コード識別子とファイルパスは元の言語のまま保持されます。",
   "profile.preferredModelPlaceholder": "gpt-5",
   "profile.branchPattern": "ブランチパターン",
   "profile.branchPatternPlaceholder": "feature/{ext_id}-{title_slug}",

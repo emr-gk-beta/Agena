@@ -14,6 +14,7 @@ type ProfileSettings = {
   default_create_pr: boolean;
   preferred_provider: string;
   preferred_model: string;
+  agent_output_language: string;
   branch_prefix: string;
   queue_warn_threshold: number;
   notification_preferences: Record<string, { in_app: boolean; email: boolean; web_push: boolean }>;
@@ -30,6 +31,21 @@ const PROVIDER_OPTIONS: Array<{ value: string; label: string }> = [
   { value: 'anthropic', label: 'Anthropic (API key)' },
   { value: 'gemini', label: 'Google Gemini (API key)' },
   { value: 'hal', label: 'HAL (self-hosted)' },
+];
+
+// Output-language options for AI-generated text (review reports, AI
+// fill output, refinement comments). 'auto' means "match the task's
+// own language" — sensible default since most teams want feedback in
+// the language the ticket was written in.
+const OUTPUT_LANGUAGE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'auto', label: 'Auto (match task language)' },
+  { value: 'tr', label: 'Türkçe' },
+  { value: 'en', label: 'English' },
+  { value: 'de', label: 'Deutsch' },
+  { value: 'es', label: 'Español' },
+  { value: 'it', label: 'Italiano' },
+  { value: 'ja', label: '日本語' },
+  { value: 'zh', label: '中文' },
 ];
 
 const MODELS_BY_PROVIDER: Record<string, string[]> = {
@@ -66,6 +82,7 @@ export default function ProfilePage() {
     default_create_pr: true,
     preferred_provider: 'openai',
     preferred_model: 'gpt-5',
+    agent_output_language: 'auto',
     branch_prefix: 'ai/task',
     queue_warn_threshold: 5,
     notification_preferences: EVENT_PREF_DEFAULTS,
@@ -90,6 +107,7 @@ export default function ProfilePage() {
         default_create_pr: rawSettings.default_create_pr !== false,
         preferred_provider: typeof rawSettings.preferred_provider === 'string' ? rawSettings.preferred_provider : prev.preferred_provider,
         preferred_model: typeof rawSettings.preferred_model === 'string' ? rawSettings.preferred_model : prev.preferred_model,
+        agent_output_language: typeof rawSettings.agent_output_language === 'string' ? rawSettings.agent_output_language : prev.agent_output_language,
         branch_prefix: typeof rawSettings.branch_prefix === 'string' ? rawSettings.branch_prefix : prev.branch_prefix,
         queue_warn_threshold: typeof rawSettings.queue_warn_threshold === 'number' ? Math.max(1, Math.floor(rawSettings.queue_warn_threshold)) : prev.queue_warn_threshold,
         notification_preferences: (typeof rawSettings.notification_preferences === 'object' && rawSettings.notification_preferences)
@@ -262,6 +280,16 @@ export default function ProfilePage() {
               onChange={(v) => patch('preferred_model', v)}
               options={(MODELS_BY_PROVIDER[profileSettings.preferred_provider] || MODELS_BY_PROVIDER.openai).map((m) => ({ value: m, label: m }))}
             />
+          </div>
+
+          <ProfileSelect
+            label={t('profile.agentOutputLanguage' as Parameters<typeof t>[0]) || 'Agent output language'}
+            value={profileSettings.agent_output_language}
+            onChange={(v) => patch('agent_output_language', v)}
+            options={OUTPUT_LANGUAGE_OPTIONS}
+          />
+          <div style={{ fontSize: 11, color: 'var(--ink-35)', marginTop: -8 }}>
+            {t('profile.agentOutputLanguageDesc' as Parameters<typeof t>[0]) || 'Language used for AI review reports, AI-fill task fields, and refinement comments. Code identifiers and file paths stay in their original language.'}
           </div>
 
           <div>

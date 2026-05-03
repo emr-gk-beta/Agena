@@ -715,6 +715,8 @@
   "profile.preferredProvider": "Tercih edilen sağlayıcı",
   "profile.preferredProviderPlaceholder": "openai | gemini | codex_cli",
   "profile.preferredModel": "Tercih edilen model",
+  "profile.agentOutputLanguage": "Agent çıktı dili",
+  "profile.agentOutputLanguageDesc": "AI inceleme raporları, AI-doldur alanları ve refinement yorumlarında kullanılır. Kod tanımlayıcıları ve dosya yolları orijinal dilinde kalır.",
   "profile.preferredModelPlaceholder": "gpt-5",
   "profile.branchPattern": "Branch Deseni",
   "profile.branchPatternPlaceholder": "feature/{ext_id}-{title_slug}",

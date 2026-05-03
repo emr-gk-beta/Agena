@@ -471,6 +471,54 @@ async def _resolve_reviewer_model(db: AsyncSession, user_id: int, role: str) -> 
 _SEV_RANK = {'clean': 0, 'low': 1, 'medium': 2, 'high': 3, 'critical': 4}
 
 
+# Maps the agent_output_language profile setting onto a natural-language
+# directive injected into agent prompts. 'auto' (default) returns an
+# empty string so the LLM matches the task's source language.
+_LANG_NAMES = {
+    'tr': 'Turkish (Türkçe)',
+    'en': 'English',
+    'de': 'German (Deutsch)',
+    'es': 'Spanish (Español)',
+    'it': 'Italian (Italiano)',
+    'ja': 'Japanese (日本語)',
+    'zh': 'Chinese (中文)',
+}
+
+
+def _output_language_directive(code: str) -> str:
+    """Format the user's preferred response language as a one-line
+    instruction the LLM can act on. Empty string for 'auto' so we don't
+    force English on a Turkish ticket the model would otherwise mirror."""
+    name = _LANG_NAMES.get((code or '').strip().lower())
+    if not name:
+        return ''
+    return (
+        f'Respond in {name}. Keep code identifiers, file paths, and '
+        f'commit/PR references in their original language; translate the '
+        f'narrative parts (Summary, finding text, recommendations).\n\n'
+    )
+
+
+async def _resolve_agent_output_language(db: AsyncSession, user_id: int) -> str:
+    """Read profile_settings.agent_output_language for the user. Returns
+    a 2-letter code (tr/en/de/es/it/ja/zh) or 'auto' when unset / unknown.
+    """
+    row = (await db.execute(select(UserPreference).where(UserPreference.user_id == user_id))).scalar_one_or_none()
+    if not row or not row.profile_settings_json:
+        return 'auto'
+    try:
+        import json as _json
+        ps = _json.loads(row.profile_settings_json)
+    except (TypeError, ValueError):
+        return 'auto'
+    if not isinstance(ps, dict):
+        return 'auto'
+    val = str(ps.get('agent_output_language') or '').strip().lower()
+    if val in _LANG_NAMES:
+        return val
+    return 'auto'
+
+
 def _parse_findings(output: str) -> tuple[int, int | None, str | None]:
     """Extract (findings_count, score, severity) from the markdown output.
 
@@ -699,9 +747,18 @@ async def _run_review_background(
                 'evaluate the description. Keep the review tight and avoid '
                 'wandering across the whole repo.\n\n'
             )
+            # Resolve the user's preferred output language. Drives the
+            # natural-language part of the report (Summary, finding text)
+            # while leaving code identifiers / file paths intact. Falls
+            # back to "auto" so the LLM picks the same language as the
+            # task's title/description if no preference is saved.
+            output_lang = await _resolve_agent_output_language(db, requested_by_user_id)
+            lang_directive = _output_language_directive(output_lang)
+
             user_prompt = (
                 f'You are reviewing the following task. Produce a structured code-review report. '
                 f'Do NOT write code, do NOT propose patches — only review.\n\n'
+                f'{lang_directive}'
                 f'Task ID: #{task.id}\n'
                 f'Title: {task.title or ""}\n'
                 f'Source: {task.source}\n'

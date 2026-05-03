@@ -30,21 +30,42 @@ from agena_services.services.llm.provider import LLMProvider
 logger = logging.getLogger(__name__)
 
 
-_PROMPT = (
-    "You are a senior product engineer. Given a software task, return a "
-    "JSON object with three fields, all in the same language as the input:\n"
-    "  story_context        — Why does this matter? Who is the user? What "
-    "is the expected business / user value? 2-4 sentences.\n"
-    "  acceptance_criteria  — Bullet list of testable criteria the work "
-    "must satisfy. One per line, prefixed with `- `.\n"
-    "  edge_cases           — Bullet list of edge cases or constraints to "
-    "watch for (race conditions, empty states, scale, accessibility, "
-    "permissions). One per line, prefixed with `- `.\n\n"
-    "Be concrete and grounded in the task's actual content — do NOT invent "
-    "facts. If the task body is too thin to ground a field, write a single "
-    "line `- (insufficient context)` for that field instead of guessing.\n\n"
-    "Respond ONLY with a JSON object, no prose, no code fences."
-)
+_LANG_NAMES = {
+    'tr': 'Turkish (Türkçe)',
+    'en': 'English',
+    'de': 'German (Deutsch)',
+    'es': 'Spanish (Español)',
+    'it': 'Italian (Italiano)',
+    'ja': 'Japanese (日本語)',
+    'zh': 'Chinese (中文)',
+}
+
+
+def _build_system_prompt(lang_code: str) -> str:
+    """Frame the system prompt with the user's preferred output language.
+    Default ("auto") matches the task body, same heuristic the reviewer
+    uses."""
+    lang_name = _LANG_NAMES.get((lang_code or '').strip().lower())
+    lang_clause = (
+        f"all in {lang_name}"
+        if lang_name else
+        "all in the same language as the input"
+    )
+    return (
+        f"You are a senior product engineer. Given a software task, return a "
+        f"JSON object with three fields, {lang_clause}:\n"
+        "  story_context        — Why does this matter? Who is the user? What "
+        "is the expected business / user value? 2-4 sentences.\n"
+        "  acceptance_criteria  — Bullet list of testable criteria the work "
+        "must satisfy. One per line, prefixed with `- `.\n"
+        "  edge_cases           — Bullet list of edge cases or constraints to "
+        "watch for (race conditions, empty states, scale, accessibility, "
+        "permissions). One per line, prefixed with `- `.\n\n"
+        "Be concrete and grounded in the task's actual content — do NOT invent "
+        "facts. If the task body is too thin to ground a field, write a single "
+        "line `- (insufficient context)` for that field instead of guessing.\n\n"
+        "Respond ONLY with a JSON object, no prose, no code fences."
+    )
 
 
 def _build_user_prompt(title: str, description: str) -> str:
@@ -115,6 +136,22 @@ async def _user_preferred_provider(db: AsyncSession, user_id: int) -> tuple[str 
     p = ps.get('preferred_provider')
     m = ps.get('preferred_model')
     return (p if isinstance(p, str) and p else None), (m if isinstance(m, str) and m else None)
+
+
+async def _user_output_language(db: AsyncSession, user_id: int) -> str:
+    """Pick up agent_output_language from profile_settings_json. Returns
+    'auto' for unset / unknown, otherwise the lower-case locale code."""
+    row = (await db.execute(select(UserPreference).where(UserPreference.user_id == user_id))).scalar_one_or_none()
+    if not row or not row.profile_settings_json:
+        return 'auto'
+    try:
+        ps = json.loads(row.profile_settings_json)
+    except (TypeError, ValueError):
+        return 'auto'
+    if not isinstance(ps, dict):
+        return 'auto'
+    val = str(ps.get('agent_output_language') or '').strip().lower()
+    return val if val in _LANG_NAMES else 'auto'
 
 
 async def _resolve_org_default(db: AsyncSession, organization_id: int) -> str:
@@ -199,8 +236,13 @@ async def fill(
         chosen = await _resolve_org_default(db, organization_id)
     chosen_model = (model or pref_model or '').strip()
 
+    # Pull profile_settings.agent_output_language so the user's chosen
+    # response language flows into the system prompt. 'auto' keeps the
+    # original "match the input" behaviour.
+    pref_lang = await _user_output_language(db, user_id)
+    system_prompt = _build_system_prompt(pref_lang)
     user_prompt = _build_user_prompt(title, description)
-    full_prompt = f"{_PROMPT}\n\n---\n\n{user_prompt}"
+    full_prompt = f"{system_prompt}\n\n---\n\n{user_prompt}"
 
     raw_response = ''
     used_provider = chosen
@@ -256,7 +298,7 @@ async def fill(
         # We parse JSON from `output` ourselves; usage / cached are unused
         # here but the model name is passed back to the caller.
         output, _usage, returned_model, _cached = await llm.generate(
-            system_prompt=_PROMPT,
+            system_prompt=system_prompt,
             user_prompt=user_prompt,
             complexity_hint='normal',
             max_output_tokens=2000,

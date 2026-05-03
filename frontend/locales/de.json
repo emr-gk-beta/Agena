@@ -715,6 +715,8 @@
   "profile.preferredProvider": "Bevorzugter Anbieter",
   "profile.preferredProviderPlaceholder": "openai | gemini | codex_cli",
   "profile.preferredModel": "Bevorzugtes Modell",
+  "profile.agentOutputLanguage": "Sprache der Agent-Ausgabe",
+  "profile.agentOutputLanguageDesc": "Wird für KI-Review-Berichte, AI-Fill-Felder und Refinement-Kommentare verwendet. Code-Bezeichner und Dateipfade bleiben in der Originalsprache.",
   "profile.preferredModelPlaceholder": "gpt-5",
   "profile.branchPattern": "Branch-Muster",
   "profile.branchPatternPlaceholder": "feature/{ext_id}-{title_slug}",

@@ -715,6 +715,8 @@
   "profile.preferredProvider": "首选提供方",
   "profile.preferredProviderPlaceholder": "openai | gemini | codex_cli",
   "profile.preferredModel": "首选模型",
+  "profile.agentOutputLanguage": "Agent 输出语言",
+  "profile.agentOutputLanguageDesc": "用于 AI 审查报告、AI 自动填充字段和 refinement 评论。代码标识符和文件路径保留原语言。",
   "profile.preferredModelPlaceholder": "gpt-5",
   "profile.branchPattern": "分支模式",
   "profile.branchPatternPlaceholder": "feature/{ext_id}-{title_slug}",
