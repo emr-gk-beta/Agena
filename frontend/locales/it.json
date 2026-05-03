@@ -3561,5 +3561,6 @@
   "reviews.failed": "Review fallita",
   "reviews.delete": "Elimina",
   "reviews.deleteConfirm": "Eliminare questo review?",
-  "reviews.deleteDesc": "Rimuove permanentemente il review e i suoi riscontri. Il task non viene toccato."
+  "reviews.deleteDesc": "Rimuove permanentemente il review e i suoi riscontri. Il task non viene toccato.",
+  "reviews.details": "Dettaglio"
 }

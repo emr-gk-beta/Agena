@@ -3561,5 +3561,6 @@
   "reviews.failed": "Review fehlgeschlagen",
   "reviews.delete": "Löschen",
   "reviews.deleteConfirm": "Diese Review löschen?",
-  "reviews.deleteDesc": "Die Review und ihre Befunde werden dauerhaft entfernt. Die Aufgabe selbst bleibt unberührt."
+  "reviews.deleteDesc": "Die Review und ihre Befunde werden dauerhaft entfernt. Die Aufgabe selbst bleibt unberührt.",
+  "reviews.details": "Detail"
 }

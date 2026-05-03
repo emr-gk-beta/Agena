@@ -254,6 +254,14 @@ export default function ReviewsPage() {
               style={{ width: 30, height: 30, borderRadius: 6, border: '1px solid var(--panel-border)', background: 'transparent', color: 'var(--ink-58)', cursor: 'pointer', fontSize: 13, opacity: isRunning ? 0.5 : 1 }}>
               {isRunning ? '…' : '↻'}
             </button>
+            <Link
+              href={`/dashboard/reviews/${r.id}`}
+              onClick={(e) => e.stopPropagation()}
+              title={t('reviews.openDetails') || 'Open details'}
+              style={{ fontSize: 11, fontWeight: 700, color: '#a78bfa', textDecoration: 'none', padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(168,85,247,0.35)', background: 'rgba(168,85,247,0.10)', whiteSpace: 'nowrap' }}
+            >
+              📄 {t('reviews.details' as Parameters<typeof t>[0]) || 'Detail'}
+            </Link>
             <Link href={`/tasks/${r.task_id}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', textDecoration: 'none', padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.08)', whiteSpace: 'nowrap' }}>
               Task →
             </Link>

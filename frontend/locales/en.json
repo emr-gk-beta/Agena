@@ -3561,5 +3561,6 @@
   "reviews.failed": "Review failed",
   "reviews.delete": "Delete",
   "reviews.deleteConfirm": "Delete this review?",
-  "reviews.deleteDesc": "This permanently removes the review and its findings. The task itself is not affected."
+  "reviews.deleteDesc": "This permanently removes the review and its findings. The task itself is not affected.",
+  "reviews.details": "Detail"
 }

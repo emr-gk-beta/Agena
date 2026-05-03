@@ -3561,5 +3561,6 @@
   "reviews.failed": "レビュー失敗",
   "reviews.delete": "削除",
   "reviews.deleteConfirm": "このレビューを削除しますか？",
-  "reviews.deleteDesc": "レビューと検出事項を完全に削除します。タスク自体は影響を受けません。"
+  "reviews.deleteDesc": "レビューと検出事項を完全に削除します。タスク自体は影響を受けません。",
+  "reviews.details": "詳細"
 }

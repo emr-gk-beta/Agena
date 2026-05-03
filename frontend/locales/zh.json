@@ -3561,5 +3561,6 @@
   "reviews.failed": "审查失败",
   "reviews.delete": "删除",
   "reviews.deleteConfirm": "删除这次审查？",
-  "reviews.deleteDesc": "将永久删除审查及其发现。任务本身不受影响。"
+  "reviews.deleteDesc": "将永久删除审查及其发现。任务本身不受影响。",
+  "reviews.details": "详情"
 }

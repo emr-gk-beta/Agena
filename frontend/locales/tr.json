@@ -3561,5 +3561,6 @@
   "reviews.failed": "İnceleme başarısız oldu",
   "reviews.delete": "Sil",
   "reviews.deleteConfirm": "Bu incelemeyi sil?",
-  "reviews.deleteDesc": "İnceleme ve bulgular kalıcı olarak silinir. Görevin kendisi etkilenmez."
+  "reviews.deleteDesc": "İnceleme ve bulgular kalıcı olarak silinir. Görevin kendisi etkilenmez.",
+  "reviews.details": "Detay"
 }

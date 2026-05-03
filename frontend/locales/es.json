@@ -3561,5 +3561,6 @@
   "reviews.failed": "Revisión fallida",
   "reviews.delete": "Borrar",
   "reviews.deleteConfirm": "¿Borrar esta revisión?",
-  "reviews.deleteDesc": "Elimina permanentemente la revisión y sus hallazgos. La tarea en sí no se ve afectada."
+  "reviews.deleteDesc": "Elimina permanentemente la revisión y sus hallazgos. La tarea en sí no se ve afectada.",
+  "reviews.details": "Detalle"
 }
