@@ -38,6 +38,7 @@ from agena_models.schemas.saas_task import (
 )
 from agena_services.services.integration_config_service import IntegrationConfigService
 from agena_services.services.notification_service import NotificationService
+from agena_services.services.task_ai_fill_service import fill as task_ai_fill
 from agena_services.services.task_service import TaskService
 
 router = APIRouter(prefix='/tasks', tags=['saas-tasks'])
@@ -205,6 +206,49 @@ async def create_task(
     response = await _to_task_response(service, tenant.organization_id, task)
     response.was_existing = bool(getattr(task, '_was_existing', False))
     return response
+
+
+# ── AI fill: title + description → story_context / acceptance_criteria
+# / edge_cases. Routes via the user's preferred provider (CLI bridge if
+# claude_cli/codex_cli, otherwise hosted LLM with the org's API key).
+class AiFillRequest(BaseModel):
+    title: str
+    description: str = ''
+    provider: str | None = None  # claude_cli | codex_cli | openai | anthropic | gemini
+    model: str | None = None
+
+
+class AiFillResponse(BaseModel):
+    story_context: str
+    acceptance_criteria: str
+    edge_cases: str
+    used_provider: str
+    used_model: str
+
+
+@router.post('/ai-fill', response_model=AiFillResponse)
+async def ai_fill_task_fields(
+    request: AiFillRequest,
+    tenant: CurrentTenant = Depends(require_permission('tasks:write')),
+    db: AsyncSession = Depends(get_db_session),
+) -> AiFillResponse:
+    if not (request.title or '').strip() and not (request.description or '').strip():
+        raise HTTPException(status_code=400, detail='title or description is required')
+    try:
+        result = await task_ai_fill(
+            db=db,
+            organization_id=tenant.organization_id,
+            user_id=tenant.user_id,
+            title=request.title,
+            description=request.description,
+            provider=request.provider,
+            model=request.model,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return AiFillResponse(**result)
 
 
 @router.get('', response_model=list[TaskResponse])

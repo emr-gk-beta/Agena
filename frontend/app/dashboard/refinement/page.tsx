@@ -509,6 +509,10 @@ export default function RefinementPage() {
   const [importPickerItem, setImportPickerItem] = useState<ExternalTask | null>(null);
   const [importPickerRepoId, setImportPickerRepoId] = useState<string>('');
   const [importingId, setImportingId] = useState<string>('');
+  // AI fill toggle in the import dialog — when on, /tasks/ai-fill is
+  // called before /tasks so the new task lands with story_context /
+  // acceptance_criteria / edge_cases already populated.
+  const [importAiFill, setImportAiFill] = useState<boolean>(false);
 
   const [azureProjects, setAzureProjects] = useState<Opt[]>([]);
   const [azureTeams, setAzureTeams] = useState<Opt[]>([]);
@@ -702,15 +706,32 @@ export default function RefinementPage() {
         `Local Repo Mapping: ${mapping.display_name || `${mapping.owner}/${mapping.repo_name}`}`,
       ].filter(Boolean);
       type TaskRecord = { id: number; status: string };
+      type AiFill = { story_context: string; acceptance_criteria: string; edge_cases: string };
+      const fullTitle = `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`;
+      const fullDescription = `${desc || '(no description)'}\n\n---\n${ctxParts.join('\n')}`;
+      let aiFields: Partial<AiFill> = {};
+      if (importAiFill) {
+        try {
+          aiFields = await apiFetch<AiFill>('/tasks/ai-fill', {
+            method: 'POST',
+            body: JSON.stringify({ title: fullTitle, description: fullDescription }),
+          });
+        } catch (e) {
+          setError(e instanceof Error ? e.message : 'AI fill failed');
+        }
+      }
       const created = await apiFetch<TaskRecord>('/tasks', {
         method: 'POST',
         body: JSON.stringify({
-          title: `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`,
-          description: `${desc || '(no description)'}\n\n---\n${ctxParts.join('\n')}`,
+          title: fullTitle,
+          description: fullDescription,
           source: provider,
           external_id: String(item.id),
           ...(item.assigned_to ? { assigned_to: item.assigned_to } : {}),
           repo_mapping_ids: [mapping.id],
+          ...(aiFields.story_context ? { story_context: aiFields.story_context } : {}),
+          ...(aiFields.acceptance_criteria ? { acceptance_criteria: aiFields.acceptance_criteria } : {}),
+          ...(aiFields.edge_cases ? { edge_cases: aiFields.edge_cases } : {}),
         }),
       });
       setTaskMapByExternalId((prev) => ({ ...prev, [item.id]: created.id }));
@@ -3134,6 +3155,26 @@ export default function RefinementPage() {
                 );
               })}
             </div>
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+              borderRadius: 10, border: '1px solid rgba(168,85,247,0.35)',
+              background: 'rgba(168,85,247,0.06)',
+              fontSize: 12, color: 'var(--ink-78)',
+              cursor: 'pointer', marginBottom: 12,
+            }}>
+              <input
+                type='checkbox'
+                checked={importAiFill}
+                onChange={(e) => setImportAiFill(e.target.checked)}
+                style={{ accentColor: '#a855f7', marginTop: 2 }}
+              />
+              <span>
+                <strong style={{ color: '#c084fc' }}>🪄 {t('tasks.aiFill.checkboxTitle' as Parameters<typeof t>[0]) || 'AI ile Doldur'}</strong>
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--ink-50)', marginTop: 2 }}>
+                  {t('tasks.aiFill.checkboxDesc' as Parameters<typeof t>[0]) || 'Story Context, Acceptance Criteria ve Edge Cases alanları AI ile doldurulur.'}
+                </span>
+              </span>
+            </label>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 type='button'

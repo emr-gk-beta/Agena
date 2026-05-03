@@ -284,6 +284,10 @@ export default function SprintsPage() {
   }>({ azure_project: '', azure_team: '', azure_sprint: '', jira_project: '', jira_board: '', jira_sprint: '' });
   const [importPickerItem, setImportPickerItem] = useState<WorkItem | null>(null);
   const [importPickerRepoId, setImportPickerRepoId] = useState<string>('');
+  // When true, the import flow asks /tasks/ai-fill to populate
+  // story_context / acceptance_criteria / edge_cases before POST /tasks
+  // so the agent gets a richer brief without the user typing it.
+  const [importAiFill, setImportAiFill] = useState<boolean>(false);
   const isJiraAuthError = (message: string) => message.toLowerCase().includes('jira credentials are invalid');
 
   const setProject = useCallback((v: string) => {
@@ -887,15 +891,36 @@ export default function SprintsPage() {
         mapping?.github_repo_full_name ? `GitHub Repo: ${mapping.github_repo_full_name}` : '',
       ].filter(Boolean);
       type TaskRecord = { id: number; status: string };
+      type AiFill = { story_context: string; acceptance_criteria: string; edge_cases: string };
+      const fullDescription = `${desc}${commentsBlock}\n\n---\n${ctxParts.join('\n')}`;
+      const fullTitle = `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`;
+      // If the import dialog's "AI ile Doldur" toggle was on, ask the
+      // backend to populate story_context / acceptance_criteria /
+      // edge_cases before we create the task. Best-effort — if the
+      // call fails we still create the task without those fields.
+      let aiFields: Partial<AiFill> = {};
+      if (importAiFill) {
+        try {
+          aiFields = await apiFetch<AiFill>('/tasks/ai-fill', {
+            method: 'POST',
+            body: JSON.stringify({ title: fullTitle, description: fullDescription }),
+          });
+        } catch (e) {
+          setErr(e instanceof Error ? e.message : 'AI fill failed');
+        }
+      }
       const created = await apiFetch<TaskRecord>('/tasks', {
         method: 'POST',
         body: JSON.stringify({
-          title: `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`,
-          description: `${desc}${commentsBlock}\n\n---\n${ctxParts.join('\n')}`,
+          title: fullTitle,
+          description: fullDescription,
           source: provider,
           external_id: String(item.id),
           ...(item.assigned_to ? { assigned_to: item.assigned_to } : {}),
           ...(mapping?.id ? { repo_mapping_ids: [mapping.id] } : {}),
+          ...(aiFields.story_context ? { story_context: aiFields.story_context } : {}),
+          ...(aiFields.acceptance_criteria ? { acceptance_criteria: aiFields.acceptance_criteria } : {}),
+          ...(aiFields.edge_cases ? { edge_cases: aiFields.edge_cases } : {}),
         }),
       });
       setTaskMapByExternalId((prev) => ({ ...prev, [item.id]: created.id }));
@@ -1254,6 +1279,26 @@ export default function SprintsPage() {
                 );
               })}
             </div>
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+              borderRadius: 10, border: '1px solid rgba(168,85,247,0.35)',
+              background: 'rgba(168,85,247,0.06)',
+              fontSize: 12, color: 'var(--ink-78)',
+              cursor: 'pointer', marginBottom: 12,
+            }}>
+              <input
+                type='checkbox'
+                checked={importAiFill}
+                onChange={(e) => setImportAiFill(e.target.checked)}
+                style={{ accentColor: '#a855f7', marginTop: 2 }}
+              />
+              <span>
+                <strong style={{ color: '#c084fc' }}>🪄 {t('tasks.aiFill.checkboxTitle' as TranslationKey) || 'AI ile Doldur'}</strong>
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--ink-50)', marginTop: 2 }}>
+                  {t('tasks.aiFill.checkboxDesc' as TranslationKey) || 'Story Context, Acceptance Criteria ve Edge Cases alanları, kullanıcının tercih ettiği AI ile (CLI varsa CLI, yoksa hosted) otomatik doldurulur.'}
+                </span>
+              </span>
+            </label>
             <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
               <button
                 type='button'

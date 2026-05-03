@@ -11,6 +11,7 @@ import { useEnabledModules } from '@/lib/useEnabledModules';
 import RemoteRepoSelector from '@/components/RemoteRepoSelector';
 import RichDescription from '@/components/RichDescription';
 import ShareTaskModal from '@/components/ShareTaskModal';
+import AiFillButton from '@/components/AiFillButton';
 
 function useIsMobile(breakpoint = 768) {
   const [isMobile, setIsMobile] = useState(false);
@@ -49,6 +50,108 @@ function sourceLabel(s: string, t: (key: TranslationKey, vars?: Record<string, s
   const key = `tasks.source.${normalized}` as TranslationKey;
   const translated = t(key);
   return translated === key ? s : translated;
+}
+
+// Compact ⋮ overflow menu used in both desktop and mobile row actions.
+// Six row buttons made the actions cell wrap onto two lines and hurt
+// readability — Run + Review stay inline as primary, Details/Edit/Share/
+// Delete collapse in here so the row stays one-line at any width.
+function RowActionsKebab({
+  items,
+  ariaLabel,
+}: {
+  items: Array<{
+    key: string;
+    label: string;
+    icon: React.ReactNode;
+    onClick: () => void;
+    danger?: boolean;
+    href?: string;
+    hidden?: boolean;
+  }>;
+  ariaLabel: string;
+}) {
+  const [open, setOpen] = React.useState(false);
+  const ref = React.useRef<HTMLDivElement | null>(null);
+  React.useEffect(() => {
+    if (!open) return;
+    function handleClickOutside(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    function handleKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false); }
+    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('keydown', handleKey);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('keydown', handleKey);
+    };
+  }, [open]);
+  const visible = items.filter((it) => !it.hidden);
+  if (visible.length === 0) return null;
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-flex' }}>
+      <button
+        type='button'
+        aria-label={ariaLabel}
+        aria-expanded={open}
+        onClick={(e) => { e.stopPropagation(); setOpen((v) => !v); }}
+        style={{
+          padding: '6px 8px', fontSize: 14, lineHeight: 1, borderRadius: 8,
+          border: '1px solid var(--panel-border-2)', background: open ? 'var(--panel-alt)' : 'transparent',
+          color: 'var(--ink-50)', cursor: 'pointer', minWidth: 30, minHeight: 30,
+          display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+        }}
+      >
+        ⋮
+      </button>
+      {open && (
+        <div
+          role='menu'
+          style={{
+            position: 'absolute', right: 0, top: 'calc(100% + 4px)', zIndex: 30,
+            minWidth: 160, padding: 4, borderRadius: 10,
+            border: '1px solid var(--panel-border-3)', background: 'var(--surface, var(--panel))',
+            boxShadow: '0 18px 50px rgba(0,0,0,0.35)',
+            display: 'grid', gap: 1,
+          }}
+        >
+          {visible.map((it) => {
+            const inner = (
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+                <span style={{ width: 16, display: 'inline-flex', justifyContent: 'center' }}>{it.icon}</span>
+                {it.label}
+              </span>
+            );
+            const baseStyle: React.CSSProperties = {
+              display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',
+              borderRadius: 8, border: 'none', background: 'transparent', textAlign: 'left',
+              fontSize: 12, fontWeight: 600,
+              color: it.danger ? '#f87171' : 'var(--ink-78)',
+              cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none',
+            };
+            if (it.href) {
+              return (
+                <a key={it.key} href={it.href} style={baseStyle}
+                  onClick={(e) => { e.stopPropagation(); setOpen(false); }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--panel-alt)'; }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                  {inner}
+                </a>
+              );
+            }
+            return (
+              <button key={it.key} type='button' style={baseStyle}
+                onClick={(e) => { e.stopPropagation(); setOpen(false); it.onClick(); }}
+                onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'var(--panel-alt)'; }}
+                onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent'; }}>
+                {inner}
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function DashboardTasksPage() {
@@ -1061,6 +1164,22 @@ export default function DashboardTasksPage() {
                 </div>
               );
             })()}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+              <AiFillButton
+                title={title}
+                description={description}
+                onFilled={(r) => {
+                  if (r.story_context) setStoryContext(r.story_context);
+                  if (r.acceptance_criteria) setAcceptanceCriteria(r.acceptance_criteria);
+                  if (r.edge_cases) setEdgeCases(r.edge_cases);
+                  setMsg(t('tasks.aiFill.done' as TranslationKey) || 'AI filled the fields below.');
+                }}
+                onError={(m) => setError(m)}
+              />
+              <span style={{ fontSize: 11, color: 'var(--ink-35)' }}>
+                {t('tasks.aiFill.hint' as TranslationKey) || 'Auto-fills the three fields below from the title + description.'}
+              </span>
+            </div>
             <textarea
               value={storyContext}
               onChange={(e) => setStoryContext(e.target.value)}
@@ -1588,10 +1707,10 @@ export default function DashboardTasksPage() {
                   <span style={{ fontSize: 12, color: 'var(--ink-25)' }}>—</span>
                 )}
               </div>
-              <div style={{ display: 'flex', gap: 5, justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end', alignItems: 'center', flexWrap: 'nowrap' }}>
                 {task.source === 'sentry' && (
                   <button onClick={() => void toggleSentryResolve(task.id)}
-                    style={{ padding: '5px 10px', fontSize: 10, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    style={{ padding: '6px 10px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: '1px solid rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.08)', color: '#a855f7', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                     {task.description?.includes('Status: resolved') ? 'Unresolve' : 'Resolve'}
                   </button>
                 )}
@@ -1610,36 +1729,20 @@ export default function DashboardTasksPage() {
                       </button>
                     )}
                     <button onClick={() => void onAssignMCP(task.id)}
-                      style={{ padding: '6px 12px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0d9488, #7c3aed)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                      style={{ padding: '6px 14px', fontSize: 11, fontWeight: 700, borderRadius: 8, border: 'none', background: 'linear-gradient(135deg, #0d9488, #7c3aed)', color: '#fff', cursor: 'pointer', whiteSpace: 'nowrap' }}>
                       Run
                     </button>
                   </>
                 )}
-                <Link href={`/tasks/${task.id}`} className='button button-outline' style={{ padding: '6px 8px', fontSize: 11, whiteSpace: 'nowrap', minHeight: 30 }}>
-                  {t('tasks.details')}
-                </Link>
-                <button onClick={() => openEditTask(task)}
-                  style={{ padding: '6px 6px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(56,189,248,0.2)', background: 'transparent', color: '#38bdf8', cursor: 'pointer', lineHeight: 1 }}>
-                  ✏️
-                </button>
-                <button
-                  onClick={() => setShareTask(task)}
-                  title={t('taskDetail.share.button' as TranslationKey)}
-                  style={{ padding: '6px 8px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(94,234,212,0.25)', background: 'transparent', color: '#5eead4', cursor: 'pointer', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-                    <circle cx='18' cy='5' r='3' />
-                    <circle cx='6' cy='12' r='3' />
-                    <circle cx='18' cy='19' r='3' />
-                    <line x1='8.59' y1='13.51' x2='15.42' y2='17.49' />
-                    <line x1='15.41' y1='6.51' x2='8.59' y2='10.49' />
-                  </svg>
-                </button>
-                {task.status !== 'running' && (
-                  <button onClick={() => setDeleteConfirmTask(task)}
-                    style={{ padding: '6px 6px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: '#ef4444', cursor: 'pointer', lineHeight: 1 }}>
-                    🗑
-                  </button>
-                )}
+                <RowActionsKebab
+                  ariaLabel={t('tasks.actionsMenu' as TranslationKey) || 'More actions'}
+                  items={[
+                    { key: 'details', label: t('tasks.details'), icon: '🔍', href: `/tasks/${task.id}` },
+                    { key: 'edit', label: t('tasks.actions.edit' as TranslationKey) || 'Edit', icon: '✏️', onClick: () => openEditTask(task) },
+                    { key: 'share', label: t('taskDetail.share.button' as TranslationKey) || 'Share', icon: '🔗', onClick: () => setShareTask(task) },
+                    { key: 'delete', label: t('tasks.actions.delete' as TranslationKey) || 'Delete', icon: '🗑', onClick: () => setDeleteConfirmTask(task), danger: true, hidden: task.status === 'running' },
+                  ]}
+                />
               </div>
             </div>
           ))
@@ -1719,8 +1822,8 @@ export default function DashboardTasksPage() {
                       {(task.total_tokens !== null && task.total_tokens !== undefined) && <span>{task.total_tokens.toLocaleString()} tok</span>}
                       {(task.retry_count !== null && task.retry_count !== undefined && task.retry_count > 0) && <span>retry: {task.retry_count}</span>}
                     </div>
-                    {/* Row 5: actions */}
-                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                    {/* Row 5: actions — primary inline, rest in ⋮ kebab */}
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
                       {busy ? (
                         <span style={{ fontSize: 11, fontWeight: 700, color: statusColor(task.status) }}>{statusLabel(task.status, t)}</span>
                       ) : (
@@ -1744,29 +1847,17 @@ export default function DashboardTasksPage() {
                           {task.description?.includes('Status: resolved') ? 'Unresolve' : 'Resolve'}
                         </button>
                       )}
-                      <Link href={`/tasks/${task.id}`} style={{ padding: '7px 10px', fontSize: 11, fontWeight: 600, borderRadius: 8, border: '1px solid var(--panel-border-2)', background: 'transparent', color: 'var(--ink-50)', textAlign: 'center', textDecoration: 'none' }}>
-                        {t('tasks.details')}
-                      </Link>
-                      <button onClick={() => openEditTask(task)} title={t('tasks.actions.edit' as TranslationKey)}
-                        style={{ padding: '7px 8px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(56,189,248,0.2)', background: 'transparent', color: '#38bdf8', cursor: 'pointer', lineHeight: 1 }}>
-                        ✏️
-                      </button>
-                      <button onClick={() => setShareTask(task)} title={t('taskDetail.share.button' as TranslationKey)}
-                        style={{ padding: '7px 8px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(94,234,212,0.25)', background: 'transparent', color: '#5eead4', cursor: 'pointer', lineHeight: 1, display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <svg width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-                          <circle cx='18' cy='5' r='3' />
-                          <circle cx='6' cy='12' r='3' />
-                          <circle cx='18' cy='19' r='3' />
-                          <line x1='8.59' y1='13.51' x2='15.42' y2='17.49' />
-                          <line x1='15.41' y1='6.51' x2='8.59' y2='10.49' />
-                        </svg>
-                      </button>
-                      {task.status !== 'running' && (
-                        <button onClick={() => setDeleteConfirmTask(task)}
-                          style={{ padding: '7px 8px', fontSize: 11, borderRadius: 8, border: '1px solid rgba(239,68,68,0.2)', background: 'transparent', color: '#ef4444', cursor: 'pointer', lineHeight: 1 }}>
-                          🗑
-                        </button>
-                      )}
+                      <span style={{ marginLeft: 'auto' }}>
+                        <RowActionsKebab
+                          ariaLabel={t('tasks.actionsMenu' as TranslationKey) || 'More actions'}
+                          items={[
+                            { key: 'details', label: t('tasks.details'), icon: '🔍', href: `/tasks/${task.id}` },
+                            { key: 'edit', label: t('tasks.actions.edit' as TranslationKey) || 'Edit', icon: '✏️', onClick: () => openEditTask(task) },
+                            { key: 'share', label: t('taskDetail.share.button' as TranslationKey) || 'Share', icon: '🔗', onClick: () => setShareTask(task) },
+                            { key: 'delete', label: t('tasks.actions.delete' as TranslationKey) || 'Delete', icon: '🗑', onClick: () => setDeleteConfirmTask(task), danger: true, hidden: task.status === 'running' },
+                          ]}
+                        />
+                      </span>
                     </div>
                   </div>
                 );
