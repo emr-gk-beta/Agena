@@ -3423,6 +3423,7 @@
   "backlog.prStatus.closed": "已关闭",
   "backlog.prStatus.completed": "已完成",
   "backlog.prStatus.merged": "已合并",
+  "backlog.prStatus.draft": "草稿",
   "backlog.set.channel.prComment": "💬 PR 评论",
   "modules.pageTitle": "模块",
   "modules.active": "已启用",

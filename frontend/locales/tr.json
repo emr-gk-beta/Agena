@@ -3423,6 +3423,7 @@
   "backlog.prStatus.closed": "Kapalı",
   "backlog.prStatus.completed": "Tamamlandı",
   "backlog.prStatus.merged": "Merge edildi",
+  "backlog.prStatus.draft": "Taslak",
   "backlog.set.channel.prComment": "💬 PR Yorumu",
   "modules.pageTitle": "Modüller",
   "modules.active": "aktif",

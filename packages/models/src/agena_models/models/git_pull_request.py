@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from agena_core.db.base import Base
@@ -18,6 +18,7 @@ class GitPullRequest(Base):
     title: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     author: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     status: Mapped[Optional[str]] = mapped_column(String(32), nullable=True)
+    is_draft: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default='0')
     source_branch: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     target_branch: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     created_at_ext: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

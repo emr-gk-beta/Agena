@@ -3423,6 +3423,7 @@
   "backlog.prStatus.closed": "Geschlossen",
   "backlog.prStatus.completed": "Abgeschlossen",
   "backlog.prStatus.merged": "Gemerged",
+  "backlog.prStatus.draft": "Entwurf",
   "backlog.set.channel.prComment": "💬 PR-Kommentar",
   "modules.pageTitle": "Module",
   "modules.active": "aktiv",

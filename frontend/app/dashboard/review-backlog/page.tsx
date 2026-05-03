@@ -13,6 +13,7 @@ type Nudge = {
   pr_author: string | null;
   pr_provider: string | null;
   pr_status: string | null;
+  pr_is_draft?: boolean;
   pr_url: string | null;
   repo_mapping_id: string | null;
   repo_display_name: string | null;
@@ -552,6 +553,16 @@ export default function ReviewBacklogPage() {
                   <span style={{ fontSize: 11, padding: '2px 8px', borderRadius: 999, background: `${color}22`, color, fontWeight: 700, textTransform: 'uppercase' }}>
                     {t(`backlog.severity.${sev}` as TranslationKey)} · {n.age_hours}h
                   </span>
+                  {n.pr_is_draft && (
+                    <span style={{
+                      fontSize: 11, padding: '2px 8px', borderRadius: 999,
+                      background: 'rgba(148,163,184,0.20)', color: '#94a3b8',
+                      fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4,
+                      border: '1px dashed rgba(148,163,184,0.55)',
+                    }}>
+                      📝 {t('backlog.prStatus.draft' as TranslationKey)}
+                    </span>
+                  )}
                   {n.pr_status && (() => {
                     const s = n.pr_status.toLowerCase();
                     const palette: Record<string, { bg: string; fg: string }> = {

@@ -358,10 +358,13 @@ async def _refresh_azure_pr_status(
             data = resp.json() if resp.content else {}
         new_status = str(data.get('status') or '').strip().lower() or pr.status
         new_closed = data.get('closedDate')
+        new_is_draft = bool(data.get('isDraft') or False)
         from datetime import datetime as _dt
         # Status mapping: Azure 'completed' → merged, 'abandoned' → closed.
         if new_status and new_status != (pr.status or '').strip().lower():
             pr.status = new_status
+        if bool(getattr(pr, 'is_draft', False)) != new_is_draft:
+            pr.is_draft = new_is_draft
         if new_status == 'completed' and pr.merged_at is None:
             pr.merged_at = _dt.utcnow()
         if new_status == 'abandoned' and pr.closed_at is None:

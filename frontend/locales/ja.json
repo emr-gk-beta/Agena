@@ -3423,6 +3423,7 @@
   "backlog.prStatus.closed": "クローズ",
   "backlog.prStatus.completed": "完了",
   "backlog.prStatus.merged": "マージ済み",
+  "backlog.prStatus.draft": "下書き",
   "backlog.set.channel.prComment": "💬 PR コメント",
   "modules.pageTitle": "モジュール",
   "modules.active": "有効",

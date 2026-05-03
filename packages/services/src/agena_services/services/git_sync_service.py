@@ -223,6 +223,7 @@ class GitSyncService:
                         deletions=int(item.get('deletions') or 0),
                         commits_count=int(item.get('commits') or 0),
                         review_comments=int(item.get('review_comments') or 0),
+                        is_draft=bool(item.get('draft') or False),
                     )
                     count += 1
 
@@ -549,6 +550,7 @@ class GitSyncService:
                         deletions=0,
                         commits_count=0,
                         review_comments=review_count,
+                        is_draft=bool(item.get('isDraft') or False),
                     )
                     if pr_row is not None:
                         await self._upsert_pr_reviews(
@@ -948,6 +950,7 @@ class GitSyncService:
         commits_count: int,
         review_comments: int,
         first_commit_at: datetime | None = None,
+        is_draft: bool = False,
     ) -> None:
         from sqlalchemy.dialects.mysql import insert as mysql_insert
 
@@ -978,11 +981,13 @@ class GitSyncService:
             deletions=deletions,
             commits_count=commits_count,
             review_comments=review_comments,
+            is_draft=bool(is_draft),
         )
         stmt = stmt.on_duplicate_key_update(
             title=stmt.inserted.title,
             author=stmt.inserted.author,
             status=stmt.inserted.status,
+            is_draft=stmt.inserted.is_draft,
             source_branch=stmt.inserted.source_branch,
             target_branch=stmt.inserted.target_branch,
             created_at_ext=stmt.inserted.created_at_ext,
