@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
@@ -60,14 +60,12 @@ function fmtDuration(start: string, end: string | null): string {
 }
 
 export default function ReviewDetailPage() {
-  const router = useRouter();
   const params = useParams();
   const { t } = useLocale();
   const reviewId = Number(params?.id);
   const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-  const [retriggering, setRetriggering] = useState(false);
 
   useEffect(() => {
     if (!Number.isFinite(reviewId)) {
@@ -103,22 +101,6 @@ export default function ReviewDetailPage() {
     })();
     return () => { alive = false; };
   }, [reviewId]);
-
-  async function rerun() {
-    if (!review) return;
-    setRetriggering(true);
-    try {
-      const fresh = await apiFetch<Review>('/reviews', {
-        method: 'POST',
-        body: JSON.stringify({ task_id: review.task_id, reviewer_agent_role: review.reviewer_agent_role }),
-      });
-      router.push(`/dashboard/reviews/${fresh.id}`);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Re-run failed');
-    } finally {
-      setRetriggering(false);
-    }
-  }
 
   const sev = review?.severity || null;
   const sevColor = severityColor(sev);
@@ -187,21 +169,6 @@ export default function ReviewDetailPage() {
               </div>
               <div style={{ fontSize: 11, color: 'var(--ink-50)', fontFamily: 'monospace' }}>
                 #{review.id} · {review.reviewer_agent_role}
-              </div>
-              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                <button
-                  onClick={() => void rerun()}
-                  disabled={retriggering}
-                  style={{
-                    padding: '7px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700,
-                    border: '1px solid rgba(168,85,247,0.4)',
-                    background: 'rgba(168,85,247,0.10)',
-                    color: '#c084fc',
-                    cursor: retriggering ? 'wait' : 'pointer',
-                  }}
-                >
-                  {retriggering ? '⏳' : '↻'} {t('reviews.rerun' as TranslationKey) || 'Re-run'}
-                </button>
               </div>
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', margin: 0, lineHeight: 1.3 }}>
