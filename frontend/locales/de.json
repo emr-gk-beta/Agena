@@ -689,6 +689,8 @@
   "profile.saving": "Wird gespeichert…",
   "profile.saved": "✓ Gespeichert",
   "profile.saveFailed": "Speichern fehlgeschlagen",
+  "profile.unsavedChanges": "Ungespeicherte Änderungen",
+  "profile.eventNotificationMatrixDesc": "Lege fest, wo jedes Ereignis landet — In-App-Posteingang, E-Mail oder Browser-Push.",
   "profile.sprintBoard": "Sprint-Board →",
   "profile.integrations": "Integrations-Einstellungen",
   "profile.integrationsDesc": "Azure PAT oder Jira-Token aktualisieren",

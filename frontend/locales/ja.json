@@ -689,6 +689,8 @@
   "profile.saving": "保存中…",
   "profile.saved": "✓ 保存済み",
   "profile.saveFailed": "保存に失敗しました",
+  "profile.unsavedChanges": "未保存の変更があります",
+  "profile.eventNotificationMatrixDesc": "各イベントの届け先を選択 — アプリ内、メール、ブラウザプッシュ。",
   "profile.sprintBoard": "Sprint ボード →",
   "profile.integrations": "連携設定",
   "profile.integrationsDesc": "Azure PAT または Jira トークンを更新",

@@ -689,6 +689,8 @@
   "profile.saving": "保存中…",
   "profile.saved": "✓ 已保存",
   "profile.saveFailed": "保存失败",
+  "profile.unsavedChanges": "有未保存的更改",
+  "profile.eventNotificationMatrixDesc": "决定每个事件的去向——应用内、邮件或浏览器推送。",
   "profile.sprintBoard": "Sprint 看板 →",
   "profile.integrations": "集成设置",
   "profile.integrationsDesc": "更新 Azure PAT 或 Jira token",

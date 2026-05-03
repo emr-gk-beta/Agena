@@ -689,6 +689,8 @@
   "profile.saving": "Kaydediliyor…",
   "profile.saved": "✓ Kaydedildi",
   "profile.saveFailed": "Kayıt başarısız",
+  "profile.unsavedChanges": "Kaydedilmemiş değişiklik var",
+  "profile.eventNotificationMatrixDesc": "Her olayın nereye düşeceğini seç — uygulama içi kutu, e-posta veya tarayıcı push.",
   "profile.sprintBoard": "Sprint Board →",
   "profile.integrations": "Entegrasyon Ayarları",
   "profile.integrationsDesc": "Azure PAT veya Jira token'ını güncelle",

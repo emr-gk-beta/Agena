@@ -689,6 +689,8 @@
   "profile.saving": "Saving…",
   "profile.saved": "✓ Saved",
   "profile.saveFailed": "Save failed",
+  "profile.unsavedChanges": "Unsaved changes",
+  "profile.eventNotificationMatrixDesc": "Decide where each event lands — in-app inbox, email, or browser push.",
   "profile.sprintBoard": "Sprint Board →",
   "profile.integrations": "Integration Settings",
   "profile.integrationsDesc": "Update your Azure PAT or Jira token",

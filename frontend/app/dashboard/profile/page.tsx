@@ -50,8 +50,8 @@ export default function ProfilePage() {
   });
   const [extraSettings, setExtraSettings] = useState<Record<string, unknown>>({});
   const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [err, setErr] = useState('');
+  const [dirty, setDirty] = useState(false);
+  const [toast, setToast] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null);
 
   useEffect(() => {
     apiFetch<MeRes>('/auth/me').then(setUser).catch(() => {});
@@ -80,9 +80,22 @@ export default function ProfilePage() {
     }).catch(() => {});
   }, []);
 
+  // Auto-dismiss toast after 2.8s. Using a fresh effect per toast value
+  // means setting a new toast immediately replaces the timer rather than
+  // racing with the previous one.
+  useEffect(() => {
+    if (!toast) return;
+    const id = window.setTimeout(() => setToast(null), 2800);
+    return () => window.clearTimeout(id);
+  }, [toast]);
+
+  function patch<K extends keyof ProfileSettings>(key: K, value: ProfileSettings[K]) {
+    setProfileSettings((p) => ({ ...p, [key]: value }));
+    setDirty(true);
+  }
+
   async function save() {
     setSaving(true);
-    setErr('');
     try {
       await savePrefs({
         profile_settings: {
@@ -90,9 +103,10 @@ export default function ProfilePage() {
           ...(profileSettings as unknown as Record<string, unknown>),
         },
       });
-      setSaved(true);
+      setDirty(false);
+      setToast({ kind: 'ok', msg: t('profile.saved') });
     } catch (e) {
-      setErr(e instanceof Error ? e.message : t('profile.saveFailed'));
+      setToast({ kind: 'err', msg: e instanceof Error ? e.message : t('profile.saveFailed') });
     } finally {
       setSaving(false);
     }
@@ -103,16 +117,57 @@ export default function ProfilePage() {
     router.push('/');
   }
 
+  const branchPreviewSrc = profileSettings.branch_prefix || 'feature/AB#{ext_id}-{title_slug}';
+
   return (
-    <div style={{ display: 'grid', gap: 18, maxWidth: 1100 }}>
-      <div>
-        <div className='section-label'>{t('profile.section')}</div>
-        <h1 style={{ fontSize: 28, fontWeight: 800, color: 'var(--ink-90)', marginTop: 8, marginBottom: 4 }}>
-          {t('profile.title')}
-        </h1>
-        <p style={{ fontSize: 14, color: 'var(--ink-30)', margin: 0 }}>{t('profile.subtitle')}</p>
+    <div style={{ display: 'grid', gap: 18, maxWidth: 1200, margin: '0 auto' }}>
+      {/* ── Sticky header: title + Save button always reachable ── */}
+      <div
+        style={{
+          position: 'sticky', top: 0, zIndex: 5,
+          padding: '14px 18px',
+          marginLeft: -18, marginRight: -18, marginTop: -18,
+          background: 'var(--surface, var(--panel-alt))',
+          borderBottom: '1px solid var(--panel-border-2)',
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          gap: 12, flexWrap: 'wrap',
+          backdropFilter: 'blur(10px)',
+        }}
+      >
+        <div style={{ minWidth: 0 }}>
+          <div className='section-label'>{t('profile.section')}</div>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', marginTop: 4, marginBottom: 2 }}>
+            {t('profile.title')}
+          </h1>
+          <div style={{ fontSize: 12, color: 'var(--ink-30)' }}>{t('profile.subtitle')}</div>
+        </div>
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {dirty && (
+            <span style={{ fontSize: 11, color: '#fde68a', fontWeight: 600 }}>
+              ● {t('profile.unsavedChanges' as Parameters<typeof t>[0]) || 'Unsaved changes'}
+            </span>
+          )}
+          <button
+            type='button'
+            onClick={() => void save()}
+            disabled={saving || !dirty}
+            style={{
+              padding: '10px 18px', borderRadius: 10, border: 'none',
+              background: saving
+                ? 'rgba(124,58,237,0.4)'
+                : (!dirty ? 'rgba(148,163,184,0.18)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)'),
+              color: !dirty && !saving ? 'var(--ink-50)' : '#fff',
+              fontWeight: 700, fontSize: 13,
+              cursor: saving || !dirty ? 'not-allowed' : 'pointer',
+              minWidth: 130, transition: 'all 0.2s',
+            }}
+          >
+            {saving ? `⏳ ${t('profile.saving')}` : `💾 ${t('profile.save')}`}
+          </button>
+        </div>
       </div>
 
+      {/* ── User card ── */}
       {user && (
         <div style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: 18, display: 'flex', alignItems: 'center', gap: 16, position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 1, background: 'linear-gradient(90deg, transparent, rgba(13,148,136,0.4), transparent)' }} />
@@ -122,7 +177,7 @@ export default function ProfilePage() {
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 3 }}>{user.full_name || '—'}</div>
             <div style={{ fontSize: 13, color: 'var(--ink-35)' }}>{user.email}</div>
-            <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <div style={{ display: 'flex', gap: 8, marginTop: 8, flexWrap: 'wrap' }}>
               <span style={{ fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 999, background: 'rgba(13,148,136,0.15)', border: '1px solid rgba(13,148,136,0.3)', color: '#5eead4' }}>{t('profile.proPlan')}</span>
               <span style={{ fontSize: 11, color: 'var(--ink-25)', padding: '3px 10px' }}>{t('profile.org')} #{user.organization_id}</span>
             </div>
@@ -141,35 +196,45 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      <div style={{ display: 'grid', gap: 14, alignItems: 'start' }}>
-        <div style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: 18, display: 'grid', gap: 10 }}>
+      {/* ── Two-column body: workspace preferences (left) + notification matrix (right) ── */}
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(380px, 1fr))',
+          gap: 14,
+          alignItems: 'start',
+        }}
+      >
+        {/* LEFT: workspace preferences */}
+        <div style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: 18, display: 'grid', gap: 14 }}>
           <div>
             <div style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 14 }}>{t('profile.workspacePreferences')}</div>
             <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 2 }}>{t('profile.workspacePreferencesDesc')}</div>
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-            <ToggleRow label={t('profile.emailNotifications')} checked={profileSettings.email_notifications} onChange={(v) => { setProfileSettings((p) => ({ ...p, email_notifications: v })); setSaved(false); }} />
-            <ToggleRow label={t('profile.webPushNotifications')} checked={profileSettings.web_push_notifications} onChange={(v) => { setProfileSettings((p) => ({ ...p, web_push_notifications: v })); setSaved(false); }} />
-            <ToggleRow label={t('profile.dailySummaryEmail')} checked={profileSettings.daily_summary} onChange={(v) => { setProfileSettings((p) => ({ ...p, daily_summary: v })); setSaved(false); }} />
-            <ToggleRow label={t('profile.autoAssignNewTasks')} checked={profileSettings.auto_assign_new_tasks} onChange={(v) => { setProfileSettings((p) => ({ ...p, auto_assign_new_tasks: v })); setSaved(false); }} />
-            <ToggleRow label={t('profile.createPrByDefault')} checked={profileSettings.default_create_pr} onChange={(v) => { setProfileSettings((p) => ({ ...p, default_create_pr: v })); setSaved(false); }} />
+            <ToggleRow label={t('profile.emailNotifications')} checked={profileSettings.email_notifications} onChange={(v) => patch('email_notifications', v)} />
+            <ToggleRow label={t('profile.webPushNotifications')} checked={profileSettings.web_push_notifications} onChange={(v) => patch('web_push_notifications', v)} />
+            <ToggleRow label={t('profile.dailySummaryEmail')} checked={profileSettings.daily_summary} onChange={(v) => patch('daily_summary', v)} />
+            <ToggleRow label={t('profile.autoAssignNewTasks')} checked={profileSettings.auto_assign_new_tasks} onChange={(v) => patch('auto_assign_new_tasks', v)} />
+            <ToggleRow label={t('profile.createPrByDefault')} checked={profileSettings.default_create_pr} onChange={(v) => patch('default_create_pr', v)} />
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
             <ProfileInput
               label={t('profile.preferredProvider')}
               value={profileSettings.preferred_provider}
-              onChange={(v) => { setProfileSettings((p) => ({ ...p, preferred_provider: v })); setSaved(false); }}
+              onChange={(v) => patch('preferred_provider', v)}
               placeholder={t('profile.preferredProviderPlaceholder')}
             />
             <ProfileInput
               label={t('profile.preferredModel')}
               value={profileSettings.preferred_model}
-              onChange={(v) => { setProfileSettings((p) => ({ ...p, preferred_model: v })); setSaved(false); }}
+              onChange={(v) => patch('preferred_model', v)}
               placeholder={t('profile.preferredModelPlaceholder')}
             />
           </div>
+
           <div>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-50)', marginBottom: 6 }}>{t('profile.branchPattern')}</div>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 8 }}>
@@ -181,7 +246,7 @@ export default function ProfilePage() {
                 { label: 'ai-task/{id}-{timestamp}', desc: 'ai-task/47-20260327' },
                 { label: 'feature/{title_slug}', desc: 'feature/merchant-status' },
               ].map((p) => (
-                <button key={p.label} onClick={() => { setProfileSettings((prev) => ({ ...prev, branch_prefix: p.label })); setSaved(false); }}
+                <button key={p.label} onClick={() => patch('branch_prefix', p.label)}
                   style={{
                     padding: '6px 10px', borderRadius: 8, fontSize: 11, cursor: 'pointer',
                     border: profileSettings.branch_prefix === p.label ? '1px solid rgba(94,234,212,0.5)' : '1px solid var(--panel-border-3)',
@@ -195,41 +260,60 @@ export default function ProfilePage() {
             </div>
             <input
               value={profileSettings.branch_prefix}
-              onChange={(e) => { setProfileSettings((p) => ({ ...p, branch_prefix: e.target.value })); setSaved(false); }}
+              onChange={(e) => patch('branch_prefix', e.target.value)}
               placeholder={t('profile.branchPatternPlaceholder')}
               style={{ width: '100%', padding: '9px 11px', borderRadius: 10, border: '1px solid var(--panel-border-3)', background: 'var(--glass)', color: 'var(--ink-90)', fontSize: 12, fontFamily: 'monospace', outline: 'none', boxSizing: 'border-box' }}
             />
             <div style={{ fontSize: 10, color: 'var(--ink-25)', marginTop: 6, fontFamily: 'monospace' }}>
-              {t('profile.preview')}: {(profileSettings.branch_prefix || 'feature/AB#{ext_id}-{title_slug}')
+              {t('profile.preview')}: {branchPreviewSrc
                 .replace('{ext_id}', '61717')
                 .replace('{title_slug}', 'merchant-status')
                 .replace('{id}', '47')
                 .replace('{timestamp}', '20260327')}
             </div>
           </div>
+
           <ProfileInput
             label={t('profile.queueWarningThreshold')}
             value={String(profileSettings.queue_warn_threshold)}
             onChange={(v) => {
               const n = Number(v);
-              setProfileSettings((p) => ({ ...p, queue_warn_threshold: Number.isFinite(n) ? Math.max(1, Math.floor(n)) : p.queue_warn_threshold }));
-              setSaved(false);
+              if (Number.isFinite(n)) patch('queue_warn_threshold', Math.max(1, Math.floor(n)));
             }}
             placeholder={t('profile.queueWarningThresholdPlaceholder')}
           />
+        </div>
+
+        {/* RIGHT: notification matrix */}
+        <div style={{ borderRadius: 16, border: '1px solid var(--panel-border-2)', background: 'var(--panel-alt)', padding: 18, display: 'grid', gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 700, color: 'var(--ink-90)', fontSize: 14 }}>{t('profile.eventNotificationMatrix')}</div>
+            <div style={{ fontSize: 12, color: 'var(--ink-35)', marginTop: 2 }}>
+              {t('profile.eventNotificationMatrixDesc' as Parameters<typeof t>[0]) || t('profile.workspacePreferencesDesc')}
+            </div>
+          </div>
           <div style={{ border: '1px solid var(--panel-border-2)', borderRadius: 12, padding: 10, background: 'var(--panel)' }}>
-            <div style={{ fontSize: 12, color: 'var(--ink-78)', fontWeight: 700, marginBottom: 8 }}>{t('profile.eventNotificationMatrix')}</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.6fr 0.7fr', gap: 8, fontSize: 11, color: 'var(--ink-35)', marginBottom: 6 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.6fr 0.7fr', gap: 8, fontSize: 11, color: 'var(--ink-35)', marginBottom: 6, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>
               <div>{t('profile.event')}</div><div>{t('profile.inApp')}</div><div>{t('profile.email')}</div><div>{t('profile.webPush')}</div>
             </div>
             {Object.keys(EVENT_PREF_DEFAULTS).map((eventKey) => {
               const channels = profileSettings.notification_preferences[eventKey] || EVENT_PREF_DEFAULTS[eventKey];
+              const updateChannel = (k: 'in_app' | 'email' | 'web_push', v: boolean) => {
+                setProfileSettings((p) => ({
+                  ...p,
+                  notification_preferences: {
+                    ...p.notification_preferences,
+                    [eventKey]: { ...channels, [k]: v },
+                  },
+                }));
+                setDirty(true);
+              };
               return (
-                <div key={eventKey} style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.6fr 0.7fr', gap: 8, alignItems: 'center', padding: '6px 0', borderTop: '1px solid var(--panel-alt)' }}>
+                <div key={eventKey} style={{ display: 'grid', gridTemplateColumns: '1.5fr 0.6fr 0.6fr 0.7fr', gap: 8, alignItems: 'center', padding: '7px 0', borderTop: '1px solid var(--panel-alt)' }}>
                   <div style={{ fontSize: 11, color: 'var(--ink-78)' }}>{t(`profile.event.${eventKey}` as Parameters<typeof t>[0])}</div>
-                  <MiniToggle checked={channels.in_app} onChange={(v) => { setProfileSettings((p) => ({ ...p, notification_preferences: { ...p.notification_preferences, [eventKey]: { ...channels, in_app: v } } })); setSaved(false); }} />
-                  <MiniToggle checked={channels.email} onChange={(v) => { setProfileSettings((p) => ({ ...p, notification_preferences: { ...p.notification_preferences, [eventKey]: { ...channels, email: v } } })); setSaved(false); }} />
-                  <MiniToggle checked={channels.web_push} onChange={(v) => { setProfileSettings((p) => ({ ...p, notification_preferences: { ...p.notification_preferences, [eventKey]: { ...channels, web_push: v } } })); setSaved(false); }} />
+                  <MiniToggle checked={channels.in_app} onChange={(v) => updateChannel('in_app', v)} />
+                  <MiniToggle checked={channels.email} onChange={(v) => updateChannel('email', v)} />
+                  <MiniToggle checked={channels.web_push} onChange={(v) => updateChannel('web_push', v)} />
                 </div>
               );
             })}
@@ -237,16 +321,8 @@ export default function ProfilePage() {
         </div>
       </div>
 
-      {err ? <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(248,113,113,0.1)', border: '1px solid rgba(248,113,113,0.3)', color: '#f87171', fontSize: 13 }}>{err}</div> : null}
-
-      <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end' }}>
-        <button onClick={() => void save()} disabled={saving}
-          style={{ padding: '11px 16px', borderRadius: 12, border: 'none', background: saved ? 'rgba(34,197,94,0.3)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)', color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', transition: 'all 0.3s', minWidth: 170 }}>
-          {saving ? t('profile.saving') : saved ? t('profile.saved') : t('profile.save')}
-        </button>
-      </div>
-
-      <div style={{ borderRadius: 14, border: '1px solid var(--panel-border)', background: 'var(--panel)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+      {/* ── Integrations footer ── */}
+      <div style={{ borderRadius: 14, border: '1px solid var(--panel-border)', background: 'var(--panel)', padding: '14px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
         <div>
           <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink-72)' }}>{t('profile.integrations')}</div>
           <div style={{ fontSize: 12, color: 'var(--ink-30)', marginTop: 2 }}>{t('profile.integrationsDesc')}</div>
@@ -255,6 +331,35 @@ export default function ProfilePage() {
           {t('profile.settings')}
         </a>
       </div>
+
+      {/* ── Toast: pinned bottom-right, auto-dismiss ── */}
+      {toast && (
+        <div
+          style={{
+            position: 'fixed', bottom: 24, right: 24, zIndex: 100,
+            minWidth: 240, maxWidth: 380,
+            padding: '12px 16px', borderRadius: 12,
+            background: toast.kind === 'ok' ? 'rgba(34,197,94,0.18)' : 'rgba(248,113,113,0.18)',
+            border: `1px solid ${toast.kind === 'ok' ? 'rgba(34,197,94,0.5)' : 'rgba(248,113,113,0.5)'}`,
+            color: toast.kind === 'ok' ? '#86efac' : '#fca5a5',
+            fontSize: 13, fontWeight: 600,
+            display: 'flex', gap: 10, alignItems: 'center',
+            boxShadow: '0 12px 40px rgba(0,0,0,0.35)',
+            backdropFilter: 'blur(10px)',
+            animation: 'profileToastIn 0.2s ease-out',
+          }}
+          onClick={() => setToast(null)}
+        >
+          <span style={{ fontSize: 18 }}>{toast.kind === 'ok' ? '✓' : '⚠'}</span>
+          <span>{toast.msg}</span>
+        </div>
+      )}
+      <style jsx>{`
+        @keyframes profileToastIn {
+          from { transform: translateY(8px); opacity: 0; }
+          to { transform: translateY(0); opacity: 1; }
+        }
+      `}</style>
     </div>
   );
 }

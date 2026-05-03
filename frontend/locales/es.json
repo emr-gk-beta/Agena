@@ -689,6 +689,8 @@
   "profile.saving": "Guardando…",
   "profile.saved": "✓ Guardado",
   "profile.saveFailed": "Error al guardar",
+  "profile.unsavedChanges": "Cambios sin guardar",
+  "profile.eventNotificationMatrixDesc": "Decide dónde aterriza cada evento — bandeja in-app, email o push del navegador.",
   "profile.sprintBoard": "Tablero de Sprint →",
   "profile.integrations": "Configuración de integraciones",
   "profile.integrationsDesc": "Actualiza tu PAT de Azure o token de Jira",

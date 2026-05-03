@@ -689,6 +689,8 @@
   "profile.saving": "Salvataggio…",
   "profile.saved": "✓ Salvato",
   "profile.saveFailed": "Salvataggio non riuscito",
+  "profile.unsavedChanges": "Modifiche non salvate",
+  "profile.eventNotificationMatrixDesc": "Decidi dove finisce ogni evento — casella in-app, email o push del browser.",
   "profile.sprintBoard": "Sprint Board →",
   "profile.integrations": "Impostazioni integrazioni",
   "profile.integrationsDesc": "Aggiorna il PAT Azure o il token Jira",
