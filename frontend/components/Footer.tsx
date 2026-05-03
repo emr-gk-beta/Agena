@@ -15,8 +15,29 @@ export default function Footer() {
 
   return (
     <footer style={{ borderTop: '1px solid var(--panel-border)', padding: '48px 24px' }}>
-      <div style={{ maxWidth: 800, margin: '0 auto' }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto' }}>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 32, marginBottom: 32 }}>
+          <div>
+            <h4 style={{ color: 'var(--ink-65)', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{t('footer.solutions')}</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <Link href='/cross-source-insights' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>🧠 Cross-Source Insights</Link>
+              <Link href='/stale-ticket-triage' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>🧹 Stale Ticket Triage</Link>
+              <Link href='/review-backlog-killer' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>⏱ Review Backlog Killer</Link>
+              <Link href='/ai-code-review' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>🔎 AI Code Review</Link>
+              <Link href='/ai-sprint-refinement' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>✨ AI Sprint Refinement</Link>
+            </div>
+          </div>
+          <div>
+            <h4 style={{ color: 'var(--ink-65)', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{t('footer.integrations')}</h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <Link href='/sentry-ai-auto-fix' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>🚨 Sentry AI Auto-Fix</Link>
+              <Link href='/jira-ai-agent' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>🪐 Jira AI Agent</Link>
+              <Link href='/azure-devops-ai-bot' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>🟦 Azure DevOps AI Bot</Link>
+              <Link href='/newrelic-ai-agent' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>📡 New Relic AI Agent</Link>
+              <Link href='/vs/seer' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>vs Sentry Seer</Link>
+              <Link href='/vs/coderabbit' style={{ color: 'var(--ink-35)', fontSize: 13, textDecoration: 'none' }}>vs CodeRabbit</Link>
+            </div>
+          </div>
           <div>
             <h4 style={{ color: 'var(--ink-65)', fontSize: 13, fontWeight: 700, marginBottom: 12 }}>{t('footer.product')}</h4>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

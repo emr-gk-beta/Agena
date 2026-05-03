@@ -3511,5 +3511,6 @@
   "integrations.saveDatadogConfig": "Datadog ayarını kaydet",
   "integrations.deleteDatadogConnection": "Datadog bağlantısını sil",
   "integrations.saveTelegram": "Telegram'ı kaydet",
-  "admin.tab.seo": "SEO"
+  "admin.tab.seo": "SEO",
+  "footer.solutions": "Çözümler"
 }

@@ -3511,5 +3511,6 @@
   "integrations.saveDatadogConfig": "保存 Datadog 配置",
   "integrations.deleteDatadogConnection": "删除 Datadog 连接",
   "integrations.saveTelegram": "保存 Telegram",
-  "admin.tab.seo": "SEO"
+  "admin.tab.seo": "SEO",
+  "footer.solutions": "解决方案"
 }

@@ -3511,5 +3511,6 @@
   "integrations.saveDatadogConfig": "Datadog-Konfig speichern",
   "integrations.deleteDatadogConnection": "Datadog-Verbindung löschen",
   "integrations.saveTelegram": "Telegram speichern",
-  "admin.tab.seo": "SEO"
+  "admin.tab.seo": "SEO",
+  "footer.solutions": "Lösungen"
 }

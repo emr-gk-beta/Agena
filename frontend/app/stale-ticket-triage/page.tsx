@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import RelatedLandings from '@/components/RelatedLandings';
 import Script from 'next/script';
 import { cookies } from 'next/headers';
 import { landingCopy, pickLang, LANGS } from '@/lib/landingI18n';
@@ -100,6 +101,8 @@ export default function StaleTicketTriagePage({ searchParams }: { searchParams: 
           ))}
         </div>
       </section>
+      <RelatedLandings current='/stale-ticket-triage' />
+      
       <footer style={{ textAlign: 'center', padding: '40px 0', borderTop: '1px solid var(--panel-border)' }}>
         <h2 style={{ fontSize: 22, fontWeight: 800, marginBottom: 12 }}>{c.footerH2}</h2>
         <Link href='/signup' style={{ padding: '12px 28px', borderRadius: 10, background: 'linear-gradient(135deg, #10b981, #06b6d4)', color: '#fff', fontSize: 14, fontWeight: 700, textDecoration: 'none', display: 'inline-block' }}>{c.footerCta}</Link>
