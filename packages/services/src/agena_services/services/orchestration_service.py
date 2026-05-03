@@ -231,21 +231,31 @@ class OrchestrationService:
                 limit=3,
             )
             if _skill_hits:
-                _skill_block = SkillService.format_for_prompt(_skill_hits, is_turkish=True)
+                # Only strong + related tiers earn a slot in the prompt.
+                # Weak hits (score 0.55-0.72) are within the multilingual
+                # embedding's noise floor — short Turkish descriptions
+                # routinely match unrelated PHP/JS skills there because
+                # the band is so narrow. We keep them in the log so the
+                # user can see what got considered, but we don't sully
+                # the agent's context with them.
+                _injectable = [h for h in _skill_hits if h.tier in ('strong', 'related')]
                 _skills_summary = ', '.join(f'#{h.id} {h.name[:60]}({h.tier})' for h in _skill_hits)
                 await task_service.add_log(task.id, organization_id, 'agent',
-                    f'Retrieved {len(_skill_hits)} relevant skill(s) from catalog: {_skills_summary}'
+                    f'Retrieved {len(_skill_hits)} relevant skill(s) from catalog: {_skills_summary} '
+                    f'(injected: {len(_injectable)})'
                 )
                 logger.info(
-                    'Retrieved %d relevant skill(s) for task %s: %s',
-                    len(_skill_hits), task.id, _skills_summary,
+                    'Retrieved %d relevant skill(s) for task %s: %s (injected=%d)',
+                    len(_skill_hits), task.id, _skills_summary, len(_injectable),
                 )
-                effective_description = (
-                    '--- RELEVANT TEAM SKILLS (from prior completed tasks) ---\n'
-                    f'{_skill_block}\n'
-                    '--- END SKILLS ---\n\n'
-                    f'{effective_description or ""}'
-                )
+                if _injectable:
+                    _skill_block = SkillService.format_for_prompt(_injectable, is_turkish=True)
+                    effective_description = (
+                        '--- RELEVANT TEAM SKILLS (from prior completed tasks) ---\n'
+                        f'{_skill_block}\n'
+                        '--- END SKILLS ---\n\n'
+                        f'{effective_description or ""}'
+                    )
         except Exception as _se:
             logger.info('Skill retrieval skipped for task %s: %s', task.id, _se)
 
