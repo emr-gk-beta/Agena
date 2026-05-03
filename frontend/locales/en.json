@@ -3290,9 +3290,6 @@
   "reviews.clearFilters": "Clear filters",
   "reviews.noFilterMatch": "No reviews match the filter",
   "reviews.noFilterHint": "Clear filters or pick a different combo.",
-  "reviews.rerun": "Re-run",
-  "reviews.inputSnapshot": "Input snapshot",
-  "reviews.output": "Reviewer output",
   "agents.toggleReviewer": "Use as code reviewer",
   "agents.toggleReviewerDesc": "When on, this agent shows up in the 🔎 Review dropdowns on tasks and on the Reviews tab. Reviews never modify code or open PRs.",
   "reviews.pickReviewer": "Pick reviewer",
@@ -3560,5 +3557,9 @@
   "footer.solutions": "Solutions",
   "skills.tab.team": "Team Skills",
   "skills.tab.public": "Public Library",
-  "skills.public.delete": "Delete"
+  "skills.public.delete": "Delete",
+  "reviews.failed": "Review failed",
+  "reviews.delete": "Delete",
+  "reviews.deleteConfirm": "Delete this review?",
+  "reviews.deleteDesc": "This permanently removes the review and its findings. The task itself is not affected."
 }

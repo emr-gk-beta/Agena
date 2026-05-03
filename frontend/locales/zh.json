@@ -3256,7 +3256,7 @@
   "reviews.duration": "持续时间",
   "reviews.requestedAt": "请求时间",
   "reviews.rerun": "重新运行",
-  "reviews.output": "审查输出",
+  "reviews.output": "审查员输出",
   "reviews.inputSnapshot": "输入快照",
   "reviews.backToList": "所有审查",
   "reviews.openTask": "打开任务",
@@ -3290,9 +3290,6 @@
   "reviews.clearFilters": "清除筛选",
   "reviews.noFilterMatch": "没有匹配的审查",
   "reviews.noFilterHint": "清除筛选或换一个组合。",
-  "reviews.rerun": "重新运行",
-  "reviews.inputSnapshot": "输入快照",
-  "reviews.output": "审查员输出",
   "agents.toggleReviewer": "作为代码审查员",
   "agents.toggleReviewerDesc": "开启后,此 agent 出现在任务的 🔎 Review 下拉框和 Reviews 标签页中。审查不会修改代码或打开 PR。",
   "reviews.pickReviewer": "选择审查员",
@@ -3560,5 +3557,9 @@
   "footer.solutions": "解决方案",
   "skills.tab.team": "团队技能",
   "skills.tab.public": "公共库",
-  "skills.public.delete": "删除"
+  "skills.public.delete": "删除",
+  "reviews.failed": "审查失败",
+  "reviews.delete": "删除",
+  "reviews.deleteConfirm": "删除这次审查？",
+  "reviews.deleteDesc": "将永久删除审查及其发现。任务本身不受影响。"
 }

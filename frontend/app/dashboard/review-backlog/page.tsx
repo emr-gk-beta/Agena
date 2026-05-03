@@ -106,6 +106,20 @@ export default function ReviewBacklogPage() {
   async function loadSettings() {
     try {
       const s = await apiFetch<Settings>('/workflow-settings');
+      // If the org never explicitly chose a nudge comment language and
+      // the user has set a profile-wide agent_output_language, prefill
+      // the dropdown with that locale so they don't have to pick the
+      // same thing twice. This is just a UI default — the user still
+      // hits Save to commit it.
+      try {
+        const { loadPrefs } = await import('@/lib/api');
+        const prefs = await loadPrefs();
+        const ps = (prefs.profile_settings || {}) as Record<string, unknown>;
+        const profileLang = String(ps.agent_output_language || '').trim().toLowerCase();
+        if ((!s.nudge_comment_language || s.nudge_comment_language === 'en') && profileLang && profileLang !== 'auto') {
+          s.nudge_comment_language = profileLang;
+        }
+      } catch { /* non-fatal */ }
       setSettings(s);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));

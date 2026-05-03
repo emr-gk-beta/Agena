@@ -3255,7 +3255,7 @@
   "reviews.model": "Modelo",
   "reviews.duration": "Duración",
   "reviews.requestedAt": "Solicitada",
-  "reviews.rerun": "Re-ejecutar",
+  "reviews.rerun": "Ejecutar de nuevo",
   "reviews.output": "Salida del revisor",
   "reviews.inputSnapshot": "Snapshot de entrada",
   "reviews.backToList": "Todas las revisiones",
@@ -3290,9 +3290,6 @@
   "reviews.clearFilters": "Limpiar filtros",
   "reviews.noFilterMatch": "Ninguna revisión coincide con el filtro",
   "reviews.noFilterHint": "Limpia filtros o cambia la combinación.",
-  "reviews.rerun": "Ejecutar de nuevo",
-  "reviews.inputSnapshot": "Snapshot de entrada",
-  "reviews.output": "Salida del revisor",
   "agents.toggleReviewer": "Usar como revisor de código",
   "agents.toggleReviewerDesc": "Cuando está activo, este agente aparece en los desplegables 🔎 Review de las tareas y en la pestaña Reviews. Las revisiones nunca modifican código ni abren PRs.",
   "reviews.pickReviewer": "Elegir revisor",
@@ -3560,5 +3557,9 @@
   "footer.solutions": "Soluciones",
   "skills.tab.team": "Skills de Equipo",
   "skills.tab.public": "Biblioteca Pública",
-  "skills.public.delete": "Eliminar"
+  "skills.public.delete": "Eliminar",
+  "reviews.failed": "Revisión fallida",
+  "reviews.delete": "Borrar",
+  "reviews.deleteConfirm": "¿Borrar esta revisión?",
+  "reviews.deleteDesc": "Elimina permanentemente la revisión y sus hallazgos. La tarea en sí no se ve afectada."
 }

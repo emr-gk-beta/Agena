@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { apiFetch } from '@/lib/api';
 import { useLocale } from '@/lib/i18n';
@@ -61,11 +61,27 @@ function fmtDuration(start: string, end: string | null): string {
 
 export default function ReviewDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const { t } = useLocale();
   const reviewId = Number(params?.id);
   const [review, setReview] = useState<Review | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  async function handleDelete() {
+    if (!review) return;
+    setDeleting(true);
+    try {
+      await apiFetch(`/reviews/${review.id}`, { method: 'DELETE' });
+      router.push('/dashboard/reviews');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed');
+      setDeleting(false);
+      setConfirmingDelete(false);
+    }
+  }
 
   useEffect(() => {
     if (!Number.isFinite(reviewId)) {
@@ -169,6 +185,22 @@ export default function ReviewDetailPage() {
               </div>
               <div style={{ fontSize: 11, color: 'var(--ink-50)', fontFamily: 'monospace' }}>
                 #{review.id} · {review.reviewer_agent_role}
+              </div>
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                <button
+                  type='button'
+                  onClick={() => setConfirmingDelete(true)}
+                  disabled={deleting}
+                  style={{
+                    padding: '7px 14px', borderRadius: 10, fontSize: 12, fontWeight: 700,
+                    border: '1px solid rgba(239,68,68,0.4)',
+                    background: 'rgba(239,68,68,0.08)',
+                    color: '#f87171',
+                    cursor: deleting ? 'wait' : 'pointer',
+                  }}
+                >
+                  🗑 {t('reviews.delete' as TranslationKey) || 'Delete'}
+                </button>
               </div>
             </div>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--ink-90)', margin: 0, lineHeight: 1.3 }}>
@@ -281,6 +313,32 @@ export default function ReviewDetailPage() {
             </details>
           )}
         </>
+      )}
+
+      {confirmingDelete && (
+        <div onClick={() => !deleting && setConfirmingDelete(false)}
+          style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: 'min(420px, calc(100vw - 24px))', borderRadius: 18, background: 'var(--surface)', border: '1px solid rgba(239,68,68,0.3)', padding: 24, display: 'grid', gap: 14, boxShadow: '0 24px 80px rgba(0,0,0,0.45)' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, margin: '0 auto' }}>🗑</div>
+            <div style={{ textAlign: 'center', fontSize: 17, fontWeight: 800, color: 'var(--ink-90)' }}>
+              {t('reviews.deleteConfirm' as TranslationKey) || 'Delete this review?'}
+            </div>
+            <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-50)', lineHeight: 1.5 }}>
+              {t('reviews.deleteDesc' as TranslationKey) || 'This permanently removes the review and its findings. The task itself is not affected.'}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>
+              <button onClick={() => setConfirmingDelete(false)} disabled={deleting}
+                style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid var(--panel-border-2)', background: 'transparent', color: 'var(--ink-50)', fontWeight: 600, fontSize: 13, cursor: deleting ? 'wait' : 'pointer' }}>
+                {t('tasks.cancel' as TranslationKey) || 'Cancel'}
+              </button>
+              <button onClick={() => void handleDelete()} disabled={deleting}
+                style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 13, cursor: deleting ? 'wait' : 'pointer' }}>
+                {deleting ? '⏳' : '🗑'} {t('reviews.delete' as TranslationKey) || 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

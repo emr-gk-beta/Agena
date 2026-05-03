@@ -126,6 +126,28 @@ async def trigger_new_review(
     return _to_response(review, task.title if task else None)
 
 
+@router.delete('/{review_id}')
+async def delete_review(
+    review_id: int,
+    tenant: CurrentTenant = Depends(get_current_tenant),
+    db: AsyncSession = Depends(get_db_session),
+) -> dict[str, bool]:
+    """Hard-delete a review row. Scoped to the caller's org so users
+    can't nuke another tenant's audit trail. Used by the reviews list
+    and detail pages so a user can prune false-positive runs."""
+    row = (await db.execute(
+        select(TaskReview).where(
+            TaskReview.id == review_id,
+            TaskReview.organization_id == tenant.organization_id,
+        )
+    )).scalar_one_or_none()
+    if row is None:
+        raise HTTPException(status_code=404, detail='Review not found')
+    await db.delete(row)
+    await db.commit()
+    return {'ok': True}
+
+
 @router.get('/by-task/{task_id}', response_model=list[TaskReviewResponse])
 async def list_reviews_for_task(
     task_id: int,

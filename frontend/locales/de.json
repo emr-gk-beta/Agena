@@ -3255,9 +3255,9 @@
   "reviews.model": "Modell",
   "reviews.duration": "Dauer",
   "reviews.requestedAt": "Angefordert",
-  "reviews.rerun": "Erneut ausführen",
-  "reviews.output": "Reviewer-Ausgabe",
-  "reviews.inputSnapshot": "Eingabe-Snapshot",
+  "reviews.rerun": "Neu ausführen",
+  "reviews.output": "Reviewer-Output",
+  "reviews.inputSnapshot": "Input-Snapshot",
   "reviews.backToList": "Alle Reviews",
   "reviews.openTask": "Aufgabe öffnen",
   "reviews.loading": "Wird geladen…",
@@ -3290,9 +3290,6 @@
   "reviews.clearFilters": "Filter löschen",
   "reviews.noFilterMatch": "Kein Review passt zum Filter",
   "reviews.noFilterHint": "Filter löschen oder andere Kombi wählen.",
-  "reviews.rerun": "Neu ausführen",
-  "reviews.inputSnapshot": "Input-Snapshot",
-  "reviews.output": "Reviewer-Output",
   "agents.toggleReviewer": "Als Code-Reviewer einsetzen",
   "agents.toggleReviewerDesc": "Wenn aktiv, taucht dieser Agent in den 🔎 Review-Dropdowns auf Tasks und im Reviews-Tab auf. Reviews ändern niemals Code und öffnen keine PRs.",
   "reviews.pickReviewer": "Reviewer wählen",
@@ -3560,5 +3557,9 @@
   "footer.solutions": "Lösungen",
   "skills.tab.team": "Team-Skills",
   "skills.tab.public": "Öffentliche Bibliothek",
-  "skills.public.delete": "Löschen"
+  "skills.public.delete": "Löschen",
+  "reviews.failed": "Review fehlgeschlagen",
+  "reviews.delete": "Löschen",
+  "reviews.deleteConfirm": "Diese Review löschen?",
+  "reviews.deleteDesc": "Die Review und ihre Befunde werden dauerhaft entfernt. Die Aufgabe selbst bleibt unberührt."
 }

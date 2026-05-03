@@ -2130,12 +2130,15 @@ export default function DashboardTasksPage() {
                 }}>
                 <div style={{
                   width: 56, height: 56, borderRadius: 16,
-                  background: `${c}18`, border: `1px solid ${c}55`,
+                  background: r.status === 'failed' ? 'rgba(239,68,68,0.12)' : `${c}18`,
+                  border: r.status === 'failed' ? '1px solid rgba(239,68,68,0.45)' : `1px solid ${c}55`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   fontSize: 26, margin: '0 auto',
-                }}>{r.severity === 'clean' ? '✅' : '🔎'}</div>
-                <div style={{ textAlign: 'center', fontSize: 18, fontWeight: 800, color: 'var(--ink-90)' }}>
-                  {t('reviews.completed' as TranslationKey) || 'Review completed'}
+                }}>{r.status === 'failed' ? '⚠' : (r.severity === 'clean' ? '✅' : '🔎')}</div>
+                <div style={{ textAlign: 'center', fontSize: 18, fontWeight: 800, color: r.status === 'failed' ? '#f87171' : 'var(--ink-90)' }}>
+                  {r.status === 'failed'
+                    ? (t('reviews.failed' as TranslationKey) || 'Review failed')
+                    : (t('reviews.completed' as TranslationKey) || 'Review completed')}
                 </div>
                 <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-50)', wordBreak: 'break-word' }}>
                   {r.task_title}

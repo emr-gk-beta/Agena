@@ -3255,9 +3255,9 @@
   "reviews.model": "Model",
   "reviews.duration": "Süre",
   "reviews.requestedAt": "Talep edildi",
-  "reviews.rerun": "Yeniden çalıştır",
-  "reviews.output": "Reviewer çıktısı",
-  "reviews.inputSnapshot": "Girdi snapshot'ı",
+  "reviews.rerun": "Tekrar çalıştır",
+  "reviews.output": "Reviewer output",
+  "reviews.inputSnapshot": "Input snapshot",
   "reviews.backToList": "Tüm incelemeler",
   "reviews.openTask": "Görevi aç",
   "reviews.loading": "Yükleniyor…",
@@ -3290,9 +3290,6 @@
   "reviews.clearFilters": "Filtreleri temizle",
   "reviews.noFilterMatch": "Filtreye uyan inceleme yok",
   "reviews.noFilterHint": "Filtreleri temizle veya farklı kombo dene.",
-  "reviews.rerun": "Tekrar çalıştır",
-  "reviews.inputSnapshot": "Input snapshot",
-  "reviews.output": "Reviewer output",
   "agents.toggleReviewer": "Kod reviewer olarak kullan",
   "agents.toggleReviewerDesc": "Açıkken bu agent task'larda ve Reviews sekmesindeki 🔎 Review dropdown'unda görünür. Review hiçbir zaman kodu değiştirmez ya da PR açmaz.",
   "reviews.pickReviewer": "Reviewer seç",
@@ -3560,5 +3557,9 @@
   "footer.solutions": "Çözümler",
   "skills.tab.team": "Takım Skill'leri",
   "skills.tab.public": "Genel Kütüphane",
-  "skills.public.delete": "Sil"
+  "skills.public.delete": "Sil",
+  "reviews.failed": "İnceleme başarısız oldu",
+  "reviews.delete": "Sil",
+  "reviews.deleteConfirm": "Bu incelemeyi sil?",
+  "reviews.deleteDesc": "İnceleme ve bulgular kalıcı olarak silinir. Görevin kendisi etkilenmez."
 }

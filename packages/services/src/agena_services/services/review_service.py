@@ -503,6 +503,7 @@ async def _resolve_agent_output_language(db: AsyncSession, user_id: int) -> str:
     """Read profile_settings.agent_output_language for the user. Returns
     a 2-letter code (tr/en/de/es/it/ja/zh) or 'auto' when unset / unknown.
     """
+    from sqlalchemy import select
     row = (await db.execute(select(UserPreference).where(UserPreference.user_id == user_id))).scalar_one_or_none()
     if not row or not row.profile_settings_json:
         return 'auto'

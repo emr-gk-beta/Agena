@@ -3256,7 +3256,7 @@
   "reviews.duration": "Durata",
   "reviews.requestedAt": "Richiesto",
   "reviews.rerun": "Riesegui",
-  "reviews.output": "Output del reviewer",
+  "reviews.output": "Output reviewer",
   "reviews.inputSnapshot": "Snapshot input",
   "reviews.backToList": "Tutti i review",
   "reviews.openTask": "Apri task",
@@ -3290,9 +3290,6 @@
   "reviews.clearFilters": "Pulisci filtri",
   "reviews.noFilterMatch": "Nessuna review corrisponde",
   "reviews.noFilterHint": "Pulisci filtri o cambia combo.",
-  "reviews.rerun": "Riesegui",
-  "reviews.inputSnapshot": "Snapshot input",
-  "reviews.output": "Output reviewer",
   "agents.toggleReviewer": "Usa come reviewer di codice",
   "agents.toggleReviewerDesc": "Quando attivo, questo agent appare nei dropdown 🔎 Review nei task e nella tab Reviews. Le review non modificano mai il codice né aprono PR.",
   "reviews.pickReviewer": "Scegli reviewer",
@@ -3560,5 +3557,9 @@
   "footer.solutions": "Soluzioni",
   "skills.tab.team": "Skill del team",
   "skills.tab.public": "Libreria Pubblica",
-  "skills.public.delete": "Elimina"
+  "skills.public.delete": "Elimina",
+  "reviews.failed": "Review fallita",
+  "reviews.delete": "Elimina",
+  "reviews.deleteConfirm": "Eliminare questo review?",
+  "reviews.deleteDesc": "Rimuove permanentemente il review e i suoi riscontri. Il task non viene toccato."
 }

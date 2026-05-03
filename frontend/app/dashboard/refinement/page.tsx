@@ -826,6 +826,21 @@ export default function RefinementPage() {
         setAgentProvider(validProviders.includes(preferredProvider) ? preferredProvider as AgentProvider : 'openai');
         setAgentModel(preferredModel || 'gpt-5.1-codex-mini');
 
+        // Default the refinement modal's language picker from the
+        // user's profile-wide agent_output_language so we don't make
+        // them re-pick it for every run. The picker still works as an
+        // override when they want a one-off translation. Backend takes
+        // English language NAMES (Turkish/English/…) so we map from the
+        // ISO codes saved in profile_settings.
+        const ISO_TO_NAME: Record<string, string> = {
+          tr: 'Turkish', en: 'English', de: 'German', es: 'Spanish',
+          zh: 'Chinese', it: 'Italian', ja: 'Japanese',
+        };
+        const prefLang = String(settings.agent_output_language || '').trim().toLowerCase();
+        if (prefLang && prefLang !== 'auto' && ISO_TO_NAME[prefLang]) {
+          setLanguage(ISO_TO_NAME[prefLang]);
+        }
+
         const prefAzureProject = prefs?.azure_project || '';
         const prefAzureTeam = prefs?.azure_team || '';
         const prefAzureSprint = prefs?.azure_sprint_path || '';

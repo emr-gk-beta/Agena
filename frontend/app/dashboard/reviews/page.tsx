@@ -172,6 +172,22 @@ export default function ReviewsPage() {
     finally { setRunning(null); }
   }
 
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+  // Inline confirm modal — replaces window.confirm() so the experience
+  // matches the rest of the app instead of the browser's grey alert.
+  const [confirmDelete, setConfirmDelete] = useState<Review | null>(null);
+  async function confirmAndDelete() {
+    if (!confirmDelete) return;
+    const reviewId = confirmDelete.id;
+    setDeletingId(reviewId);
+    try {
+      await apiFetch(`/reviews/${reviewId}`, { method: 'DELETE' });
+      setReviews((rs) => rs.filter((r) => r.id !== reviewId));
+      setConfirmDelete(null);
+    } catch { /* keep the modal open so the user can retry */ }
+    finally { setDeletingId(null); }
+  }
+
   function clearFilters() {
     setFilterRole('');
     setFilterSeverity('');
@@ -241,6 +257,13 @@ export default function ReviewsPage() {
             <Link href={`/tasks/${r.task_id}`} onClick={(e) => e.stopPropagation()} style={{ fontSize: 11, fontWeight: 700, color: '#60a5fa', textDecoration: 'none', padding: '6px 10px', borderRadius: 6, border: '1px solid rgba(96,165,250,0.3)', background: 'rgba(96,165,250,0.08)', whiteSpace: 'nowrap' }}>
               Task →
             </Link>
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(r); }}
+              disabled={deletingId === r.id}
+              title={t('reviews.delete') || 'Delete'}
+              style={{ width: 30, height: 30, borderRadius: 6, border: '1px solid rgba(239,68,68,0.3)', background: 'transparent', color: '#f87171', cursor: deletingId === r.id ? 'wait' : 'pointer', fontSize: 13, opacity: deletingId === r.id ? 0.5 : 1 }}>
+              🗑
+            </button>
             <span style={{ fontSize: 14, color: 'var(--ink-35)', minWidth: 14 }}>{isOpen ? '▾' : '▸'}</span>
           </div>
         </div>
@@ -447,6 +470,35 @@ export default function ReviewsPage() {
           </div>
         )}
       </div>
+
+      {confirmDelete && (
+        <div onClick={() => deletingId !== confirmDelete.id && setConfirmDelete(null)}
+          style={{ position: 'fixed', inset: 0, zIndex: 10000, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', display: 'grid', placeItems: 'center', padding: 16 }}>
+          <div onClick={(e) => e.stopPropagation()}
+            style={{ width: 'min(420px, calc(100vw - 24px))', borderRadius: 18, background: 'var(--surface)', border: '1px solid rgba(239,68,68,0.3)', padding: 24, display: 'grid', gap: 14, boxShadow: '0 24px 80px rgba(0,0,0,0.45)' }}>
+            <div style={{ width: 56, height: 56, borderRadius: 16, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26, margin: '0 auto' }}>🗑</div>
+            <div style={{ textAlign: 'center', fontSize: 17, fontWeight: 800, color: 'var(--ink-90)' }}>
+              {t('reviews.deleteConfirm') || 'Delete this review?'}
+            </div>
+            <div style={{ textAlign: 'center', fontSize: 12, color: 'var(--ink-50)', wordBreak: 'break-word' }}>
+              {confirmDelete.task_title || `Task #${confirmDelete.task_id}`} · #{confirmDelete.id}
+            </div>
+            <div style={{ textAlign: 'center', fontSize: 13, color: 'var(--ink-50)', lineHeight: 1.5 }}>
+              {t('reviews.deleteDesc') || 'This permanently removes the review and its findings. The task itself is not affected.'}
+            </div>
+            <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 4 }}>
+              <button onClick={() => setConfirmDelete(null)} disabled={deletingId === confirmDelete.id}
+                style={{ padding: '10px 18px', borderRadius: 10, border: '1px solid var(--panel-border-2)', background: 'transparent', color: 'var(--ink-50)', fontWeight: 600, fontSize: 13, cursor: deletingId === confirmDelete.id ? 'wait' : 'pointer' }}>
+                {t('tasks.cancel') || 'Cancel'}
+              </button>
+              <button onClick={() => void confirmAndDelete()} disabled={deletingId === confirmDelete.id}
+                style={{ padding: '10px 18px', borderRadius: 10, border: 'none', background: '#ef4444', color: '#fff', fontWeight: 700, fontSize: 13, cursor: deletingId === confirmDelete.id ? 'wait' : 'pointer' }}>
+                {deletingId === confirmDelete.id ? '⏳' : '🗑'} {t('reviews.delete') || 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

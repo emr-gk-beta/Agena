@@ -3290,9 +3290,6 @@
   "reviews.clearFilters": "フィルタをクリア",
   "reviews.noFilterMatch": "一致するレビューはありません",
   "reviews.noFilterHint": "フィルタをクリアするか別の組み合わせを試してください。",
-  "reviews.rerun": "再実行",
-  "reviews.inputSnapshot": "入力スナップショット",
-  "reviews.output": "レビュアー出力",
   "agents.toggleReviewer": "コードレビュアーとして使う",
   "agents.toggleReviewerDesc": "オンの場合、このエージェントはタスクの 🔎 Review ドロップダウンと Reviews タブに表示されます。レビューはコードを変更せず PR も作成しません。",
   "reviews.pickReviewer": "レビュアーを選択",
@@ -3560,5 +3557,9 @@
   "footer.solutions": "ソリューション",
   "skills.tab.team": "チームスキル",
   "skills.tab.public": "パブリックライブラリ",
-  "skills.public.delete": "削除"
+  "skills.public.delete": "削除",
+  "reviews.failed": "レビュー失敗",
+  "reviews.delete": "削除",
+  "reviews.deleteConfirm": "このレビューを削除しますか？",
+  "reviews.deleteDesc": "レビューと検出事項を完全に削除します。タスク自体は影響を受けません。"
 }
