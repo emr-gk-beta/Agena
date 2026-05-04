@@ -367,9 +367,17 @@ async def list_member_workitems(
         if not refs:
             return []
         ids = ','.join(str(i['id']) for i in refs[:100])
+        # Pull description + AC + repro along with the title so the
+        # /dashboard/team import flow gets the same context the sprints
+        # page does (embedded screenshots survive because the HTML
+        # description carries the `<img>` tags pointing at Azure
+        # attachments).
         details_url = (
             f"{config.base_url.rstrip('/')}/_apis/wit/workitems"
-            f'?ids={ids}&fields=System.Id,System.Title,System.State,System.AssignedTo&api-version=7.1-preview.3'
+            f'?ids={ids}&fields='
+            'System.Id,System.Title,System.State,System.AssignedTo,System.Description,'
+            'Microsoft.VSTS.Common.AcceptanceCriteria,Microsoft.VSTS.TCM.ReproSteps'
+            '&api-version=7.1-preview.3'
         )
         dr = await client.get(details_url, headers=_azure_headers(config.secret))
         dr.raise_for_status()
@@ -380,6 +388,9 @@ async def list_member_workitems(
             'id': str(f.get('System.Id', '')),
             'title': f.get('System.Title', ''),
             'state': f.get('System.State', ''),
+            'description': f.get('System.Description', '') or '',
+            'acceptance_criteria': f.get('Microsoft.VSTS.Common.AcceptanceCriteria', '') or '',
+            'repro_steps': f.get('Microsoft.VSTS.TCM.ReproSteps', '') or '',
         })
     return result
 
@@ -885,7 +896,12 @@ async def list_jira_member_workitems(
         while True:
             params = {
                 'sprint': sprint_id,
-                'fields': 'summary,status,assignee',
+                # Pull rendered HTML description so embedded inline
+                # images (Jira media nodes → <img> tags) make it back
+                # to the team-page importer; without `expand=renderedFields`
+                # we'd only get ADF JSON which strips screenshot URLs.
+                'fields': 'summary,status,assignee,description',
+                'expand': 'renderedFields',
                 'maxResults': max_results,
                 'startAt': start_at,
             }
@@ -915,11 +931,27 @@ async def list_jira_member_workitems(
                 if normalized_target not in {account_id, email, display}:
                     continue
                 status = fields.get('status') if isinstance(fields.get('status'), dict) else {}
+                rendered = issue.get('renderedFields') or {}
+                # Prefer rendered HTML (image <img> tags resolved); fall
+                # back to raw description (could be ADF dict on newer
+                # Jira). dict description means ADF — we serialize it
+                # with json so the model at least sees the structure.
+                desc_raw = rendered.get('description') if isinstance(rendered, dict) else ''
+                if not desc_raw:
+                    raw_desc = fields.get('description')
+                    if isinstance(raw_desc, str):
+                        desc_raw = raw_desc
+                    elif raw_desc:
+                        import json as _j
+                        desc_raw = _j.dumps(raw_desc)
+                    else:
+                        desc_raw = ''
                 results.append(
                     {
                         'id': str(issue.get('key') or issue.get('id') or ''),
                         'title': str(fields.get('summary') or ''),
                         'state': str((status or {}).get('name') or ''),
+                        'description': desc_raw or '',
                     }
                 )
 

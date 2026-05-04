@@ -89,6 +89,8 @@ class ClaudeCLIService:
             '5. After all edits are done, output a short summary listing every file you changed.\n\n'
             'RULES:\n'
             '- Actually edit the files using tools — do NOT just output code blocks.\n'
+            '- CRITICAL — PRESERVE EXISTING CONTENT: For any file that already exists, ALWAYS Read it first, then use Edit (or MultiEdit) to make targeted changes. NEVER use Write to overwrite an existing file unless the task explicitly asks you to delete and recreate it. Migration files, list-style files (Upgrade.php, schema dump, route registries, enum lists, changelogs) are APPEND-ONLY by default — add your new entry to the end, do not touch existing entries.\n'
+            '- If you find yourself about to call Write on an existing file, STOP and switch to Edit. Write replaces the entire file content; Edit keeps everything around your patch intact.\n'
             '- Implement EVERY part the task asks for: schema, controllers, views, state machines, menu entries, validations, notifications — whatever the task and Acceptance Criteria require.\n'
             '- Do not invent extra unrelated work. The bar is "complete the task as specified", not "as little as possible" and not "rewrite the codebase".\n'
             '- STAY OUT OF vendor/, node_modules/, dist/, build/, .venv/, framework internals. Reading framework source is almost never necessary — if the task description or a similar existing module already shows the pattern, USE that pattern instead of grepping for how the framework resolves it under the hood. Budget at most 1–2 vendor reads in the entire run, and only when an existing repo example does not answer the question.\n'

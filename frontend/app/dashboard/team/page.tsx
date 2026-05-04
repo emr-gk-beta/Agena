@@ -1,10 +1,18 @@
 'use client';
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { apiFetch, loadPrefs, savePrefs, type AzureMember } from '@/lib/api';
-import { useLocale } from '@/lib/i18n';
+import { createPortal } from 'react-dom';
+import { apiFetch, loadPrefs, savePrefs, type AzureMember, type RepoMapping } from '@/lib/api';
+import { useLocale, type TranslationKey } from '@/lib/i18n';
 import { useRole, canAccess } from '@/lib/rbac';
-type WorkItem = { id: string; title: string; state: string };
+type WorkItem = {
+  id: string;
+  title: string;
+  state: string;
+  description?: string;
+  acceptance_criteria?: string;
+  repro_steps?: string;
+};
 
 const STATE_COLORS: Record<string, string> = {
   'Backlog': '#6b7280', 'To Do': '#f59e0b', 'In Progress': '#38bdf8',
@@ -77,6 +85,16 @@ export default function TeamPage() {
   const [importingId, setImportingId] = useState<string | null>(null);
   const [toast, setToast] = useState<{ msg: string; kind: 'ok' | 'err' } | null>(null);
 
+  // Repo picker modal — same flow as /dashboard/sprints so an import
+  // from this page wires up the same repo mapping context (azure repo
+  // url, playbook, github fullname) the AI agents need to actually
+  // edit code. Without this the imported task is a "no-repo" orphan
+  // and the photo-bearing description gets dropped on the floor.
+  const [repoMappings, setRepoMappings] = useState<RepoMapping[]>([]);
+  const [importPickerItem, setImportPickerItem] = useState<WorkItem | null>(null);
+  const [importPickerRepoId, setImportPickerRepoId] = useState<string>('');
+  const [importAiFill, setImportAiFill] = useState<boolean>(false);
+
   useEffect(() => {
     const init = async () => {
       try {
@@ -132,6 +150,51 @@ export default function TeamPage() {
           setTeam(azureTeam);
           setSprintPath(azureSprint);
           setMyTeam(bySource.azure || []);
+        }
+
+        // Repo mappings — same lookup pattern as /dashboard/sprints.
+        // Prefer the canonical /repo-mappings table; fall back to the
+        // user-pref blob for orgs that haven't migrated yet.
+        try {
+          type ServerMapping = {
+            id: number; name?: string; provider: string; owner: string;
+            repo_name: string; base_branch?: string;
+            local_repo_path?: string | null; playbook?: string | null;
+          };
+          const rows = await apiFetch<ServerMapping[]>('/repo-mappings');
+          if (Array.isArray(rows) && rows.length > 0) {
+            const mapped: RepoMapping[] = rows.map((r) => {
+              const prov: 'azure' | 'github' = r.provider === 'github' ? 'github' : 'azure';
+              if (prov === 'github') {
+                return {
+                  id: String(r.id),
+                  name: r.name || `${r.owner}/${r.repo_name}`,
+                  local_path: r.local_repo_path || '',
+                  provider: prov,
+                  github_owner: r.owner,
+                  github_repo: r.repo_name,
+                  github_repo_full_name: `${r.owner}/${r.repo_name}`,
+                  default_branch: r.base_branch || 'main',
+                  repo_playbook: r.playbook || '',
+                };
+              }
+              return {
+                id: String(r.id),
+                name: r.name || r.repo_name,
+                local_path: r.local_repo_path || '',
+                provider: prov,
+                azure_project: r.owner,
+                azure_repo_name: r.repo_name,
+                default_branch: r.base_branch || 'main',
+                repo_playbook: r.playbook || '',
+              };
+            });
+            setRepoMappings(mapped);
+          } else if (prefs.repo_mappings?.length) {
+            setRepoMappings(prefs.repo_mappings);
+          }
+        } catch {
+          if (prefs.repo_mappings?.length) setRepoMappings(prefs.repo_mappings);
         }
       } catch (e: unknown) {
         if (e instanceof Error && e.message.toLowerCase().includes('invalid token')) return;
@@ -309,27 +372,124 @@ export default function TeamPage() {
     return `${azureBaseUrl}/${encodeURIComponent(project)}/_workitems/edit/${encodeURIComponent(item.id)}`;
   }
 
-  async function importSingleItem(item: WorkItem) {
+  function requestImportSingleItem(item: WorkItem) {
     if (importedIds[item.id]) {
       setToast({ msg: t('sprints.alreadyImported'), kind: 'ok' });
       setTimeout(() => setToast(null), 2500);
       return;
     }
+    if (repoMappings.length === 0) {
+      setToast({
+        msg: t('sprints.noRepoMapping' as TranslationKey) || 'Henüz repo eşleşmesi yok — Mappings sayfasından ekle',
+        kind: 'err',
+      });
+      setTimeout(() => setToast(null), 3500);
+      return;
+    }
+    if (!importPickerRepoId && repoMappings[0]) {
+      setImportPickerRepoId(String(repoMappings[0].id));
+    }
+    setImportPickerItem(item);
+  }
+
+  async function importSingleItem(item: WorkItem, mapping: RepoMapping | undefined) {
+    if (importedIds[item.id]) {
+      setToast({ msg: t('sprints.alreadyImported'), kind: 'ok' });
+      setTimeout(() => setToast(null), 2500);
+      return;
+    }
+    if (!mapping?.id) {
+      setToast({
+        msg: t('sprints.noRepoMapping' as TranslationKey) || 'Önce bir repo seç',
+        kind: 'err',
+      });
+      setTimeout(() => setToast(null), 2800);
+      return;
+    }
     setImportingId(item.id);
     try {
+      // Preserve the original HTML description so embedded screenshots
+      // (Azure <img> tags pointing at /_apis/wit/attachments/...) make
+      // it through to the AI agent — the orchestration layer parses
+      // <img> tags out of description on its end.
+      const desc = String(item.description || '').trim();
+
+      // Pull discussion comments — same logic as /dashboard/sprints
+      // so the AI sees clarifications + acceptance-criteria tweaks
+      // posted after the original ticket body. Azure-only for now.
+      let commentsBlock = '';
+      if (provider === 'azure' && project) {
+        try {
+          type AzureComment = { id: number; text: string; created_by: string; created_at: string };
+          const params = new URLSearchParams({ project });
+          const comments = await apiFetch<AzureComment[]>(
+            `/tasks/azure/workitems/${item.id}/comments?${params}`,
+          );
+          if (Array.isArray(comments) && comments.length) {
+            const ordered = [...comments].reverse();
+            const lines = ordered.map((c, i) => {
+              const text = String(c.text || '')
+                .replace(/<\/?[^>]+>/g, '')
+                .replace(/&nbsp;/g, ' ')
+                .replace(/&amp;/g, '&')
+                .replace(/&lt;/g, '<')
+                .replace(/&gt;/g, '>')
+                .replace(/\n{3,}/g, '\n\n')
+                .trim();
+              const who = c.created_by || 'unknown';
+              const when = c.created_at ? c.created_at.slice(0, 19).replace('T', ' ') : '';
+              return `### Comment ${i + 1} — ${who}${when ? ` (${when})` : ''}\n${text}`;
+            }).filter((s) => s.length > 0);
+            if (lines.length) {
+              commentsBlock = `\n\n---\n## Discussion (${lines.length} comment${lines.length === 1 ? '' : 's'})\n${lines.join('\n\n')}`;
+            }
+          }
+        } catch { /* non-fatal */ }
+      }
+
+      const azureRepoUrl =
+        mapping.provider === 'azure' && mapping.azure_project && mapping.azure_repo_name && azureBaseUrl
+          ? `${azureBaseUrl}/${encodeURIComponent(mapping.azure_project)}/_git/${encodeURIComponent(mapping.azure_repo_name)}`
+          : '';
       const ctxParts = [
         `External Source: ${provider === 'jira' ? `Jira #${item.id}` : `Azure #${item.id}`}`,
+        'Prompt Instruction: Read any images in the task description and include their context in your analysis.',
         project ? `Project: ${project}` : '',
         team ? `Team: ${team}` : '',
         sprintPath ? `Sprint: ${sprintPath}` : '',
         workItemUrl(item) ? `External URL: ${workItemUrl(item)}` : '',
+        azureRepoUrl ? `Azure Repo: ${azureRepoUrl}` : '',
+        mapping.name ? `Local Repo Mapping: ${mapping.name}` : '',
+        mapping.local_path ? `Local Repo Path: ${mapping.local_path}` : '',
+        mapping.repo_playbook ? `Repo Playbook: ${mapping.repo_playbook.replace(/\n+/g, ' ').trim()}` : '',
+        mapping.github_repo_full_name ? `GitHub Repo: ${mapping.github_repo_full_name}` : '',
       ].filter(Boolean);
+      const fullTitle = `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`;
+      const fullDescription = `${desc || item.title}${commentsBlock}\n\n---\n${ctxParts.join('\n')}`;
+
+      type AiFill = { story_context: string; acceptance_criteria: string; edge_cases: string };
+      let aiFields: Partial<AiFill> = {};
+      if (importAiFill) {
+        try {
+          aiFields = await apiFetch<AiFill>('/tasks/ai-fill', {
+            method: 'POST',
+            body: JSON.stringify({ title: fullTitle, description: fullDescription }),
+          });
+        } catch { /* non-fatal — task still gets created without AI fields */ }
+      }
+
       type TaskRec = { id: number };
       const created = await apiFetch<TaskRec>('/tasks', {
         method: 'POST',
         body: JSON.stringify({
-          title: `[${provider === 'jira' ? 'Jira' : 'Azure'} #${item.id}] ${item.title}`,
-          description: `${item.title}\n\n---\n${ctxParts.join('\n')}`,
+          title: fullTitle,
+          description: fullDescription,
+          source: provider,
+          external_id: String(item.id),
+          ...(Number(mapping.id) ? { repo_mapping_ids: [Number(mapping.id)] } : {}),
+          ...(aiFields.story_context ? { story_context: aiFields.story_context } : {}),
+          ...(aiFields.acceptance_criteria ? { acceptance_criteria: aiFields.acceptance_criteria } : {}),
+          ...(aiFields.edge_cases ? { edge_cases: aiFields.edge_cases } : {}),
         }),
       });
       setImportedIds((prev) => ({ ...prev, [item.id]: created.id }));
@@ -495,13 +655,23 @@ export default function TeamPage() {
 
       {toast && (
         <div style={{
-          padding: '10px 14px',
-          borderRadius: 10,
-          background: toast.kind === 'ok' ? 'rgba(34,197,94,0.12)' : 'rgba(248,113,113,0.12)',
-          border: '1px solid ' + (toast.kind === 'ok' ? 'rgba(34,197,94,0.3)' : 'rgba(248,113,113,0.3)'),
-          color: toast.kind === 'ok' ? '#22c55e' : '#f87171',
+          position: 'fixed',
+          left: '50%',
+          bottom: 24,
+          transform: 'translateX(-50%)',
+          zIndex: 9999,
+          minWidth: 280,
+          maxWidth: 480,
+          padding: '12px 20px',
+          borderRadius: 12,
+          background: toast.kind === 'ok' ? 'rgba(5,46,22,0.95)' : 'rgba(127,29,29,0.95)',
+          border: '1px solid ' + (toast.kind === 'ok' ? 'rgba(34,197,94,0.5)' : 'rgba(248,113,113,0.5)'),
+          boxShadow: '0 10px 30px rgba(0,0,0,0.4)',
+          backdropFilter: 'blur(8px)',
+          color: '#fff',
           fontSize: 13,
           fontWeight: 600,
+          textAlign: 'center',
         }}>
           {toast.msg}
         </div>
@@ -587,7 +757,7 @@ export default function TeamPage() {
                               )}
                               <span style={{ fontSize: 10, fontWeight: 700, padding: '2px 8px', borderRadius: 999, background: sc(item.state) + '18', border: '1px solid ' + sc(item.state) + '35', color: sc(item.state), whiteSpace: 'nowrap' }}>{item.state}</span>
                               <button
-                                onClick={(e) => { e.stopPropagation(); void importSingleItem(item); }}
+                                onClick={(e) => { e.stopPropagation(); requestImportSingleItem(item); }}
                                 disabled={isImporting || isImported}
                                 title={isImported ? t('sprints.alreadyImported') : t('team.importItem')}
                                 style={{
@@ -740,6 +910,126 @@ export default function TeamPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Import repo picker modal — same UX as /dashboard/sprints so a
+          team-page import gets the same repo/playbook context. Portaled
+          to body so it sits above the page panels. */}
+      {importPickerItem && typeof document !== 'undefined' && createPortal(
+        <div
+          onClick={() => setImportPickerItem(null)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 10000,
+            background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: 16,
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              width: 460, maxWidth: '100%', maxHeight: '90vh',
+              background: 'var(--surface)', color: 'var(--ink-90)',
+              border: '1px solid var(--panel-border-3)', borderRadius: 14,
+              padding: 18, boxShadow: '0 24px 80px rgba(0,0,0,0.45)',
+              display: 'flex', flexDirection: 'column', minHeight: 0,
+            }}
+          >
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1, color: 'var(--ink-35)', marginBottom: 4 }}>
+              {t('sprints.importRepoPicker.label' as TranslationKey)}
+            </div>
+            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink-90)', marginBottom: 2, lineHeight: 1.35 }}>
+              {`[${provider === 'jira' ? 'Jira' : 'Azure'} #${importPickerItem.id}] ${importPickerItem.title}`}
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--ink-55)', marginBottom: 14 }}>
+              {t('sprints.importRepoPicker.hint' as TranslationKey)}
+            </div>
+            <div style={{ display: 'grid', gap: 6, overflowY: 'auto', marginBottom: 14, minHeight: 0, flex: 1 }}>
+              {repoMappings.map((m) => {
+                const selected = String(m.id) === importPickerRepoId;
+                return (
+                  <label
+                    key={m.id}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px',
+                      borderRadius: 8, border: '1px solid ' + (selected ? 'rgba(13,148,136,0.55)' : 'var(--panel-border-2)'),
+                      background: selected ? 'rgba(13,148,136,0.1)' : 'var(--panel-alt)',
+                      cursor: 'pointer', fontSize: 12, color: 'var(--ink-78)',
+                    }}
+                  >
+                    <input
+                      type='radio'
+                      name='import-repo-team'
+                      checked={selected}
+                      onChange={() => setImportPickerRepoId(String(m.id))}
+                      style={{ accentColor: '#0d9488', width: 16, height: 16, flexShrink: 0, padding: 0, margin: 0 }}
+                    />
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0, flex: 1 }}>
+                      <span style={{ fontWeight: 700, color: 'var(--ink-90)' }}>{m.name}</span>
+                      {m.local_path && (
+                        <span style={{ fontSize: 10, color: 'var(--ink-35)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{m.local_path}</span>
+                      )}
+                    </div>
+                  </label>
+                );
+              })}
+            </div>
+            <label style={{
+              display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 12px',
+              borderRadius: 10, border: '1px solid rgba(168,85,247,0.35)',
+              background: 'rgba(168,85,247,0.06)',
+              fontSize: 12, color: 'var(--ink-78)',
+              cursor: 'pointer', marginBottom: 12,
+            }}>
+              <input
+                type='checkbox'
+                checked={importAiFill}
+                onChange={(e) => setImportAiFill(e.target.checked)}
+                style={{ accentColor: '#a855f7', marginTop: 2 }}
+              />
+              <span>
+                <strong style={{ color: '#c084fc' }}>🪄 {t('tasks.aiFill.checkboxTitle' as TranslationKey) || 'AI ile Doldur'}</strong>
+                <span style={{ display: 'block', fontSize: 11, color: 'var(--ink-50)', marginTop: 2 }}>
+                  {t('tasks.aiFill.checkboxDesc' as TranslationKey) || 'Story Context, Acceptance Criteria ve Edge Cases alanları otomatik doldurulur.'}
+                </span>
+              </span>
+            </label>
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type='button'
+                onClick={() => setImportPickerItem(null)}
+                style={{
+                  fontSize: 12, padding: '8px 16px', borderRadius: 10,
+                  border: '1px solid var(--panel-border-2)', background: 'transparent',
+                  color: 'var(--ink-65)', cursor: 'pointer',
+                }}
+              >
+                {t('tasks.cancel')}
+              </button>
+              <button
+                type='button'
+                disabled={!importPickerRepoId}
+                onClick={() => {
+                  const picked = repoMappings.find((m) => String(m.id) === importPickerRepoId);
+                  const target = importPickerItem;
+                  setImportPickerItem(null);
+                  if (target) void importSingleItem(target, picked);
+                }}
+                style={{
+                  fontSize: 12, padding: '8px 18px', borderRadius: 10,
+                  border: '1px solid rgba(13,148,136,0.6)',
+                  background: importPickerRepoId ? 'linear-gradient(135deg, #0d9488, #5eead4)' : 'var(--panel)',
+                  color: importPickerRepoId ? '#0a1815' : 'var(--ink-35)',
+                  cursor: importPickerRepoId ? 'pointer' : 'not-allowed',
+                  fontWeight: 800,
+                }}
+              >
+                {t('sprints.import')}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
@@ -927,6 +1217,7 @@ function OrgMembersPanel({ t }: { t: (key: Parameters<ReturnType<typeof useLocal
           ))}
         </div>
       </div>
+
     </div>
   );
 }
