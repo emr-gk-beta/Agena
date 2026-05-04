@@ -31,3 +31,7 @@ Thumbs.db
 .vscode/settings.json
 .idea/
 .claude/
+
+# Corporate proxy cert — kept locally for docker build, never committed
+docker/InternalProxy.crt
+*.crt
